@@ -39,7 +39,7 @@ export function TopNav({ userName, userImage }: TopNavProps) {
         {/* Logo */}
         <div className="flex items-center">
           <Link href="/home" className="flex items-center gap-2">
-            <div className="relative w-[120px] h-[32px]">
+            <div className="relative w-[307px] h-[82px]">
               <Image src="/peer-capital-logo.svg" alt="Peer Capital" fill className="object-contain" priority />
             </div>
           </Link>

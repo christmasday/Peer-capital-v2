@@ -109,9 +109,9 @@ export function ResponsiveHeader({ userName, userImage }: ResponsiveHeaderProps)
               <Image
                 src="/peer-capital-logo.svg"
                 alt="Peer Capital"
-                width={100}
-                height={100}
-                className="object-contain h-8 w-auto"
+                width={256}
+                height={256}
+                className="object-contain h-[82px] w-auto"
                 priority
               />
             </Link>

@@ -64,9 +64,9 @@ export function DesktopNav({ userName, userImage }: DesktopNavProps) {
             <Image
               src="/peer-capital-logo.svg"
               alt="Peer Capital"
-              width={150}
-              height={150}
-              className="object-contain h-10 w-auto"
+              width={384}
+              height={384}
+              className="object-contain h-[26px] w-auto"
               priority
             />
           </Link>
