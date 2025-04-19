@@ -1,0 +1,201 @@
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
+
+export interface Database {
+  public: {
+    Tables: {
+      profiles: {
+        Row: {
+          id: string
+          first_name: string | null
+          middle_name: string | null
+          last_name: string | null
+          phone_number: string | null
+          bvn: string | null
+          date_of_birth: string | null
+          address: string | null
+          city: string | null
+          state: string | null
+          zip_code: string | null
+          profile_picture_url: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id: string
+          first_name?: string | null
+          middle_name?: string | null
+          last_name?: string | null
+          phone_number?: string | null
+          bvn?: string | null
+          date_of_birth?: string | null
+          address?: string | null
+          city?: string | null
+          state?: string | null
+          zip_code?: string | null
+          profile_picture_url?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          first_name?: string | null
+          middle_name?: string | null
+          last_name?: string | null
+          phone_number?: string | null
+          bvn?: string | null
+          date_of_birth?: string | null
+          address?: string | null
+          city?: string | null
+          state?: string | null
+          zip_code?: string | null
+          profile_picture_url?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      account_balances: {
+        Row: {
+          id: string
+          user_id: string
+          balance: number
+          loan_balance: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          balance?: number
+          loan_balance?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          balance?: number
+          loan_balance?: number
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      loan_helpers: {
+        Row: {
+          id: string
+          user_id: string | null
+          name: string
+          interest_rate: number
+          max_loan_amount: number
+          loans_issued: number
+          amount_issued: number
+          profile_image_url: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          name: string
+          interest_rate: number
+          max_loan_amount: number
+          loans_issued?: number
+          amount_issued?: number
+          profile_image_url?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          name?: string
+          interest_rate?: number
+          max_loan_amount?: number
+          loans_issued?: number
+          amount_issued?: number
+          profile_image_url?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      loan_requests: {
+        Row: {
+          id: string
+          user_id: string
+          helper_id: string
+          amount: number
+          interest_rate: number
+          duration_months: number
+          status: string
+          purpose: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          helper_id: string
+          amount: number
+          interest_rate: number
+          duration_months: number
+          status?: string
+          purpose: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          helper_id?: string
+          amount?: number
+          interest_rate?: number
+          duration_months?: number
+          status?: string
+          purpose?: string
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      transactions: {
+        Row: {
+          id: string
+          user_id: string
+          amount: number
+          type: string
+          description: string
+          reference: string
+          status: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          amount: number
+          type: string
+          description: string
+          reference: string
+          status?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          amount?: number
+          type?: string
+          description?: string
+          reference?: string
+          status?: string
+          created_at?: string
+        }
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+  }
+}
