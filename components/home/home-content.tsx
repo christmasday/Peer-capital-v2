@@ -1,10 +1,9 @@
 "use client"
 
-import { Bell, Eye, Plus, ArrowRightLeft, TrendingUp, Search, Filter } from "lucide-react"
+import { Bell, Eye, Plus, ArrowRightLeft, TrendingUp } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { HelperCard } from "@/components/helpers/helper-card"
 import { Button } from "@/components/ui/button"
-import { useState } from "react"
 
 interface HomeContentProps {
   userProfile: any
@@ -12,8 +11,6 @@ interface HomeContentProps {
 }
 
 export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
-  const [searchQuery, setSearchQuery] = useState("")
-
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-NG", {
       style: "currency",
@@ -123,47 +120,29 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
         <div className="mb-8">
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-5">
             <h2 className="text-xl font-bold text-gray-900 mb-4 md:mb-0">Top Helpers</h2>
-
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
-                <Input
-                  placeholder="Search helpers"
-                  className="pl-9 pr-3 py-2 w-full sm:w-60 rounded-lg border-gray-200 focus:border-blue-500 text-sm"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
-              <Button variant="outline" className="flex items-center gap-2 text-sm py-2 h-auto">
-                <Filter size={14} />
-                <span>Filter</span>
-              </Button>
-            </div>
           </div>
 
           {loanHelpers && loanHelpers.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-              {loanHelpers
-                .filter((helper) => searchQuery === "" || helper.name.toLowerCase().includes(searchQuery.toLowerCase()))
-                .map((helper, index) => (
-                  <HelperCard
-                    key={helper.id}
-                    id={helper.id}
-                    name={helper.name}
-                    interestRate={helper.interest_rate.toString()}
-                    maxLoan={formatCurrency(helper.max_loan_amount)}
-                    loanIssued={helper.loans_issued.toString()}
-                    amountIssued={formatCurrency(helper.amount_issued)}
-                    profileImage={helper.profile_image_url || "/vibrant-street-market.png"}
-                    rating={4.5 - index * 0.2} // Just for visual variety
-                  />
-                ))}
+              {loanHelpers.map((helper, index) => (
+                <HelperCard
+                  key={helper.id}
+                  id={helper.id}
+                  name={helper.name}
+                  interestRate={helper.interest_rate.toString()}
+                  maxLoan={formatCurrency(helper.max_loan_amount)}
+                  loanIssued={helper.loans_issued.toString()}
+                  amountIssued={formatCurrency(helper.amount_issued)}
+                  profileImage={helper.profile_image_url || "/vibrant-street-market.png"}
+                  rating={4.5 - index * 0.2} // Just for visual variety
+                />
+              ))}
             </div>
           ) : (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 text-center">
               <div className="flex flex-col items-center justify-center">
                 <div className="bg-blue-50 p-3 rounded-full mb-3">
-                  <Search className="h-6 w-6 text-blue-500" />
+                  <TrendingUp className="h-6 w-6 text-blue-500" />
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">No loan helpers available</h3>
                 <p className="text-sm text-gray-500 max-w-md mx-auto mb-4">

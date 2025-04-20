@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
 import { SignoutButton } from "@/components/auth/signout-button"
+import { Logo } from "@/components/logo"
 
 interface DesktopNavProps {
   userName?: string
@@ -60,16 +61,7 @@ export function DesktopNav({ userName, userImage }: DesktopNavProps) {
     >
       <div className={cn("p-6 flex justify-between items-center", isCollapsed && "p-4")}>
         {!isCollapsed ? (
-          <Link href="/home" className="flex items-center gap-2">
-            <Image
-              src="/peer-capital-logo.svg"
-              alt="Peer Capital"
-              width={384}
-              height={384}
-              className="object-contain h-[26px] w-auto"
-              priority
-            />
-          </Link>
+          <Logo width={54} height={14} className="flex-shrink-0" />
         ) : (
           <Link href="/home" className="flex items-center justify-center w-full">
             <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold">

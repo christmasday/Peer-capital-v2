@@ -1,5 +1,5 @@
 import { ForgotPasswordForm } from "@/components/forgot-password-form"
-import Image from "next/image"
+import { Logo } from "@/components/logo"
 
 export default function ForgotPasswordPage() {
   return (
@@ -7,14 +7,7 @@ export default function ForgotPasswordPage() {
       <div className="absolute inset-0 z-0 bg-gradient-to-br from-gray-900 via-black to-blue-900" />
       <div className="w-full max-w-md z-10">
         <div className="flex justify-center mb-8">
-          <Image
-            src="/peer-capital-logo-new.png"
-            alt="Peer Capital"
-            width={180}
-            height={60}
-            className="object-contain w-auto"
-            priority
-          />
+          <Logo width={180} height={60} />
         </div>
         <h1 className="text-3xl font-bold text-center mb-6 text-white">Reset Password</h1>
         <ForgotPasswordForm />

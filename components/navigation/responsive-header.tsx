@@ -7,6 +7,7 @@ import { useState } from "react"
 import { usePathname } from "next/navigation"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { SignoutButton } from "@/components/auth/signout-button"
+import { Logo } from "@/components/logo"
 
 interface ResponsiveHeaderProps {
   userName?: string
@@ -37,16 +38,7 @@ export function ResponsiveHeader({ userName, userImage }: ResponsiveHeaderProps)
               </SheetTrigger>
               <SheetContent side="left" className="p-0 w-[280px] sm:w-[350px]">
                 <div className="p-5 border-b flex items-center justify-between">
-                  <Link href="/home" onClick={() => setIsMenuOpen(false)}>
-                    <Image
-                      src="/peer-capital-logo.svg"
-                      alt="Peer Capital"
-                      width={120}
-                      height={120}
-                      className="object-contain h-10 w-auto"
-                      priority
-                    />
-                  </Link>
+                  <Logo width={54} height={14} className="flex-shrink-0" />
                 </div>
 
                 <div className="p-4 border-b">
@@ -105,16 +97,7 @@ export function ResponsiveHeader({ userName, userImage }: ResponsiveHeaderProps)
                 </nav>
               </SheetContent>
             </Sheet>
-            <Link href="/home">
-              <Image
-                src="/peer-capital-logo.svg"
-                alt="Peer Capital"
-                width={256}
-                height={256}
-                className="object-contain h-[82px] w-auto"
-                priority
-              />
-            </Link>
+            <Logo width={60} height={15} className="flex-shrink-0" />
           </div>
           <div className="flex items-center gap-3">
             <button className="p-2 relative">

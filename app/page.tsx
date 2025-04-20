@@ -1,4 +1,5 @@
 import { LoginForm } from "@/components/login-form"
+import { Logo } from "@/components/logo"
 import Image from "next/image"
 
 export default function Home() {
@@ -8,14 +9,7 @@ export default function Home() {
       <div className="flex flex-1 flex-col justify-center px-4 py-12 md:px-8 lg:px-12 xl:px-20">
         <div className="mx-auto w-full max-w-md">
           <div className="mb-8">
-            <Image
-              src="/peer-capital-logo-new.png"
-              alt="Peer Capital"
-              width={270}
-              height={90}
-              className="object-contain w-auto"
-              priority
-            />
+            <Logo width={270} height={90} />
           </div>
 
           <h1 className="text-3xl font-bold mb-2">Welcome Back</h1>

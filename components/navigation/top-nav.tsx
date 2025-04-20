@@ -4,7 +4,6 @@ import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
 
 import { useState } from "react"
 import Link from "next/link"
-import Image from "next/image"
 import { usePathname } from "next/navigation"
 import { Bell, Menu, X, Home, Wallet, BarChart2, User, MessageSquare } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -17,6 +16,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { SignoutButton } from "@/components/auth/signout-button"
+import { Logo } from "@/components/logo"
+import Image from "next/image"
 
 interface TopNavProps {
   userName?: string
@@ -38,11 +39,7 @@ export function TopNav({ userName, userImage }: TopNavProps) {
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         {/* Logo */}
         <div className="flex items-center">
-          <Link href="/home" className="flex items-center gap-2">
-            <div className="relative w-[307px] h-[82px]">
-              <Image src="/peer-capital-logo.svg" alt="Peer Capital" fill className="object-contain" priority />
-            </div>
-          </Link>
+          <Logo width={72} height={18} className="flex-shrink-0" />
         </div>
 
         {/* Desktop Navigation */}
