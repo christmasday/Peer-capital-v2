@@ -1,18 +1,9 @@
 import { MainLayout } from "@/components/layouts/main-layout"
 import { HomeContent } from "@/components/home/home-content"
 import { checkAuth } from "@/lib/auth-utils"
+import { getUserProfile } from "@/lib/actions/auth"
 
-// Mock data for fallback
-const mockUserProfile = {
-  user: { id: "fallback-user", email: "user@example.com" },
-  profile: {
-    first_name: "User",
-    last_name: "",
-    profile_picture_url: "/vibrant-street-market.png",
-  },
-  account: { balance: 120000, loan_balance: 50000 },
-}
-
+// Mock data for loan helpers
 const mockLoanHelpers = [
   {
     id: "1",
@@ -40,8 +31,10 @@ export default async function HomePage({ searchParams }: { searchParams: { auth?
     await checkAuth()
   }
 
-  // Use mock data for now to avoid potential auth issues
-  const userProfile = mockUserProfile
+  // Get the user profile which includes account balance
+  const userProfile = await getUserProfile()
+
+  // Get loan helpers
   const loanHelpers = mockLoanHelpers
 
   return (

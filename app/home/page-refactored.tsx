@@ -4,8 +4,12 @@ import { Input } from "@/components/ui/input"
 import { AccountCard } from "@/components/account/account-card"
 import { HelperCard } from "@/components/helpers/helper-card"
 import { BottomNav } from "@/components/navigation/bottom-nav"
+import { getUserProfile } from "@/lib/actions/auth"
 
-export default function HomePage() {
+export default async function HomePage() {
+  // Get the user profile which includes account balance
+  const userProfile = await getUserProfile()
+
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
       {/* Status Bar - Mobile Only */}
@@ -41,9 +45,14 @@ export default function HomePage() {
         <div className="flex justify-between items-center py-6">
           <div className="flex items-center gap-4">
             <div className="relative h-16 w-16 rounded-full overflow-hidden">
-              <Image src="/placeholder.svg?height=100&width=100" alt="Profile" fill className="object-cover" />
+              <Image
+                src={userProfile.profile?.profile_picture_url || "/placeholder.svg?height=100&width=100"}
+                alt="Profile"
+                fill
+                className="object-cover"
+              />
             </div>
-            <h1 className="text-2xl font-bold text-blue-700">Hi, Sarah</h1>
+            <h1 className="text-2xl font-bold text-blue-700">Hi, {userProfile.profile?.first_name || "User"}</h1>
           </div>
           <button className="p-2 relative">
             <Bell className="h-6 w-6 text-gray-700" />
@@ -52,7 +61,7 @@ export default function HomePage() {
         </div>
 
         {/* Account Card */}
-        <AccountCard balance="₦120,000.00" loanBalance="₦50,000.00" />
+        <AccountCard balance={userProfile.account?.balance || 0} loanBalance={userProfile.account?.loan_balance || 0} />
 
         {/* Search Input */}
         <div className="mb-8">
@@ -68,6 +77,7 @@ export default function HomePage() {
 
           {/* Helper Cards */}
           <HelperCard
+            id="1"
             name="Ada Ada"
             interestRate="0.2%"
             maxLoan="2,000,000"
@@ -77,6 +87,7 @@ export default function HomePage() {
           />
 
           <HelperCard
+            id="2"
             name="Don Halbert"
             interestRate="0.4%"
             maxLoan="5,500,000"
