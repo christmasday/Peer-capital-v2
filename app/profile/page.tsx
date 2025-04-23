@@ -5,10 +5,8 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Edit, Mail, Phone, MapPin, Calendar, User, CreditCard, Shield } from "lucide-react"
-import { SeedDataButton } from "@/components/admin/seed-data-button"
 import { MainLayout } from "@/components/layouts/main-layout"
 import { format } from "date-fns"
-import { SignoutButton } from "@/components/auth/signout-button"
 import { checkAuth } from "@/lib/auth-utils"
 
 export default async function ProfilePage() {
@@ -43,7 +41,6 @@ export default async function ProfilePage() {
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold text-gray-900">My Profile</h1>
           <div className="flex gap-2">
-            <SeedDataButton userId={userProfile.user.id} />
             <Link href="/profile/edit">
               <Button variant="outline" size="sm" className="flex items-center gap-1">
                 <Edit className="h-4 w-4" />
@@ -160,10 +157,7 @@ export default async function ProfilePage() {
               <div className="border-t pt-6">
                 <h3 className="text-lg font-semibold mb-4">Account Actions</h3>
                 <div className="flex flex-col sm:flex-row gap-3">
-                  <SignoutButton variant="destructive" className="w-full">
-                    Sign Out
-                  </SignoutButton>
-                  <Button variant="outline" className="w-full sm:w-auto">
+                  <Button variant="outline" className="w-full">
                     Change Password
                   </Button>
                 </div>

@@ -1,7 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { Eye, EyeOff, Plus, ArrowRightLeft, TrendingUp } from "lucide-react"
+import Link from "next/link"
+import { Eye, EyeOff, Plus, ArrowRightLeft, TrendingUp, ArrowDown } from "lucide-react"
 
 interface AccountCardProps {
   balance: string | number
@@ -48,12 +49,19 @@ export function AccountCard({ balance, loanBalance }: AccountCardProps) {
         </div>
 
         <div className="flex justify-between items-center">
-          <div className="flex flex-col items-center">
+          <Link href="/account/fund" className="flex flex-col items-center">
             <div className="bg-white p-3 rounded-lg mb-2">
               <Plus className="h-5 w-5 text-blue-700" />
             </div>
-            <span className="text-sm">Fund Account</span>
-          </div>
+            <span className="text-sm">Fund</span>
+          </Link>
+
+          <Link href="/account/withdraw" className="flex flex-col items-center">
+            <div className="bg-white p-3 rounded-lg mb-2">
+              <ArrowDown className="h-5 w-5 text-blue-700" />
+            </div>
+            <span className="text-sm">Withdraw</span>
+          </Link>
 
           <div className="flex flex-col items-center">
             <div className="bg-white p-3 rounded-lg mb-2">

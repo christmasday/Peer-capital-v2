@@ -2,10 +2,13 @@ import { redirect } from "next/navigation"
 import { format } from "date-fns"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { FileText } from "lucide-react"
 import { getUserTransactions } from "@/lib/actions/transactions"
 import { MainLayout } from "@/components/layouts/main-layout"
 import { getUserProfile } from "@/lib/actions/auth"
 import { checkAuth } from "@/lib/auth-utils"
+import Link from "next/link"
 
 export default async function TransactionsPage() {
   // Check authentication
@@ -109,16 +112,24 @@ export default async function TransactionsPage() {
                         </p>
                       </div>
                     </div>
-                    <div className="text-right sm:ml-4">
+                    <div className="text-right sm:ml-4 flex flex-col items-end">
                       <p
                         className={`font-bold ${transaction.type === "deposit" ? "text-green-600" : transaction.type === "withdrawal" ? "text-red-600" : "text-blue-600"}`}
                       >
                         {transaction.type === "deposit" ? "+" : transaction.type === "withdrawal" ? "-" : ""}
                         {formatCurrency(transaction.amount)}
                       </p>
-                      <Badge className={`mt-1 ${getStatusColor(transaction.status)}`}>
-                        {transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1)}
-                      </Badge>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Badge className={`${getStatusColor(transaction.status)}`}>
+                          {transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1)}
+                        </Badge>
+                        <Link href={`/transactions/receipt/${transaction.id}`}>
+                          <Button variant="ghost" size="sm" className="h-6 px-2">
+                            <FileText className="h-3 w-3 mr-1" />
+                            Receipt
+                          </Button>
+                        </Link>
+                      </div>
                     </div>
                   </div>
                 </CardContent>

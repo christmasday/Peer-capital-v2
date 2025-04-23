@@ -2,6 +2,7 @@
 
 import { createServerClient } from "@/lib/supabase/server"
 import { getJWTFromCookies, verifyJWT } from "@/lib/jwt"
+import { createAdminClient } from "@/lib/supabase/admin"
 
 // Mock data for fallback
 const mockTransactions = [
@@ -91,5 +92,60 @@ export async function getUserTransactions() {
     console.error("Unexpected error fetching transactions:", error)
     // Return mock data as fallback
     return { transactions: mockTransactions }
+  }
+}
+
+export async function getTransactionById(id: string) {
+  try {
+    // Check for JWT first
+    const jwt = getJWTFromCookies()
+    let userId = null
+
+    if (jwt) {
+      try {
+        const { payload, error } = await verifyJWT(jwt)
+        if (!error && payload && payload.userId) {
+          userId = payload.userId
+        }
+      } catch (error) {
+        console.error("Error verifying JWT:", error)
+      }
+    }
+
+    // If no userId from JWT, try Supabase session
+    if (!userId) {
+      const supabase = createServerClient()
+      const { data: sessionData } = await supabase.auth.getSession()
+
+      if (sessionData.session?.user) {
+        userId = sessionData.session.user.id
+      }
+    }
+
+    // If still no userId, return mock data
+    if (!userId) {
+      // Find a mock transaction with the given ID or return the first one
+      const mockTransaction = mockTransactions.find((t) => t.id === id) || mockTransactions[0]
+      return { transaction: mockTransaction }
+    }
+
+    // Get the transaction
+    const adminClient = createAdminClient()
+    const { data, error } = await adminClient
+      .from("transactions")
+      .select("*")
+      .eq("id", id)
+      .eq("user_id", userId)
+      .single()
+
+    if (error) {
+      console.error("Error fetching transaction:", error)
+      return { error: "Transaction not found" }
+    }
+
+    return { transaction: data }
+  } catch (error) {
+    console.error("Unexpected error fetching transaction:", error)
+    return { error: "An unexpected error occurred" }
   }
 }

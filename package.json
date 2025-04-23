@@ -69,7 +69,9 @@
     "@testing-library/react": "latest",
     "fs": "latest",
     "path": "latest",
-    "bcryptjs": "latest"
+    "bcryptjs": "latest",
+    "html2canvas": "latest",
+    "jspdf": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",

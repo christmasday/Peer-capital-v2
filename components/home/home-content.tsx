@@ -1,9 +1,10 @@
 "use client"
 
-import { Bell, Eye, Plus, ArrowRightLeft, TrendingUp } from "lucide-react"
+import { Bell, Eye, Plus, ArrowRightLeft, TrendingUp, ArrowDown } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { HelperCard } from "@/components/helpers/helper-card"
 import { Button } from "@/components/ui/button"
+import Link from "next/link"
 
 interface HomeContentProps {
   userProfile: any
@@ -57,12 +58,19 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
                 </div>
 
                 <div className="flex justify-between items-center">
-                  <div className="flex flex-col items-center">
+                  <Link href="/account/fund" className="flex flex-col items-center">
                     <div className="bg-white p-2 rounded-lg mb-2">
                       <Plus className="h-4 w-4 text-blue-700" />
                     </div>
-                    <span className="text-xs">Fund Account</span>
-                  </div>
+                    <span className="text-xs">Fund</span>
+                  </Link>
+
+                  <Link href="/account/withdraw" className="flex flex-col items-center">
+                    <div className="bg-white p-2 rounded-lg mb-2">
+                      <ArrowDown className="h-4 w-4 text-blue-700" />
+                    </div>
+                    <span className="text-xs">Withdraw</span>
+                  </Link>
 
                   <div className="flex flex-col items-center">
                     <div className="bg-white p-2 rounded-lg mb-2">
