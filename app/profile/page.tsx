@@ -7,6 +7,8 @@ import { MainLayout } from "@/components/layouts/main-layout"
 import { format } from "date-fns"
 import { checkAuth } from "@/lib/auth-utils"
 
+export const dynamic = "force-dynamic"
+
 export default async function ProfilePage() {
   // Check authentication
   await checkAuth()

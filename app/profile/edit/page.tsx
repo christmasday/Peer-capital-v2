@@ -5,6 +5,8 @@ import { MainLayout } from "@/components/layouts/main-layout"
 import { ProfileMenu } from "@/components/profile/profile-menu"
 import { checkAuth } from "@/lib/auth-utils"
 
+export const dynamic = "force-dynamic"
+
 export default async function ProfileEditPage() {
   // Check authentication
   await checkAuth()

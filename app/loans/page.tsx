@@ -11,6 +11,8 @@ import { MainLayout } from "@/components/layouts/main-layout"
 import { getUserProfile } from "@/lib/actions/auth"
 import { checkAuth } from "@/lib/auth-utils"
 
+export const dynamic = "force-dynamic"
+
 export default async function LoansPage() {
   // Check authentication
   await checkAuth()

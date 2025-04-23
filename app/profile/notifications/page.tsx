@@ -4,6 +4,8 @@ import { MainLayout } from "@/components/layouts/main-layout"
 import { NotificationPreferencesForm } from "@/components/profile/notification-preferences-form"
 import { checkAuth } from "@/lib/auth-utils"
 
+export const dynamic = "force-dynamic"
+
 export default async function NotificationsPage() {
   // Check authentication
   await checkAuth()
