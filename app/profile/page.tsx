@@ -1,10 +1,8 @@
 import { getUserProfile } from "@/lib/actions/auth"
 import { redirect } from "next/navigation"
 import Image from "next/image"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { Edit, Mail, Phone, MapPin, Calendar, User, CreditCard, Shield, Lock } from "lucide-react"
+import { Mail, Phone, MapPin, Calendar, User, CreditCard, Shield } from "lucide-react"
 import { MainLayout } from "@/components/layouts/main-layout"
 import { format } from "date-fns"
 import { checkAuth } from "@/lib/auth-utils"
@@ -40,14 +38,7 @@ export default async function ProfilePage() {
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold text-gray-900">My Profile</h1>
-          <div className="flex gap-2">
-            <Link href="/profile/edit">
-              <Button variant="outline" size="sm" className="flex items-center gap-1">
-                <Edit className="h-4 w-4" />
-                Edit Profile
-              </Button>
-            </Link>
-          </div>
+          {/* Edit Profile button removed */}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -144,18 +135,6 @@ export default async function ProfilePage() {
                       <p className="font-medium">{formatDate(user.created_at)}</p>
                     </div>
                   </div>
-                </div>
-              </div>
-
-              <div className="border-t pt-6">
-                <h3 className="text-lg font-semibold mb-4">Account Actions</h3>
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <Link href="/profile/change-password" className="w-full">
-                    <Button variant="outline" className="w-full">
-                      <Lock className="mr-2 h-4 w-4" />
-                      Change Password
-                    </Button>
-                  </Link>
                 </div>
               </div>
             </CardContent>

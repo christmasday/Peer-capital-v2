@@ -4,8 +4,7 @@ import { createServerClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { revalidatePath } from "next/cache"
 
-// Update the updateProfile function to handle all profile fields
-
+// Update the updateProfile function to use multiple authentication methods
 export async function updateProfile({
   firstName,
   middleName,
@@ -35,14 +34,44 @@ export async function updateProfile({
     const supabase = createServerClient()
     const adminClient = createAdminClient()
 
-    // Get the current user
-    const { data: sessionData } = await supabase.auth.getSession()
+    // Try multiple methods to get the user ID
+    let userId = null
 
-    if (!sessionData.session?.user) {
-      return { error: "You must be logged in to update your profile" }
+    // Method 1: Try to get user from Supabase session
+    try {
+      const { data: sessionData } = await supabase.auth.getSession()
+      if (sessionData.session?.user) {
+        userId = sessionData.session.user.id
+        console.log("Using user ID from Supabase session for profile update:", userId)
+      }
+    } catch (sessionError) {
+      console.error("Error getting session for profile update:", sessionError)
+      // Continue to next method
     }
 
-    const userId = sessionData.session.user.id
+    // Method 2: Try to get user from JWT if session failed
+    if (!userId) {
+      try {
+        const { getJWTFromCookies, verifyJWT } = await import("@/lib/jwt")
+        const jwt = getJWTFromCookies()
+        if (jwt) {
+          const { payload, error } = await verifyJWT(jwt)
+          if (!error && payload && (payload.userId || payload.sub)) {
+            userId = payload.userId || payload.sub
+            console.log("Using user ID from JWT for profile update:", userId)
+          }
+        }
+      } catch (jwtError) {
+        console.error("Error verifying JWT for profile update:", jwtError)
+        // Continue to next method
+      }
+    }
+
+    // If we still don't have a user ID, return an error
+    if (!userId) {
+      console.error("No authenticated user found for profile update")
+      return { error: "Authentication failed. Please try logging in again." }
+    }
 
     // Update the profile using admin client to bypass RLS
     const { error } = await adminClient
@@ -77,21 +106,54 @@ export async function updateProfile({
   }
 }
 
+// Update the uploadProfilePicture function to use multiple authentication methods
 export async function uploadProfilePicture(file: File) {
   try {
     const supabase = createServerClient()
     const adminClient = createAdminClient()
 
-    // Get the current user
-    const { data: sessionData } = await supabase.auth.getSession()
+    // Try multiple methods to get the user ID
+    let userId = null
 
-    if (!sessionData.session?.user) {
-      return { error: "You must be logged in to upload a profile picture" }
+    // Method 1: Try to get user from Supabase session
+    try {
+      const { data: sessionData } = await supabase.auth.getSession()
+      if (sessionData.session?.user) {
+        userId = sessionData.session.user.id
+        console.log("Using user ID from Supabase session:", userId)
+      }
+    } catch (sessionError) {
+      console.error("Error getting session:", sessionError)
+      // Continue to next method
+    }
+
+    // Method 2: Try to get user from JWT if session failed
+    if (!userId) {
+      try {
+        const { getJWTFromCookies, verifyJWT } = await import("@/lib/jwt")
+        const jwt = getJWTFromCookies()
+        if (jwt) {
+          const { payload, error } = await verifyJWT(jwt)
+          if (!error && payload && (payload.userId || payload.sub)) {
+            userId = payload.userId || payload.sub
+            console.log("Using user ID from JWT:", userId)
+          }
+        }
+      } catch (jwtError) {
+        console.error("Error verifying JWT:", jwtError)
+        // Continue to next method
+      }
+    }
+
+    // If we still don't have a user ID, return an error
+    if (!userId) {
+      console.error("No authenticated user found for profile picture upload")
+      return { error: "Authentication failed. Please try logging in again." }
     }
 
     // Generate a unique file name
     const fileExt = file.name.split(".").pop()
-    const fileName = `${sessionData.session.user.id}-${Date.now()}.${fileExt}`
+    const fileName = `${userId}-${Date.now()}.${fileExt}`
 
     // Convert File to ArrayBuffer
     const arrayBuffer = await file.arrayBuffer()

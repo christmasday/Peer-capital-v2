@@ -151,8 +151,8 @@ export interface Database {
           loans_issued: number
           amount_issued: number
           profile_image_url?: string | null
-          created_at: string
-          updated_at: string
+          created_at?: string
+          updated_at?: string
         }
         Update: {
           id?: string
