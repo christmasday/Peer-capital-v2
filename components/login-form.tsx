@@ -74,6 +74,9 @@ export function LoginForm() {
           storeJWT(result.jwt)
         }
 
+        // Set auth bypass cookie to prevent middleware redirects
+        document.cookie = "auth-bypass=true; path=/; max-age=300; SameSite=Lax" // 5 minutes
+
         // Set bypass flag to prevent redirect loops
         localStorage.setItem("auth_bypass", "true")
         localStorage.setItem("auth_bypass_time", Date.now().toString())
@@ -84,6 +87,9 @@ export function LoginForm() {
 
         // Set a simple auth flag that doesn't depend on Supabase
         localStorage.setItem("is_authenticated", "true")
+
+        // Set a cookie version of the auth flag
+        document.cookie = "is_authenticated=true; path=/; max-age=86400; SameSite=Lax" // 24 hours
 
         // Wait a moment to ensure everything is set
         await new Promise((resolve) => setTimeout(resolve, 500))

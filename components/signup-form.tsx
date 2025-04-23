@@ -4,18 +4,18 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { AlertCircle } from "lucide-react"
+import { AlertCircle, Info } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { PersonalInfoStep } from "@/components/signup-steps/personal-info-step"
 import { AddressStep } from "@/components/signup-steps/address-step"
 import { SecurityStep } from "@/components/signup-steps/security-step"
 import { FinalStep } from "@/components/signup-steps/final-step"
-import { signUp } from "@/lib/actions/auth"
+import { signUp, checkUserExists } from "@/lib/actions/auth"
 import { initializeStorage } from "@/lib/actions/storage"
 import { uploadProfilePicture } from "@/lib/actions/upload"
+import Link from "next/link"
 
 export type SignupFormData = {
   firstName: string
@@ -29,6 +29,7 @@ export type SignupFormData = {
   city: string
   state: string
   zipCode: string
+  country: string
   password: string
   confirmPassword: string
   profilePicture: File | null
@@ -50,6 +51,7 @@ export function SignupForm() {
     city: "",
     state: "",
     zipCode: "",
+    country: "Nigeria", // Default to Nigeria
     password: "",
     confirmPassword: "",
     profilePicture: null,
@@ -64,16 +66,27 @@ export function SignupForm() {
   })
   const [attemptedSubmit, setAttemptedSubmit] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isCheckingExistence, setIsCheckingExistence] = useState(false)
   const [profilePictureUrl, setProfilePictureUrl] = useState<string | null>(null)
   const [signupSuccess, setSignupSuccess] = useState(false)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [storageInitialized, setStorageInitialized] = useState(false)
+  const [existingUserInfo, setExistingUserInfo] = useState<{
+    exists: boolean
+    field?: string
+    message?: string
+  } | null>(null)
 
   const totalSteps = 4
   const progress = (currentStep / totalSteps) * 100
 
   const updateFormData = (data: Partial<SignupFormData>) => {
     setFormData((prev) => ({ ...prev, ...data }))
+
+    // Clear existing user error when email, phone, or BVN is changed
+    if (existingUserInfo && (data.email || data.phoneNumber || data.bvn)) {
+      setExistingUserInfo(null)
+    }
   }
 
   // Validate current step
@@ -104,6 +117,9 @@ export function SignupForm() {
           isValid = false
         } else if (!/^\d+$/.test(formData.phoneNumber)) {
           errors.push("Phone number must contain only digits")
+          isValid = false
+        } else if (formData.phoneNumber.length > 11) {
+          errors.push("Phone number must not exceed 11 digits")
           isValid = false
         }
         if (!formData.bvn.trim()) {
@@ -138,6 +154,10 @@ export function SignupForm() {
         }
         if (!formData.state.trim()) {
           errors.push("State is required")
+          isValid = false
+        }
+        if (!formData.country.trim()) {
+          errors.push("Country is required")
           isValid = false
         }
         break
@@ -207,6 +227,8 @@ export function SignupForm() {
       allErrors.push("Phone number is required")
     } else if (!/^\d+$/.test(formData.phoneNumber)) {
       allErrors.push("Phone number must contain only digits")
+    } else if (formData.phoneNumber.length > 11) {
+      allErrors.push("Phone number must not exceed 11 digits")
     }
     if (!formData.bvn.trim()) {
       allErrors.push("BVN is required")
@@ -226,6 +248,7 @@ export function SignupForm() {
     if (!formData.address.trim()) allErrors.push("Street address is required")
     if (!formData.city.trim()) allErrors.push("City is required")
     if (!formData.state.trim()) allErrors.push("State is required")
+    if (!formData.country.trim()) allErrors.push("Country is required")
 
     // Validate security
     if (!formData.password) {
@@ -251,10 +274,74 @@ export function SignupForm() {
     return allErrors.length === 0
   }
 
-  const handleNext = () => {
+  const handleNext = async () => {
     const isStepValid = validateStep(currentStep)
 
     if (isStepValid) {
+      // If we're on the personal info step, check if email, phone, or BVN already exists
+      if (currentStep === 1) {
+        try {
+          setIsCheckingExistence(true)
+          setFormErrors([]) // Clear any previous errors
+
+          // Add a loading message
+          setFormErrors(["Checking if user exists... This may take a moment."])
+
+          // Add timeout to prevent hanging with a longer timeout
+          // const checkPromise = checkUserExists(formData.email, formData.phoneNumber, formData.bvn)
+          // const timeoutPromise = new Promise<{ exists: boolean; error?: string }>((resolve) => {
+          //   setTimeout(() => {
+          //     console.log("User existence check timed out - continuing anyway")
+          //     resolve({
+          //       exists: false,
+          //       error: "Connection is slow, but you can continue. We'll verify again before account creation.",
+          //     })
+          //   }, 15000) // 15 seconds timeout
+          // })
+
+          // const existsCheck = await Promise.race([checkPromise, timeoutPromise])
+          const existsCheck = await checkUserExists(formData.email, formData.phoneNumber, formData.bvn)
+
+          // Clear the loading message
+          setFormErrors([])
+
+          // Show a non-blocking warning if there was a timeout or error
+          if (existsCheck.error) {
+            console.warn("Existence check issue:", existsCheck.error)
+            // Show a warning but still allow continuing
+            setFormErrors([existsCheck.error])
+
+            // Wait a moment to show the message before proceeding
+            await new Promise((resolve) => setTimeout(resolve, 1500))
+
+            // Continue to next step despite the error
+            setCurrentStep(currentStep + 1)
+            setFormErrors([])
+            window.scrollTo(0, 0)
+            setIsCheckingExistence(false)
+            return
+          }
+
+          if (existsCheck.exists) {
+            setExistingUserInfo(existsCheck)
+            setFormErrors([existsCheck.message || "This user already exists"])
+            setIsCheckingExistence(false)
+            return
+          }
+
+          setExistingUserInfo(null)
+        } catch (error) {
+          console.error("Error checking user existence:", error)
+          // Continue anyway, the server will check again during signup
+          setFormErrors(["Unable to verify if user exists. You can continue, but we'll check again during signup."])
+
+          // Wait a moment to show the message before proceeding
+          await new Promise((resolve) => setTimeout(resolve, 1500))
+        } finally {
+          setIsCheckingExistence(false)
+        }
+      }
+
       if (currentStep < totalSteps) {
         setCurrentStep(currentStep + 1)
         setFormErrors([])
@@ -283,14 +370,61 @@ export function SignupForm() {
         setIsSubmitting(true)
         console.log("Starting signup process...")
 
+        // Check if user already exists before proceeding
+        try {
+          setIsCheckingExistence(true)
+          setFormErrors(["Verifying account information... This may take a moment."])
+
+          const existsCheck = await checkUserExists(formData.email, formData.phoneNumber, formData.bvn)
+
+          // Clear the loading message
+          setFormErrors([])
+
+          // If there was an error but we're continuing anyway
+          if (existsCheck.error) {
+            console.warn("Existence check issue during submission:", existsCheck.error)
+            // Show a warning but continue with signup
+            setFormErrors([existsCheck.error])
+            // Wait a moment to show the message
+            await new Promise((resolve) => setTimeout(resolve, 1500))
+            setFormErrors([])
+          }
+
+          if (existsCheck.exists) {
+            setExistingUserInfo(existsCheck)
+            setFormErrors([existsCheck.message || "This user already exists"])
+            setIsSubmitting(false)
+            setIsCheckingExistence(false)
+            return
+          }
+
+          setExistingUserInfo(null)
+        } catch (error) {
+          console.error("Error checking user existence:", error)
+          // Continue anyway, the server will check again during signup
+          setFormErrors(["Unable to verify if user exists. Continuing with signup anyway."])
+          await new Promise((resolve) => setTimeout(resolve, 1500))
+          setFormErrors([])
+        } finally {
+          setIsCheckingExistence(false)
+        }
+
         // Upload profile picture if exists using the server action
         let pictureUrl = null
         if (formData.profilePicture) {
           console.log("Uploading profile picture...")
 
           try {
-            // Use the server action for file upload
-            const uploadResult = await uploadProfilePicture(formData.profilePicture)
+            // Use the server action for file upload with timeout
+            const uploadPromise = uploadProfilePicture(formData.profilePicture)
+            const uploadTimeoutPromise = new Promise<{ error: string }>((resolve) => {
+              setTimeout(() => {
+                console.log("Profile picture upload timed out - continuing without picture")
+                resolve({ error: "Upload timed out" })
+              }, 3000)
+            })
+
+            const uploadResult = await Promise.race([uploadPromise, uploadTimeoutPromise])
 
             if (typeof uploadResult === "string") {
               pictureUrl = uploadResult
@@ -308,42 +442,81 @@ export function SignupForm() {
         // Register user with Supabase
         console.log("Registering user with Supabase...")
 
-        const result = await signUp({
-          email: formData.email,
-          password: formData.password,
-          firstName: formData.firstName,
-          middleName: formData.middleName,
-          lastName: formData.lastName,
-          phoneNumber: formData.phoneNumber,
-          bvn: formData.bvn,
-          dateOfBirth: formData.dateOfBirth,
-          address: formData.address,
-          city: formData.city,
-          state: formData.state,
-          zipCode: formData.zipCode,
-          profilePictureUrl: pictureUrl,
-        })
+        try {
+          // Add timeout to prevent hanging
+          const signupPromise = signUp({
+            email: formData.email,
+            password: formData.password,
+            firstName: formData.firstName,
+            middleName: formData.middleName,
+            lastName: formData.lastName,
+            phoneNumber: formData.phoneNumber,
+            bvn: formData.bvn,
+            dateOfBirth: formData.dateOfBirth,
+            address: formData.address,
+            city: formData.city,
+            state: formData.state,
+            zipCode: formData.zipCode,
+            country: formData.country,
+            profilePictureUrl: pictureUrl,
+          })
 
-        if (result.error) {
-          console.error("Signup error:", result.error)
-          setFormErrors([result.error])
-          return
+          const signupTimeoutPromise = new Promise<{ error: string }>((resolve) => {
+            setTimeout(() => {
+              console.log("Signup request timed out")
+              resolve({ error: "Signup request timed out. Please try again later." })
+            }, 15000)
+          })
+
+          const result = await Promise.race([signupPromise, signupTimeoutPromise])
+
+          if (result.error) {
+            console.error("Signup error:", result.error)
+
+            // Check if it's an existing user error
+            if (result.error.includes("already exists") || result.error.includes("already registered")) {
+              setExistingUserInfo({
+                exists: true,
+                message: result.error,
+              })
+            }
+
+            // Add more detailed error message for database errors
+            if (result.error.includes("Database error")) {
+              setFormErrors([
+                result.error,
+                "This could be due to a temporary issue. Please try again in a few moments or contact support if the problem persists.",
+              ])
+            } else {
+              setFormErrors([result.error])
+            }
+            return
+          }
+
+          // Handle warnings from the server
+          if (result.warning) {
+            console.warn("Signup warning:", result.warning)
+            // Show the warning but still proceed with success
+            setFormErrors([result.warning])
+            // Wait a moment to show the warning
+            await new Promise((resolve) => setTimeout(resolve, 2000))
+            setFormErrors([])
+          }
+
+          console.log("Signup successful:", result)
+          setSignupSuccess(true)
+          setSuccessMessage(
+            result.message || "Account created successfully! You will be redirected to the login page in a moment.",
+          )
+
+          // Redirect to login page on successful signup after 2 seconds
+          setTimeout(() => {
+            router.push("/")
+          }, 2000)
+        } catch (signupError) {
+          console.error("Signup request error:", signupError)
+          setFormErrors(["An error occurred during signup. Please try again later."])
         }
-
-        if (result.warning) {
-          console.warn("Signup warning:", result.warning)
-        }
-
-        console.log("Signup successful:", result)
-        setSignupSuccess(true)
-        setSuccessMessage(
-          result.message || "Account created successfully! You will be redirected to the login page in a moment.",
-        )
-
-        // Redirect to login page on successful signup after 2 seconds
-        setTimeout(() => {
-          router.push("/")
-        }, 2000)
       } catch (error) {
         console.error("Unexpected signup error:", error)
         setFormErrors(["An unexpected error occurred. Please try again."])
@@ -377,22 +550,31 @@ export function SignupForm() {
         try {
           console.log("Initializing storage...")
 
-          // Add a timeout to prevent hanging
-          const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error("Storage initialization timed out")), 5000),
+          // Add a shorter timeout to prevent hanging
+          const timeoutPromise = new Promise(
+            (_, reject) =>
+              setTimeout(() => {
+                console.log("Storage initialization timed out - continuing anyway")
+                return { success: true, message: "Timed out but continuing" }
+              }, 2000), // Reduced from 5000ms to 2000ms
           )
 
           // Race between the actual initialization and the timeout
-          const result = (await Promise.race([initializeStorage(), timeoutPromise])) as {
-            success: boolean
-            message?: string
-            error?: string
-          }
+          try {
+            const result = (await Promise.race([initializeStorage(), timeoutPromise])) as {
+              success: boolean
+              message?: string
+              error?: string
+            }
 
-          if (result.success) {
-            console.log("Storage initialized:", result.message || "Success")
-          } else {
-            console.warn("Storage initialization failed:", result.error)
+            if (result && result.success) {
+              console.log("Storage initialized:", result.message || "Success")
+            } else if (result && result.error) {
+              console.warn("Storage initialization failed:", result.error)
+            }
+          } catch (raceError) {
+            console.warn("Storage initialization race failed:", raceError)
+            // Continue anyway
           }
         } catch (error) {
           console.error("Failed to initialize storage from signup form:", error)
@@ -403,7 +585,11 @@ export function SignupForm() {
       }
     }
 
-    init()
+    // Initialize but don't wait for it to complete
+    init().catch((error) => {
+      console.error("Unhandled storage initialization error:", error)
+      setStorageInitialized(true) // Mark as initialized to prevent retries
+    })
   }, [storageInitialized])
 
   const renderStep = () => {
@@ -421,18 +607,17 @@ export function SignupForm() {
     }
   }
 
+  // Replace the Card wrapper with a div since the Card is now in the parent component
   return (
-    <Card className="w-full">
+    <div className="w-full">
       <form onSubmit={handleSubmit}>
-        <CardHeader>
-          <div className="space-y-2">
-            <h2 className="text-xl font-semibold text-center">
-              Step {currentStep} of {totalSteps}
-            </h2>
-            <Progress value={progress} className="h-2" />
-          </div>
-        </CardHeader>
-        <CardContent>
+        <div className="space-y-2">
+          <h2 className="text-xl font-semibold text-center">
+            Step {currentStep} of {totalSteps}
+          </h2>
+          <Progress value={progress} className="h-2" />
+        </div>
+        <div className="mt-4">
           {signupSuccess ? (
             <Alert className="mb-4">
               <AlertDescription>{successMessage}</AlertDescription>
@@ -440,11 +625,22 @@ export function SignupForm() {
           ) : (
             <>
               {formErrors.length > 0 && (
-                <Alert variant="destructive" className="mb-4">
-                  <AlertCircle className="h-4 w-4" />
+                <Alert
+                  variant={formErrors.some((err) => err.includes("Connection is slow")) ? "default" : "destructive"}
+                  className={`mb-4 ${formErrors.some((err) => err.includes("Connection is slow")) ? "bg-yellow-50 border-yellow-200" : ""}`}
+                >
+                  {formErrors.some((err) => err.includes("Connection is slow")) ? (
+                    <Info className="h-4 w-4 text-yellow-500" />
+                  ) : (
+                    <AlertCircle className="h-4 w-4" />
+                  )}
                   <AlertDescription>
                     <div className="mt-2">
-                      <p className="font-medium">Please fix the following errors:</p>
+                      <p className="font-medium">
+                        {formErrors.some((err) => err.includes("Connection is slow"))
+                          ? "Notice:"
+                          : "Please fix the following errors:"}
+                      </p>
                       <ul className="list-disc pl-5 mt-1 space-y-1">
                         {formErrors.map((error, index) => (
                           <li key={index} className="text-sm">
@@ -457,33 +653,60 @@ export function SignupForm() {
                 </Alert>
               )}
 
+              {existingUserInfo?.exists && (
+                <Alert className="mb-4 bg-blue-50 border-blue-200">
+                  <Info className="h-4 w-4 text-blue-500" />
+                  <AlertDescription>
+                    <div className="mt-2">
+                      <p className="font-medium">Already have an account?</p>
+                      <p className="text-sm mt-1">
+                        <Link href="/" className="text-blue-600 hover:text-blue-800">
+                          Click here to log in
+                        </Link>{" "}
+                        instead.
+                      </p>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
+
               {renderStep()}
             </>
           )}
-        </CardContent>
+        </div>
         {!signupSuccess && (
-          <CardFooter className="flex justify-between">
+          <div className="flex justify-between mt-6">
             {currentStep > 1 ? (
-              <Button type="button" variant="outline" onClick={handlePrevious} disabled={isSubmitting}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handlePrevious}
+                disabled={isSubmitting || isCheckingExistence}
+              >
                 Previous
               </Button>
             ) : (
-              <Button type="button" variant="outline" onClick={() => router.push("/")} disabled={isSubmitting}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => router.push("/")}
+                disabled={isSubmitting || isCheckingExistence}
+              >
                 Cancel
               </Button>
             )}
             {currentStep < totalSteps ? (
-              <Button type="button" onClick={handleNext} disabled={isSubmitting}>
-                Next
+              <Button type="button" onClick={handleNext} disabled={isSubmitting || isCheckingExistence}>
+                {isCheckingExistence ? "Checking..." : "Next"}
               </Button>
             ) : (
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Creating Account..." : "Submit"}
+              <Button type="submit" className="w-full" disabled={isSubmitting || isCheckingExistence}>
+                {isSubmitting ? "Creating Account..." : isCheckingExistence ? "Checking..." : "Create Account"}
               </Button>
             )}
-          </CardFooter>
+          </div>
         )}
       </form>
-    </Card>
+    </div>
   )
 }

@@ -5,6 +5,7 @@ import type React from "react"
 import { useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { SignupFormData } from "@/components/signup-form"
 
 interface AddressStepProps {
@@ -12,11 +13,80 @@ interface AddressStepProps {
   updateFormData: (data: Partial<SignupFormData>) => void
 }
 
+// List of countries - focusing on African countries first with Nigeria at the top
+const countries = [
+  "Nigeria",
+  "Algeria",
+  "Angola",
+  "Benin",
+  "Botswana",
+  "Burkina Faso",
+  "Burundi",
+  "Cabo Verde",
+  "Cameroon",
+  "Central African Republic",
+  "Chad",
+  "Comoros",
+  "Congo",
+  "Côte d'Ivoire",
+  "Djibouti",
+  "Egypt",
+  "Equatorial Guinea",
+  "Eritrea",
+  "Eswatini",
+  "Ethiopia",
+  "Gabon",
+  "Gambia",
+  "Ghana",
+  "Guinea",
+  "Guinea-Bissau",
+  "Kenya",
+  "Lesotho",
+  "Liberia",
+  "Libya",
+  "Madagascar",
+  "Malawi",
+  "Mali",
+  "Mauritania",
+  "Mauritius",
+  "Morocco",
+  "Mozambique",
+  "Namibia",
+  "Niger",
+  "Rwanda",
+  "Sao Tome and Principe",
+  "Senegal",
+  "Seychelles",
+  "Sierra Leone",
+  "Somalia",
+  "South Africa",
+  "South Sudan",
+  "Sudan",
+  "Tanzania",
+  "Togo",
+  "Tunisia",
+  "Uganda",
+  "Zambia",
+  "Zimbabwe",
+  // Other major countries
+  "United States",
+  "United Kingdom",
+  "Canada",
+  "Australia",
+  "China",
+  "India",
+  "Germany",
+  "France",
+  "Japan",
+  "Brazil",
+]
+
 export function AddressStep({ formData, updateFormData }: AddressStepProps) {
   const [errors, setErrors] = useState({
     address: "",
     city: "",
     state: "",
+    country: "",
   })
 
   const validateField = (name: string, value: string) => {
@@ -40,8 +110,32 @@ export function AddressStep({ formData, updateFormData }: AddressStepProps) {
     validateField(name, value)
   }
 
+  const handleCountryChange = (value: string) => {
+    updateFormData({ country: value })
+    validateField("country", value)
+  }
+
   return (
     <div className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="country">
+          Country of Residence <span className="text-red-500">*</span>
+        </Label>
+        <Select value={formData.country} onValueChange={handleCountryChange}>
+          <SelectTrigger id="country" className={errors.country ? "border-red-500" : ""}>
+            <SelectValue placeholder="Select your country" />
+          </SelectTrigger>
+          <SelectContent>
+            {countries.map((country) => (
+              <SelectItem key={country} value={country}>
+                {country}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {errors.country && <p className="text-sm text-red-500">{errors.country}</p>}
+      </div>
+
       <div className="space-y-2">
         <Label htmlFor="address">
           Street Address <span className="text-red-500">*</span>

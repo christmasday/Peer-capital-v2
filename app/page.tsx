@@ -1,45 +1,42 @@
 import { LoginForm } from "@/components/login-form"
 import { Logo } from "@/components/logo"
-import Image from "next/image"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
-export default function Home() {
+export default function LoginPage() {
   return (
     <main className="flex min-h-screen flex-col md:flex-row">
-      {/* Left side - Login */}
-      <div className="flex flex-1 flex-col justify-center px-4 py-12 md:px-8 lg:px-12 xl:px-20">
-        <div className="mx-auto w-full max-w-md">
-          <div className="mb-8">
-            <Logo width={270} height={90} />
+      {/* Left side - Login Form */}
+      <div className="flex flex-col justify-center items-center w-full md:w-1/2 p-6 md:p-10 bg-white">
+        <div className="w-full max-w-md">
+          <div className="flex justify-center md:justify-start mb-8">
+            <Logo width={180} height={60} />
           </div>
 
-          <h1 className="text-3xl font-bold mb-2">Welcome Back</h1>
-          <p className="text-muted-foreground mb-8">Sign in to access your account</p>
-
-          <LoginForm />
+          <Card className="border-none shadow-lg">
+            <CardHeader className="space-y-1">
+              <CardTitle className="text-2xl font-bold text-center md:text-left">Sign in to your account</CardTitle>
+              <CardDescription className="text-center md:text-left">
+                Enter your email and password to sign in
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <LoginForm />
+            </CardContent>
+          </Card>
         </div>
       </div>
 
-      {/* Right side - Banner */}
-      <div className="hidden md:flex md:w-1/2 relative">
-        {/* Background image */}
-        <Image src="/vibrant-street-market.png" alt="Peer Capital Community" fill className="object-cover" priority />
-
-        {/* Darker overlay for better text readability */}
-        <div className="absolute inset-0 bg-black opacity-70" />
-
-        {/* Gradient overlay on top for depth */}
-        <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-black to-blue-900 opacity-40" />
-
-        {/* Content */}
-        <div className="absolute inset-0 flex flex-col justify-center px-8 lg:px-12 z-10">
-          <div className="max-w-md text-white">
-            <h2 className="text-3xl font-bold mb-4 drop-shadow-md">
-              Empowering Communities Through Peer-to-Peer Lending
-            </h2>
-            <p className="text-lg opacity-95 drop-shadow-md">
-              Join thousands of people who are building financial resilience together through our community-based
-              lending platform.
-            </p>
+      {/* Right side - Background Image with Overlay */}
+      <div className="hidden md:block w-1/2 relative">
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-900/80 to-gray-900/90 z-10"></div>
+        <div
+          className="absolute inset-0 bg-cover bg-center z-0"
+          style={{ backgroundImage: "url('/vibrant-street-market.png')" }}
+        ></div>
+        <div className="absolute inset-0 flex items-center justify-center z-20">
+          <div className="text-white text-center px-6">
+            <h2 className="text-3xl font-bold mb-4">Welcome to Peer Capital</h2>
+            <p className="text-xl opacity-80">Your trusted platform for peer-to-peer lending</p>
           </div>
         </div>
       </div>

@@ -44,6 +44,8 @@ export function PersonalInfoStep({ formData, updateFormData }: PersonalInfoStepP
           error = "Phone number is required"
         } else if (!/^\d+$/.test(value)) {
           error = "Phone number must contain only digits"
+        } else if (value.length > 11) {
+          error = "Phone number must not exceed 11 digits"
         }
         break
       case "bvn":
@@ -63,6 +65,13 @@ export function PersonalInfoStep({ formData, updateFormData }: PersonalInfoStepP
           if (age < 18) {
             error = "You must be at least 18 years old"
           }
+          // If dateOfBirth exists and needs formatting
+          if (formData.dateOfBirth) {
+            // Parse the date (handles various input formats)
+            const date = new Date(formData.dateOfBirth)
+            // Format as YYYY-MM-DD
+            formData.dateOfBirth = date.toISOString().split("T")[0]
+          }
         }
         break
     }
@@ -79,7 +88,7 @@ export function PersonalInfoStep({ formData, updateFormData }: PersonalInfoStepP
       const digitsOnly = value.replace(/\D/g, "")
 
       // Apply max length
-      const maxLength = name === "bvn" ? 11 : undefined
+      const maxLength = name === "bvn" ? 11 : name === "phoneNumber" ? 11 : undefined
       const truncatedValue = maxLength ? digitsOnly.slice(0, maxLength) : digitsOnly
 
       updateFormData({ [name]: truncatedValue })
@@ -155,7 +164,7 @@ export function PersonalInfoStep({ formData, updateFormData }: PersonalInfoStepP
 
       <div className="space-y-2">
         <Label htmlFor="phoneNumber">
-          Phone Number <span className="text-red-500">*</span>
+          Phone Number (max 11 digits) <span className="text-red-500">*</span>
         </Label>
         <Input
           id="phoneNumber"
@@ -164,6 +173,7 @@ export function PersonalInfoStep({ formData, updateFormData }: PersonalInfoStepP
           value={formData.phoneNumber}
           onChange={handleChange}
           onBlur={handleBlur}
+          maxLength={11}
           className={errors.phoneNumber ? "border-red-500" : ""}
         />
         {errors.phoneNumber && <p className="text-sm text-red-500">{errors.phoneNumber}</p>}

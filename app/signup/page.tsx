@@ -1,16 +1,23 @@
 import { SignupForm } from "@/components/signup-form"
 import { Logo } from "@/components/logo"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 export default function SignupPage() {
   return (
-    <main className="relative flex min-h-screen flex-col items-center justify-center p-4">
-      <div className="absolute inset-0 z-0 bg-gradient-to-br from-gray-900 via-black to-blue-900" />
-      <div className="w-full max-w-md z-10">
-        <div className="flex justify-center mb-8">
-          <Logo width={180} height={60} />
+    <main className="flex min-h-screen flex-col items-center justify-center p-4 bg-muted/40">
+      <div className="w-full max-w-md">
+        <div className="flex justify-center mb-6">
+          <Logo width={180} height={60} className="flex-shrink-0" />
         </div>
-        <h1 className="text-3xl font-bold text-center mb-6 text-white">Create Your Account</h1>
-        <SignupForm />
+        <Card className="border-none shadow-lg">
+          <CardHeader className="space-y-1">
+            <CardTitle className="text-2xl font-bold text-center">Create an account</CardTitle>
+            <CardDescription className="text-center">Enter your information to create your account</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <SignupForm />
+          </CardContent>
+        </Card>
       </div>
     </main>
   )

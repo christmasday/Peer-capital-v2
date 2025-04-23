@@ -1,108 +1,114 @@
 import { createClient } from "@supabase/supabase-js"
-import type { Database } from "@/lib/supabase/database.types"
+import type { Database } from "./database.types"
 
-// Track failed connection attempts to implement circuit breaker
+// Circuit breaker pattern
 let connectionFailures = 0
 const MAX_FAILURES = 3
 let lastFailureTime = 0
-const CIRCUIT_RESET_TIME = 30000 // 30 seconds
-let isOfflineModeForced = false
+let isOfflineModeEnabled = false
 
-// Create a mock client that doesn't make actual network requests
-const createMockClient = () => {
-  console.log("Creating mock Supabase admin client (offline mode)")
+// Export the offline mode check for use in other modules
+export function isOfflineMode() {
+  // Reset offline mode if it's been more than 5 minutes since the last failure
+  if (isOfflineModeEnabled && Date.now() - lastFailureTime > 5 * 60 * 1000) {
+    console.log("Resetting offline mode after 5 minutes of no failures")
+    isOfflineModeEnabled = false
+    connectionFailures = 0
+  }
+  return isOfflineModeEnabled
+}
 
-  // This is a mock client that returns empty results for all operations
+// Allow forcing offline mode from other modules
+export function forceOfflineMode(value: boolean) {
+  console.log(`Forcing offline mode: ${value}`)
+  isOfflineModeEnabled = value
+  if (value) {
+    lastFailureTime = Date.now()
+  }
+}
+
+// Create a mock client for offline mode
+function createMockClient() {
+  console.log("Creating mock Supabase admin client for offline mode")
+
+  // Create a basic mock that won't throw errors
   return {
-    from: () => ({
+    from: (table: string) => ({
       select: () => ({
         eq: () => ({
           single: async () => ({ data: null, error: null }),
-          limit: async () => ({ data: [], error: null }),
+          limit: () => ({ data: [], error: null }),
         }),
-        limit: async () => ({ data: [], error: null }),
-        order: () => ({
-          limit: async () => ({ data: [], error: null }),
-        }),
+        limit: () => ({ data: [], error: null }),
       }),
       insert: async () => ({ data: null, error: null }),
       update: async () => ({ data: null, error: null }),
+      upsert: async () => ({ data: null, error: null }),
+      delete: async () => ({ data: null, error: null }),
     }),
-    storage: {
-      listBuckets: async () => ({ data: [], error: null }),
-      createBucket: async () => ({ data: null, error: null }),
-      from: () => ({
-        upload: async () => ({ data: { path: "" }, error: null }),
-        createPolicy: async () => ({ data: null, error: null }),
-        getPublicUrl: () => ({ data: { publicUrl: "/vibrant-street-market.png" } }),
-      }),
-    },
     auth: {
-      getSession: async () => ({ data: { session: null }, error: null }),
-      signInWithPassword: async () => ({ data: { user: null, session: null }, error: { message: "Offline mode" } }),
-      signUp: async () => ({ data: { user: null }, error: null }),
-      signOut: async () => ({ error: null }),
       admin: {
         getUserById: async () => ({ data: { user: { user_metadata: {} } }, error: null }),
+        listUsers: async () => ({ data: { users: [] }, error: null }),
+        createUser: async (userData: any) => ({
+          data: {
+            user: {
+              id: "mock-user-id",
+              email: userData.email,
+              user_metadata: userData.user_metadata || {},
+            },
+          },
+          error: null,
+        }),
       },
+      getSession: async () => ({ data: { session: null }, error: null }),
     },
-  } as unknown as ReturnType<typeof createClient<Database>>
+    storage: {
+      from: (bucket: string) => ({
+        upload: async () => ({ data: { path: "mock-path" }, error: null }),
+        getPublicUrl: () => ({ data: { publicUrl: "/placeholder.svg" } }),
+      }),
+    },
+  }
 }
 
-// Force offline mode (useful for testing or when we know the network is down)
-export const forceOfflineMode = (force = true) => {
-  isOfflineModeForced = force
-  console.log(`Offline mode ${force ? "enabled" : "disabled"} manually`)
-  return isOfflineModeForced
-}
-
-// Create a Supabase client with the service role key for admin operations
-export const createAdminClient = () => {
-  // Check if offline mode is forced
-  if (isOfflineModeForced) {
-    console.log("Offline mode is forced - using mock client")
-    return createMockClient()
-  }
-
-  // Check if circuit is open (too many recent failures)
-  const now = Date.now()
-  if (connectionFailures >= MAX_FAILURES && now - lastFailureTime < CIRCUIT_RESET_TIME) {
-    console.log("Circuit breaker open - using mock client")
-    return createMockClient()
-  }
-
-  // Check if required environment variables are available
-  const supabaseUrl = process.env.SUPABASE_URL
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-  if (!supabaseUrl || !supabaseServiceKey) {
-    console.error("Missing required Supabase environment variables for admin client")
-    return createMockClient()
-  }
-
+// Create a Supabase admin client
+export function createAdminClient() {
   try {
-    // Create a real client with error handling
-    const client = createClient<Database>(supabaseUrl, supabaseServiceKey, {
+    // Check if we're in offline mode
+    if (isOfflineMode()) {
+      return createMockClient()
+    }
+
+    // Get Supabase URL and service role key from environment variables
+    const supabaseUrl = process.env.SUPABASE_URL
+    const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+    // Validate environment variables
+    if (!supabaseUrl || !supabaseServiceRoleKey) {
+      console.error("Missing Supabase environment variables for admin client")
+      forceOfflineMode(true)
+      return createMockClient()
+    }
+
+    // Create the Supabase admin client with better error handling
+    const adminClient = createClient<Database>(supabaseUrl, supabaseServiceRoleKey, {
       auth: {
-        persistSession: false,
         autoRefreshToken: false,
+        persistSession: false,
       },
-      // Add shorter timeout to prevent hanging requests
       global: {
+        headers: {
+          "x-admin-client-info": `@supabase/admin-client`,
+        },
         fetch: (url, options) => {
-          // Use a shorter timeout for admin operations
+          // Add timeout to fetch requests
           const controller = new AbortController()
           const timeoutId = setTimeout(() => {
             controller.abort()
-            console.log("Request timed out:", url.toString())
-
-            // Track failure for circuit breaker
+            console.log("Admin client request timed out:", url.toString())
             connectionFailures++
-            lastFailureTime = Date.now()
-
-            // If we've hit the failure threshold, force offline mode
             if (connectionFailures >= MAX_FAILURES) {
-              console.log(`Circuit breaker tripped after timeout - enabling offline mode`)
               forceOfflineMode(true)
             }
 
@@ -117,7 +123,7 @@ export const createAdminClient = () => {
                 status: 200,
               },
             )
-          }, 3000) // 3 second timeout
+          }, 5000) // 5 second timeout
 
           return fetch(url, {
             ...options,
@@ -125,7 +131,7 @@ export const createAdminClient = () => {
           })
             .then((response) => {
               clearTimeout(timeoutId)
-              // Reset failure count on success
+              // Reset failures on success
               connectionFailures = 0
               return response
             })
@@ -135,15 +141,14 @@ export const createAdminClient = () => {
 
               // Track failure for circuit breaker
               connectionFailures++
-              lastFailureTime = Date.now()
 
               // If we've hit the failure threshold, force offline mode
               if (connectionFailures >= MAX_FAILURES) {
-                console.log(`Circuit breaker tripped after ${MAX_FAILURES} failures - enabling offline mode`)
+                console.log(`Circuit breaker tripped after ${connectionFailures} failures - enabling offline mode`)
                 forceOfflineMode(true)
               }
 
-              // Instead of throwing, return a mock response
+              // Return a mock response instead of throwing
               return new Response(
                 JSON.stringify({
                   data: null,
@@ -159,61 +164,10 @@ export const createAdminClient = () => {
       },
     })
 
-    // Test the connection with a simple ping
-    // We'll do this asynchronously to not block the client creation
-    setTimeout(async () => {
-      try {
-        const pingPromise = client.from("profiles").select("count", { count: "exact", head: true }).limit(1)
-
-        // Add a timeout to the ping
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error("Ping timed out")), 2000)
-        })
-
-        const { error } = (await Promise.race([pingPromise, timeoutPromise])) as any
-
-        if (error) {
-          console.warn("Admin client ping failed:", error.message)
-          connectionFailures++
-          lastFailureTime = Date.now()
-
-          // If we've hit the failure threshold, force offline mode
-          if (connectionFailures >= MAX_FAILURES) {
-            console.log(`Circuit breaker tripped after ping failure - enabling offline mode`)
-            forceOfflineMode(true)
-          }
-        }
-      } catch (e) {
-        console.error("Admin client ping error:", e instanceof Error ? e.message : String(e))
-        connectionFailures++
-        lastFailureTime = Date.now()
-
-        // If we've hit the failure threshold, force offline mode
-        if (connectionFailures >= MAX_FAILURES) {
-          console.log(`Circuit breaker tripped after ping error - enabling offline mode`)
-          forceOfflineMode(true)
-        }
-      }
-    }, 0)
-
-    return client
+    return adminClient
   } catch (error) {
-    console.error("Error creating Supabase admin client:", error instanceof Error ? error.message : String(error))
-    connectionFailures++
-    lastFailureTime = Date.now()
+    console.error("Error creating Supabase admin client:", error)
+    forceOfflineMode(true)
     return createMockClient()
   }
-}
-
-// Function to check if we're in offline mode
-export const isOfflineMode = () => {
-  return isOfflineModeForced || connectionFailures >= MAX_FAILURES
-}
-
-// Function to reset the circuit breaker
-export const resetCircuitBreaker = () => {
-  connectionFailures = 0
-  lastFailureTime = 0
-  isOfflineModeForced = false
-  console.log("Circuit breaker reset - offline mode disabled")
 }

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import type React from "react"
 import { TopNav } from "@/components/navigation/top-nav"
-import { getJWTFromStorage } from "@/lib/jwt-client"
+import { getJWTFromStorage, isJWTExpired } from "@/lib/jwt-client"
 
 interface MainLayoutProps {
   children: React.ReactNode
@@ -46,12 +46,11 @@ export function MainLayout({ children, userName, userImage }: MainLayoutProps) {
       if (jwt) {
         try {
           // Simple client-side check without verification
-          const payload = parseJWT(jwt)
-          if (payload && payload.exp && payload.exp * 1000 > Date.now()) {
+          if (!isJWTExpired(jwt)) {
             console.log("Valid JWT found in localStorage")
             jwtValid = true
           } else {
-            console.log("JWT found but expired or invalid")
+            console.log("JWT found but expired")
           }
         } catch (error) {
           console.error("Error parsing JWT:", error)
@@ -66,7 +65,10 @@ export function MainLayout({ children, userName, userImage }: MainLayoutProps) {
 
       // Check for auth cookies
       const hasAuthCookie =
-        document.cookie.includes("auth-status=authenticated") || document.cookie.includes("sb-auth-token=")
+        document.cookie.includes("auth-status=authenticated") ||
+        document.cookie.includes("sb-auth-token=") ||
+        document.cookie.includes("auth-bypass=true") ||
+        document.cookie.includes("is_authenticated=true")
 
       if (hasAuthCookie) {
         console.log("Authentication confirmed via cookies")
@@ -99,6 +101,11 @@ export function MainLayout({ children, userName, userImage }: MainLayoutProps) {
         localStorage.setItem("auth_bypass", "true")
         localStorage.setItem("auth_bypass_time", Date.now().toString())
         localStorage.setItem("is_authenticated", "true")
+
+        // Set a cookie for middleware checks
+        document.cookie = "auth-bypass=true; path=/; max-age=300; SameSite=Lax" // 5 minutes
+        document.cookie = "is_authenticated=true; path=/; max-age=86400; SameSite=Lax" // 24 hours
+
         setIsAuthenticated(true)
         setIsLoading(false)
         return true

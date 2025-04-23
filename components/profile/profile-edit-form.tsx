@@ -108,7 +108,7 @@ export function ProfileEditForm({ profile }: ProfileEditFormProps) {
         setIsUploading(false)
       }
 
-      // Update profile
+      // Update profile with all fields
       const result = await updateProfile({
         firstName: values.firstName,
         middleName: values.middleName,
@@ -119,6 +119,9 @@ export function ProfileEditForm({ profile }: ProfileEditFormProps) {
         state: values.state,
         zipCode: values.zipCode,
         profilePictureUrl: pictureUrl,
+        // Include BVN and date of birth if they exist in the profile
+        bvn: profile?.bvn || undefined,
+        dateOfBirth: profile?.date_of_birth || undefined,
       })
 
       if (result.error) {

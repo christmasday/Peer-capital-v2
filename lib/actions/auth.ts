@@ -1,12 +1,10 @@
 "use server"
-
-import { createServerClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { v4 as uuidv4 } from "uuid"
 import { cookies } from "next/headers"
 
 // Add the JWT imports at the top of the file
-import { generateJWT, setJWTCookie, clearJWTCookies } from "@/lib/jwt"
+import { generateJWT, setJWTCookie, clearJWTCookies, verifyJWT, getJWTFromCookies } from "@/lib/jwt"
 
 // Define offline mode variables
 let isOfflineModeEnabled = false
@@ -19,7 +17,175 @@ function forceOfflineMode(value: boolean) {
   isOfflineModeEnabled = value
 }
 
-// Update the signIn function to handle JWT generation more robustly
+// Add a new function to refresh JWT tokens
+export async function refreshJWT(currentToken: string) {
+  try {
+    console.log("Attempting to refresh JWT token")
+
+    // Verify the current token first
+    const { payload, error: verifyError } = await import("@/lib/jwt").then((module) => module.verifyJWT(currentToken))
+
+    if (verifyError || !payload) {
+      console.error("Failed to verify current JWT:", verifyError)
+      return { error: "Invalid token" }
+    }
+
+    // Get the user ID from the token
+    const userId = payload.userId || payload.sub
+
+    if (!userId) {
+      console.error("No user ID found in JWT payload")
+      return { error: "Invalid token payload" }
+    }
+
+    // Check if the token is actually expired or about to expire
+    const expiryTime = payload.exp
+    const currentTime = Math.floor(Date.now() / 1000)
+    const timeUntilExpiry = expiryTime - currentTime
+
+    // Only refresh if token is expired or about to expire (less than 15 minutes)
+    if (timeUntilExpiry > 900) {
+      console.log("Token is still valid for more than 15 minutes, no need to refresh")
+      return { success: true, refreshed: false }
+    }
+
+    // Get the user's email from Supabase
+    let userEmail = payload.email
+
+    // If email is not in the token, try to get it from Supabase
+    if (!userEmail) {
+      try {
+        const adminClient = createAdminClient()
+        const { data: userData, error: userError } = await adminClient.auth.admin.getUserById(userId)
+
+        if (userError || !userData?.user) {
+          console.error("Error fetching user data for JWT refresh:", userError)
+          // Continue with just the user ID
+        } else {
+          userEmail = userData.user.email
+        }
+      } catch (error) {
+        console.error("Error getting user email for JWT refresh:", error)
+        // Continue with just the user ID
+      }
+    }
+
+    // Generate a new JWT with the same data but extended expiration
+    const { jwt, error: jwtError } = await generateJWT({
+      userId: userId,
+      email: userEmail,
+      role: payload.role || "user",
+      sessionId: payload.sessionId || uuidv4(),
+    })
+
+    if (jwtError || !jwt) {
+      console.error("Error generating new JWT:", jwtError)
+      return { error: "Failed to generate new token" }
+    }
+
+    // Set the new JWT in cookies
+    const cookieSet = setJWTCookie(jwt)
+
+    if (!cookieSet) {
+      console.error("Failed to set JWT cookie")
+      return { error: "Failed to set authentication cookie" }
+    }
+
+    console.log("JWT refreshed successfully")
+    return { success: true, refreshed: true, jwt }
+  } catch (error) {
+    console.error("Unexpected error during JWT refresh:", error)
+    return {
+      error: `An unexpected error occurred during token refresh: ${error instanceof Error ? error.message : String(error)}`,
+    }
+  }
+}
+
+// Replace the createAuthUser function with this implementation
+async function createAuthUser(userData: {
+  email: string
+  password: string
+  firstName: string
+  middleName?: string
+  lastName: string
+  phoneNumber: string
+  bvn: string
+  dateOfBirth: string
+  address: string
+  city: string
+  state: string
+  zipCode?: string
+  country: string
+  profilePictureUrl?: string | null
+}) {
+  try {
+    console.log("Creating user in custom auth system...")
+    const adminClient = createAdminClient()
+
+    // Hash the password
+    const { hashPassword } = await import("@/lib/auth-utils/password")
+    const hashedPassword = await hashPassword(userData.password)
+
+    // Create user metadata
+    const userMetadata = {
+      first_name: userData.firstName,
+      middle_name: userData.middleName,
+      last_name: userData.lastName,
+      phone_number: userData.phoneNumber,
+      bvn: userData.bvn,
+      date_of_birth: userData.dateOfBirth,
+      address: userData.address,
+      city: userData.city,
+      state: userData.state,
+      zip_code: userData.zipCode,
+      country: userData.country,
+      profile_picture_url: userData.profilePictureUrl,
+    }
+
+    // Create the auth user in public.auth_users table
+    const userId = uuidv4()
+    const now = new Date().toISOString()
+
+    const { error: authError } = await adminClient.from("auth_users").insert({
+      id: userId,
+      email: userData.email.toLowerCase(),
+      phone: userData.phoneNumber, // Explicitly set the phone field
+      encrypted_password: hashedPassword,
+      raw_user_meta_data: userMetadata,
+      created_at: now,
+      updated_at: now,
+      email_confirmed_at: now, // Auto-confirm email
+    })
+
+    if (authError) {
+      console.error("Auth signup error:", authError.message)
+
+      // Check for specific error messages related to existing users
+      if (authError.message.includes("duplicate key") || authError.message.includes("unique constraint")) {
+        return {
+          error: "This email is already registered. Please use a different email or try logging in.",
+        }
+      }
+
+      return { error: authError.message }
+    }
+
+    console.log("Auth user created successfully with ID:", userId)
+    return {
+      success: true,
+      user: {
+        id: userId,
+        email: userData.email,
+        user_metadata: userMetadata,
+      },
+    }
+  } catch (error) {
+    console.error("Unexpected error creating auth user:", error)
+    return { error: `An unexpected error occurred: ${error instanceof Error ? error.message : String(error)}` }
+  }
+}
+
+// Replace the signIn function with this implementation
 export async function signIn(formData: FormData) {
   try {
     const email = formData.get("email") as string
@@ -30,47 +196,72 @@ export async function signIn(formData: FormData) {
     }
 
     console.log("Attempting to sign in user:", email)
-    const supabase = createServerClient()
+    const adminClient = createAdminClient()
 
-    // Sign in with password
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+    // Get user from auth_users table
+    const { data: userData, error: userError } = await adminClient
+      .from("auth_users")
+      .select("*")
+      .eq("email", email.toLowerCase())
+      .single()
 
-    if (error) {
-      console.error("Login error:", error.message)
-      return { error: error.message }
+    if (userError || !userData) {
+      console.error("Login error:", userError?.message || "User not found")
+      return { error: "Invalid email or password" }
     }
 
-    if (!data.user || !data.session) {
-      console.error("No user or session returned from auth")
-      return { error: "Authentication failed. Please try again." }
+    // Verify password
+    const { comparePassword } = await import("@/lib/auth-utils/password")
+    const passwordValid = await comparePassword(password, userData.encrypted_password)
+
+    if (!passwordValid) {
+      console.error("Login error: Invalid password")
+      return { error: "Invalid email or password" }
     }
 
-    console.log("User signed in successfully:", data.user.id)
-    console.log("Session established:", !!data.session)
+    // Update last sign in time
+    await adminClient
+      .from("auth_users")
+      .update({
+        last_sign_in_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", userData.id)
+
+    console.log("User signed in successfully:", userData.id)
+
+    // Create a session object similar to Supabase's
+    const sessionId = uuidv4()
+    const session = {
+      id: sessionId,
+      user_id: userData.id,
+      created_at: new Date().toISOString(),
+      expires_at: Math.floor(Date.now() / 1000) + 60 * 60 * 24, // 24 hours
+      access_token: uuidv4(), // Generate a random token
+    }
 
     // Generate JWT
+    let jwt = null
     try {
-      const { jwt, error: jwtError } = await generateJWT({
-        userId: data.user.id,
-        email: data.user.email,
+      const { jwt: generatedJwt, error: jwtError } = await generateJWT({
+        userId: userData.id,
+        email: userData.email || "",
         role: "user",
-        sessionId: data.session.id,
+        sessionId: sessionId,
       })
 
       if (jwtError) {
         console.error("JWT generation error:", jwtError)
-        // Continue with Supabase session as fallback
-      } else if (jwt) {
+        // Continue with session as fallback
+      } else if (generatedJwt) {
         // Set JWT in cookies
-        const cookieSet = setJWTCookie(jwt)
+        const cookieSet = setJWTCookie(generatedJwt)
         console.log("JWT cookie set:", cookieSet)
+        jwt = generatedJwt
       }
     } catch (jwtError) {
       console.error("Error during JWT generation:", jwtError)
-      // Continue with Supabase session as fallback
+      // Continue with session as fallback
     }
 
     // Set cookies with longer expiration
@@ -78,7 +269,7 @@ export async function signIn(formData: FormData) {
       const cookieStore = cookies()
 
       // Set a session cookie with a long expiration
-      cookieStore.set("sb-auth-token", data.session.access_token, {
+      cookieStore.set("custom-auth-token", session.access_token, {
         path: "/",
         maxAge: 60 * 60 * 24 * 7, // 7 days
         httpOnly: true,
@@ -95,6 +286,15 @@ export async function signIn(formData: FormData) {
         sameSite: "lax",
       })
 
+      // Set an auth bypass cookie to prevent middleware redirects
+      cookieStore.set("auth-bypass", "true", {
+        path: "/",
+        maxAge: 300, // 5 minutes
+        httpOnly: false,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+      })
+
       console.log("Auth cookies set successfully")
     } catch (cookieError) {
       console.error("Error setting cookies:", cookieError)
@@ -103,9 +303,14 @@ export async function signIn(formData: FormData) {
 
     return {
       success: true,
-      user: data.user,
+      user: {
+        id: userData.id,
+        email: userData.email,
+        user_metadata: userData.raw_user_meta_data,
+      },
       redirectUrl: "/home",
-      session: data.session,
+      session: session,
+      jwt: jwt, // Return the JWT to the client
     }
   } catch (error) {
     console.error("Unexpected error during sign in:", error)
@@ -177,8 +382,16 @@ async function ensureUserProfile(userId: string) {
         console.error("Error fetching user data:", userError)
         // Create a basic profile anyway
         try {
+          // Define metadata here to avoid the "undeclared variable" error
+          const metadata = userData?.user?.user_metadata || {}
+
           const { error: createError } = await adminClient.from("profiles").insert({
             id: userId,
+            first_name: metadata.first_name,
+            middle_name: metadata.middle_name,
+            last_name: metadata.last_name,
+            phone_number: metadata.phone_number,
+            bvn: metadata.bvn,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })
@@ -192,23 +405,25 @@ async function ensureUserProfile(userId: string) {
           return { success: true, fallback: true }
         }
       } else {
-        // Create profile with user metadata
+        // Create profile with user metadata - ensure ALL fields are included
         const metadata = userData.user.user_metadata || {}
 
         try {
           const { error: createError } = await adminClient.from("profiles").insert({
             id: userId,
-            first_name: metadata.first_name || null,
-            middle_name: metadata.middle_name || null,
-            last_name: metadata.last_name || null,
-            phone_number: metadata.phone_number || null,
-            bvn: metadata.bvn || null,
-            date_of_birth: metadata.date_of_birth || null,
-            address: metadata.address || null,
-            city: metadata.city || null,
-            state: metadata.state || null,
-            zip_code: metadata.zip_code || null,
-            profile_picture_url: metadata.profile_picture_url || null,
+            email: metadata.email || userData.user.email,
+            first_name: metadata.first_name,
+            middle_name: metadata.middle_name,
+            last_name: metadata.last_name,
+            phone_number: metadata.phone_number,
+            bvn: metadata.bvn,
+            date_of_birth: metadata.date_of_birth,
+            address: metadata.address,
+            city: metadata.city,
+            state: metadata.state,
+            zip_code: metadata.zip_code,
+            country: metadata.country,
+            profile_picture_url: metadata.profile_picture_url,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })
@@ -227,6 +442,14 @@ async function ensureUserProfile(userId: string) {
       return { success: true, fallback: true }
     }
 
+    // After creating the profile, ensure notification preferences exist
+    try {
+      await ensureNotificationPreferences(userId)
+    } catch (preferencesError) {
+      console.error("Error ensuring notification preferences:", preferencesError)
+      // Continue anyway, this is not critical
+    }
+
     // Ensure account balance exists
     try {
       await ensureAccountBalance(userId)
@@ -242,13 +465,32 @@ async function ensureUserProfile(userId: string) {
   }
 }
 
-// Function to ensure a user has an account balance
+// Update the ensureAccountBalance function to properly check if the user exists in auth_users first
+// and to handle the foreign key constraint error
+
 async function ensureAccountBalance(userId: string) {
   try {
     console.log("Ensuring account balance exists for:", userId)
     const adminClient = createAdminClient()
 
-    // Check if account balance exists
+    // First, verify that the user exists in auth_users table
+    try {
+      const { data: userExists, error: userCheckError } = await adminClient
+        .from("auth_users")
+        .select("id")
+        .eq("id", userId)
+        .single()
+
+      if (userCheckError || !userExists) {
+        console.error("User does not exist in auth_users table:", userCheckError || "No user found")
+        return { error: "User does not exist in auth_users table", fallback: true }
+      }
+    } catch (userCheckError) {
+      console.error("Error checking if user exists in auth_users:", userCheckError)
+      return { error: "Failed to verify user existence", fallback: true }
+    }
+
+    // Now check if account balance already exists
     try {
       const { data: existingBalance, error: balanceCheckError } = await adminClient
         .from("account_balances")
@@ -272,33 +514,587 @@ async function ensureAccountBalance(userId: string) {
 
     console.log("Creating account balance for user:", userId)
 
-    // Create account balance
-    try {
-      const { error: balanceError } = await adminClient.from("account_balances").insert({
-        id: uuidv4(),
-        user_id: userId,
-        balance: 0,
-        loan_balance: 0,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
+    // Create account balance with retry logic
+    let retryCount = 0
+    const maxRetries = 3
 
-      if (balanceError) {
-        console.error("Error creating account balance:", balanceError)
-        return { error: "Failed to create account balance", fallback: true }
+    while (retryCount < maxRetries) {
+      try {
+        const { error: balanceError } = await adminClient.from("account_balances").insert({
+          id: uuidv4(),
+          user_id: userId,
+          balance: 0,
+          loan_balance: 0,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+
+        if (balanceError) {
+          if (balanceError.code === "23503") {
+            // Foreign key violation
+            console.error(`Foreign key violation (attempt ${retryCount + 1}):`, balanceError.message)
+            retryCount++
+            // Wait a bit before retrying to allow for any pending transactions to complete
+            await new Promise((resolve) => setTimeout(resolve, 500))
+          } else {
+            console.error("Error creating account balance:", balanceError)
+            return { error: "Failed to create account balance: " + balanceError.message, fallback: true }
+          }
+        } else {
+          // Success!
+          console.log("Account balance created successfully for user:", userId)
+          return { success: true }
+        }
+      } catch (insertError) {
+        console.error("Exception during account balance insert:", insertError)
+        retryCount++
+        if (retryCount >= maxRetries) {
+          return { success: true, fallback: true, warning: "Failed to create account balance after retries" }
+        }
+        // Wait before retrying
+        await new Promise((resolve) => setTimeout(resolve, 500))
       }
-    } catch (insertError) {
-      console.error("Error inserting account balance:", insertError)
-      return { success: true, fallback: true }
     }
 
-    return { success: true }
+    // If we get here, all retries failed
+    console.warn("All retries failed when creating account balance")
+    return { success: true, fallback: true, warning: "Failed to create account balance after maximum retries" }
   } catch (error) {
     console.error("Unexpected error in ensureAccountBalance:", error)
     return { success: true, fallback: true }
   }
 }
 
+// Function to ensure notification preferences exist for a user
+async function ensureNotificationPreferences(userId: string) {
+  try {
+    console.log("Ensuring notification preferences exist for:", userId)
+    const adminClient = createAdminClient()
+
+    // Check if notification preferences exist
+    try {
+      const { data: existingPreferences, error: preferencesCheckError } = await adminClient
+        .from("notification_preferences")
+        .select("id")
+        .eq("user_id", userId)
+        .single()
+
+      if (preferencesCheckError && preferencesCheckError.code !== "PGRST116") {
+        console.error("Error checking for existing notification preferences:", preferencesCheckError)
+        return { error: "Failed to check for existing notification preferences", fallback: true }
+      }
+
+      if (existingPreferences) {
+        console.log("Notification preferences already exist for user:", userId)
+        return { success: true }
+      }
+    } catch (checkError) {
+      console.error("Error checking for existing notification preferences:", checkError)
+      return { success: true, fallback: true }
+    }
+
+    console.log("Creating notification preferences for user:", userId)
+
+    // Create notification preferences
+    try {
+      const { error: preferencesError } = await adminClient.from("notification_preferences").insert({
+        id: uuidv4(),
+        user_id: userId,
+        email_notifications: true,
+        sms_notifications: false,
+        push_notifications: false,
+        marketing_emails: true,
+        transaction_alerts: true,
+        security_alerts: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+
+      if (preferencesError) {
+        console.error("Error creating notification preferences:", preferencesError)
+        return { error: "Failed to create notification preferences", fallback: true }
+      }
+    } catch (insertError) {
+      console.error("Error inserting notification preferences:", insertError)
+      return { success: true, fallback: true }
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error("Unexpected error in ensureNotificationPreferences:", error)
+    return { success: true, fallback: true }
+  }
+}
+
+// Replace the checkEmailExists function with this implementation
+export async function checkEmailExists(email: string) {
+  console.log("Checking if email exists:", email)
+  let errorMessage = ""
+
+  try {
+    const adminClient = createAdminClient()
+
+    // Check if we're in offline mode
+    if (isOfflineMode()) {
+      console.log("Skipping email existence check in offline mode")
+      return { exists: false }
+    }
+
+    // Check auth_users table
+    try {
+      const { data: authUsers, error: authQueryError } = await adminClient
+        .from("auth_users")
+        .select("id, email")
+        .eq("email", email.toLowerCase().trim())
+        .limit(1)
+
+      if (authQueryError) {
+        console.error("Error checking for existing user by email in auth_users:", authQueryError)
+        errorMessage = "Error checking auth system for email"
+      } else if (authUsers && authUsers.length > 0) {
+        console.log("Email match found in auth_users:", email)
+        return {
+          exists: true,
+          source: "auth_users",
+          field: "email",
+          message: "This email is already registered. Please use a different email or try logging in.",
+        }
+      } else {
+        console.log("Email check passed - email not found in auth_users")
+      }
+    } catch (emailCheckError) {
+      console.error("Failed to check email existence in auth_users:", emailCheckError)
+      errorMessage = "Error checking auth system for email"
+      // Continue with profiles check
+    }
+
+    // Next, check profiles table
+    try {
+      const { data: emailProfiles, error: profileEmailError } = await adminClient
+        .from("profiles")
+        .select("id, email")
+        .eq("email", email)
+        .limit(1)
+
+      if (profileEmailError) {
+        console.error("Error checking for existing email in profiles:", profileEmailError)
+      } else if (emailProfiles && emailProfiles.length > 0) {
+        // Compare emails case-insensitively
+        const submittedEmail = email.toLowerCase().trim()
+        const existingEmail = emailProfiles[0].email?.toLowerCase().trim()
+
+        if (existingEmail === submittedEmail) {
+          console.log("Email match found in profiles table:", {
+            submitted: submittedEmail,
+            existing: existingEmail,
+          })
+          return {
+            exists: true,
+            source: "profiles",
+            field: "email",
+            message: "This email is already registered in our system. Please use a different email.",
+          }
+        } else {
+          console.log("Email found in profiles but doesn't match exactly:", {
+            submitted: submittedEmail,
+            existing: existingEmail,
+          })
+        }
+      } else {
+        console.log("Email check passed - email not found in profiles")
+      }
+    } catch (profileEmailCheckError) {
+      console.error("Failed to check email existence in profiles:", profileEmailCheckError)
+      // Continue with result
+    }
+
+    // If we get here, no existing email was found
+    console.log("Email existence check completed: Email does not exist")
+    return {
+      exists: false,
+      warning: errorMessage || undefined,
+    }
+  } catch (error) {
+    console.error("Unexpected error in email existence check:", error)
+    // Return a non-blocking error
+    return {
+      exists: false,
+      warning: errorMessage || "Failed to check if email already exists",
+      error: "Failed to check if email already exists. You can continue, but we'll verify again during signup.",
+    }
+  }
+}
+
+// Replace the checkUserExists function with this implementation
+export async function checkUserExists(email: string, phoneNumber: string, bvn: string) {
+  console.log("Starting user existence check for:", { email, phoneNumber, bvn: bvn.substring(0, 4) + "****" })
+  let errorMessage = ""
+
+  try {
+    const adminClient = createAdminClient()
+
+    // Check if we're in offline mode
+    if (isOfflineMode()) {
+      console.log("Skipping user existence check in offline mode")
+      return { exists: false }
+    }
+
+    // First, check if the email exists in auth_users
+    try {
+      const { data: authUsers, error: authQueryError } = await adminClient
+        .from("auth_users")
+        .select("id, email")
+        .eq("email", email.toLowerCase().trim())
+        .limit(1)
+
+      if (authQueryError) {
+        console.error("Error checking for existing user by email in auth_users:", authQueryError)
+        errorMessage = "Error checking auth system for email"
+      } else if (authUsers && authUsers.length > 0) {
+        console.log("Email match found in auth_users:", email)
+        return {
+          exists: true,
+          source: "auth_users",
+          field: "email",
+          message: "This email is already registered. Please use a different email or try logging in.",
+        }
+      } else {
+        console.log("Email check passed - email not found in auth_users")
+      }
+    } catch (emailCheckError) {
+      console.error("Failed to check email existence in auth_users:", emailCheckError)
+      errorMessage = "Error checking auth system for email"
+      // Continue with profiles check
+    }
+
+    // Next, check if the email exists in profiles
+    try {
+      const { data: emailProfiles, error: profileEmailError } = await adminClient
+        .from("profiles")
+        .select("id, email")
+        .eq("email", email)
+        .limit(1)
+
+      if (profileEmailError) {
+        console.error("Error checking for existing email in profiles:", profileEmailError)
+      } else if (emailProfiles && emailProfiles.length > 0) {
+        // Compare emails case-insensitively
+        const submittedEmail = email.toLowerCase().trim()
+        const existingEmail = emailProfiles[0].email?.toLowerCase().trim()
+
+        if (existingEmail === submittedEmail) {
+          console.log("Email match found in profiles table:", {
+            submitted: submittedEmail,
+            existing: existingEmail,
+          })
+          return {
+            exists: true,
+            source: "profiles",
+            field: "email",
+            message: "This email is already registered in our system. Please use a different email.",
+          }
+        } else {
+          console.log("Email found in profiles but doesn't match exactly:", {
+            submitted: submittedEmail,
+            existing: existingEmail,
+          })
+        }
+      } else {
+        console.log("Email check passed - email not found in profiles")
+      }
+    } catch (profileEmailCheckError) {
+      console.error("Failed to check email existence in profiles:", profileEmailCheckError)
+      // Continue with other checks
+    }
+
+    // Next, check if the phone number exists in profiles
+    try {
+      const { data: phoneProfiles, error: phoneError } = await adminClient
+        .from("profiles")
+        .select("id")
+        .eq("phone_number", phoneNumber)
+        .limit(1)
+
+      if (phoneError) {
+        console.error("Error checking for existing phone number:", phoneError)
+      } else if (phoneProfiles && phoneProfiles.length > 0) {
+        console.log("Phone number already exists in profiles")
+        return {
+          exists: true,
+          source: "profiles",
+          field: "phoneNumber",
+          message: "This phone number is already registered. Please use a different phone number.",
+        }
+      } else {
+        console.log("Phone number check passed - phone not found in profiles")
+      }
+    } catch (phoneCheckError) {
+      console.error("Failed to check phone number existence:", phoneCheckError)
+      // Continue with other checks
+    }
+
+    // Finally, check if the BVN exists in profiles
+    try {
+      const { data: bvnProfiles, error: bvnError } = await adminClient
+        .from("profiles")
+        .select("id")
+        .eq("bvn", bvn)
+        .limit(1)
+
+      if (bvnError) {
+        console.error("Error checking for existing BVN:", bvnError)
+      } else if (bvnProfiles && bvnProfiles.length > 0) {
+        console.log("BVN already exists in profiles")
+        return {
+          exists: true,
+          source: "profiles",
+          field: "bvn",
+          message: "This BVN is already registered. Please use a different BVN.",
+        }
+      } else {
+        console.log("BVN check passed - BVN not found in profiles")
+      }
+    } catch (bvnCheckError) {
+      console.error("Failed to check BVN existence:", bvnCheckError)
+      // Continue anyway
+    }
+
+    // If we get here, no existing user was found
+    console.log("User existence check completed: User does not exist")
+    return {
+      exists: false,
+      warning: errorMessage || undefined,
+    }
+  } catch (error) {
+    console.error("Unexpected error in user existence check:", error)
+    // Return a non-blocking error
+    return {
+      exists: false,
+      warning: errorMessage || "Failed to check if user already exists",
+      error: "Failed to check if user already exists. You can continue, but we'll verify again during signup.",
+    }
+  }
+}
+
+// Function to create a user in Supabase Auth
+// async function createAuthUser(userData: {
+//   email: string
+//   password: string
+//   firstName: string
+//   middleName?: string
+//   lastName: string
+//   phoneNumber: string
+//   bvn: string
+//   dateOfBirth: string
+//   address: string
+//   city: string
+//   state: string
+//   zipCode?: string
+//   country: string
+//   profilePictureUrl?: string | null
+// }) {
+//   try {
+//     console.log("Creating user in custom auth system...")
+//     const adminClient = createAdminClient()
+
+//     // Hash the password
+//     const { hashPassword } = await import("@/lib/auth-utils/password")
+//     const hashedPassword = await hashPassword(userData.password)
+
+//     // Create user metadata
+//     const userMetadata = {
+//       first_name: userData.firstName,
+//       middle_name: userData.middleName,
+//       last_name: userData.lastName,
+//       phone_number: userData.phoneNumber,
+//       bvn: userData.bvn,
+//       date_of_birth: userData.dateOfBirth,
+//       address: userData.address,
+//       city: userData.city,
+//       state: userData.state,
+//       zip_code: userData.zipCode,
+//       country: userData.country,
+//       profile_picture_url: userData.profilePictureUrl,
+//     }
+
+//     // Create the auth user in public.auth_users table
+//     const userId = uuidv4()
+//     const now = new Date().toISOString()
+
+//     const { error: authError } = await adminClient
+//       .from("auth_users")
+//       .insert({
+//         id: userId,
+//         email: userData.email.toLowerCase(),
+//         encrypted_password: hashedPassword,
+//         raw_user_meta_data: userMetadata,
+//         created_at: now,
+//         updated_at: now,
+//         email_confirmed_at: now, // Auto-confirm email
+//       })
+
+//     if (authError) {
+//       console.error("Auth signup error:", authError.message)
+
+//       // Check for specific error messages related to existing users
+//       if (
+//         authError.message.includes("duplicate key") ||
+//         authError.message.includes("unique constraint")
+//       ) {
+//         return {
+//           error: "This email is already registered. Please use a different email or try logging in.",
+//         }
+//       }
+
+//       return { error: authError.message }
+//     }
+
+//     console.log("Auth user created successfully with ID:", userId)
+//     return {
+//       success: true,
+//       user: {
+//         id: userId,
+//         email: userData.email,
+//         user_metadata: userMetadata
+//       }
+//     }
+//   } catch (error) {
+//     console.error("Unexpected error creating auth user:", error)
+//     return { error: `An unexpected error occurred: ${error instanceof Error ? error.message : String(error)}` }
+//   }
+// }
+
+// Function to create a user profile
+async function createUserProfile(
+  userId: string,
+  userData: {
+    email: string
+    firstName: string
+    middleName?: string
+    lastName: string
+    phoneNumber: string
+    bvn: string
+    dateOfBirth: string
+    address: string
+    city: string
+    state: string
+    zipCode?: string
+    country: string
+    profilePictureUrl?: string | null
+  },
+) {
+  try {
+    console.log("Creating user profile...")
+    const adminClient = createAdminClient()
+
+    // Check if a profile with this ID already exists
+    const { data: existingProfile, error: checkError } = await adminClient
+      .from("profiles")
+      .select("id")
+      .eq("id", userId)
+      .maybeSingle()
+
+    if (checkError) {
+      console.error("Error checking for existing profile:", checkError)
+      // Continue anyway
+    }
+
+    if (existingProfile) {
+      console.log("Profile already exists for this user, skipping profile creation")
+      return { success: true, message: "Profile already exists" }
+    }
+
+    // Format the date properly for PostgreSQL
+    let formattedDateOfBirth = null
+    try {
+      if (userData.dateOfBirth) {
+        // Try parsing as ISO string first
+        const date = new Date(userData.dateOfBirth)
+        if (!isNaN(date.getTime())) {
+          formattedDateOfBirth = date.toISOString().split("T")[0]
+          console.log("Formatted date of birth:", formattedDateOfBirth)
+        } else {
+          console.error("Invalid date format:", userData.dateOfBirth)
+          // Leave as null
+        }
+      }
+    } catch (dateError) {
+      console.error("Error formatting date:", dateError)
+      // Continue with null
+    }
+
+    // Prepare profile data - explicitly include email field and ensure all fields are properly formatted
+    const profileData = {
+      id: userId,
+      email: userData.email, // Email is required
+      first_name: userData.firstName || "",
+      middle_name: userData.middleName || null,
+      last_name: userData.lastName || "",
+      phone_number: userData.phoneNumber || "",
+      bvn: userData.bvn || "",
+      date_of_birth: formattedDateOfBirth || null, // Properly formatted date
+      address: userData.address || "",
+      city: userData.city || "",
+      state: userData.state || "",
+      zip_code: userData.zipCode || null,
+      country: userData.country || "Nigeria", // Default to Nigeria if not provided
+      profile_picture_url: userData.profilePictureUrl || null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+
+    // Log the profile data we're about to insert (excluding sensitive info)
+    console.log("Profile data to insert:", {
+      ...profileData,
+      bvn: "***REDACTED***",
+    })
+
+    // Try inserting with more detailed error logging
+    try {
+      const { error: profileError } = await adminClient.from("profiles").insert(profileData)
+
+      if (profileError) {
+        console.error("Error creating profile:", profileError)
+        console.error("Profile error details:", JSON.stringify(profileError))
+        console.error("Error code:", profileError.code)
+        console.error("Error message:", profileError.message)
+        console.error("Error details:", profileError.details)
+
+        // If there's a unique constraint violation, handle it gracefully
+        if (profileError.code === "23505") {
+          // PostgreSQL unique violation code
+          console.log("Unique constraint violation - profile may already exist")
+          return { success: true, warning: "Profile may already exist" }
+        } else if (profileError.code === "23502") {
+          // NOT NULL violation
+          console.error("NOT NULL constraint violation - missing required field")
+          return {
+            error: "Missing required field: " + (profileError.details || profileError.message),
+          }
+        } else {
+          return {
+            error: "Database error creating profile: " + profileError.message,
+          }
+        }
+      }
+    } catch (insertError) {
+      console.error("Exception during profile insert:", insertError)
+      console.error("Insert error details:", JSON.stringify(insertError))
+      return {
+        error:
+          "Database error creating profile: " +
+          (insertError instanceof Error ? insertError.message : String(insertError)),
+      }
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error("Unexpected error creating user profile:", error)
+    return { error: `An unexpected error occurred: ${error instanceof Error ? error.message : String(error)}` }
+  }
+}
+
+// Update the signUp function to ensure proper sequencing
 export async function signUp(userData: {
   email: string
   password: string
@@ -312,6 +1108,7 @@ export async function signUp(userData: {
   city: string
   state: string
   zipCode?: string
+  country: string
   profilePictureUrl?: string | null
 }) {
   try {
@@ -320,104 +1117,76 @@ export async function signUp(userData: {
       password: "***REDACTED***", // Don't log the password
     })
 
-    const supabase = createServerClient()
-    const adminClient = createAdminClient()
+    // First check if user with email already exists
+    const existsCheck = await checkEmailExists(userData.email)
 
-    // Store user data in the user metadata
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: userData.email,
-      password: userData.password,
-      options: {
-        data: {
-          // Store all user profile data in metadata for later retrieval
-          first_name: userData.firstName,
-          middle_name: userData.middleName,
-          last_name: userData.lastName,
-          phone_number: userData.phoneNumber,
-          bvn: userData.bvn,
-          date_of_birth: userData.dateOfBirth,
-          address: userData.address,
-          city: userData.city,
-          state: userData.state,
-          zip_code: userData.zipCode,
-          profile_picture_url: userData.profilePictureUrl,
-        },
-      },
-    })
-
-    if (authError) {
-      console.error("Auth signup error:", authError.message)
-      return { error: authError.message }
+    if (existsCheck.exists) {
+      console.log("Email already exists:", existsCheck)
+      return { error: existsCheck.message || "This email already exists" }
     }
 
-    if (!authData.user) {
-      console.error("No user returned from auth signup")
-      return { error: "Failed to create user" }
+    // Step 1: Create the auth user
+    const authResult = await createAuthUser(userData)
+
+    if (!authResult.success || !authResult.user) {
+      console.error("Failed to create auth user:", authResult.error)
+      return { error: authResult.error || "Failed to create user account" }
     }
 
-    console.log("Auth user created successfully with ID:", authData.user.id)
+    const userId = authResult.user.id
+    console.log("Auth user created successfully with ID:", userId)
 
-    // Immediately create the profile in the profiles table
-    try {
-      const { error: profileError } = await adminClient.from("profiles").insert({
-        id: authData.user.id,
-        first_name: userData.firstName,
-        middle_name: userData.middleName || null,
-        last_name: userData.lastName,
-        phone_number: userData.phoneNumber,
-        bvn: userData.bvn,
-        date_of_birth: userData.dateOfBirth,
-        address: userData.address,
-        city: userData.city,
-        state: userData.state,
-        zip_code: userData.zipCode || null,
-        profile_picture_url: userData.profilePictureUrl || null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
+    // Add a small delay to ensure the auth user is fully committed to the database
+    await new Promise((resolve) => setTimeout(resolve, 500))
 
-      if (profileError) {
-        console.error("Error creating profile:", profileError)
-        return {
-          success: true,
-          user: authData.user,
-          warning: "Account created but profile setup failed. Profile will be created on first login.",
-          message: "Account created successfully! Please log in to continue.",
-        }
+    // Step 2: Create the user profile
+    const profileResult = await createUserProfile(userId, userData)
+
+    if (!profileResult.success) {
+      console.error("Failed to create user profile:", profileResult.error)
+
+      // Try to delete the auth user to maintain consistency
+      try {
+        const adminClient = createAdminClient()
+        await adminClient.from("auth_users").delete().eq("id", userId)
+        console.log("Deleted auth user after profile creation failure")
+      } catch (deleteError) {
+        console.error("Failed to delete auth user after profile creation failure:", deleteError)
       }
-    } catch (profileError) {
-      console.error("Error creating profile:", profileError)
-      return {
-        success: true,
-        user: authData.user,
-        warning: "Account created but profile setup failed. Profile will be created on first login.",
-        message: "Account created successfully! Please log in to continue.",
-      }
+
+      return { error: profileResult.error || "Failed to create user profile" }
     }
 
-    // Create account balance
-    try {
-      const { error: balanceError } = await adminClient.from("account_balances").insert({
-        id: uuidv4(),
-        user_id: authData.user.id,
-        balance: 0,
-        loan_balance: 0,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
+    // Add another small delay before creating account balance
+    await new Promise((resolve) => setTimeout(resolve, 500))
 
-      if (balanceError) {
-        console.error("Error creating account balance:", balanceError)
-        // Not critical, continue
+    // Step 3: Create account balance
+    try {
+      const balanceResult = await ensureAccountBalance(userId)
+      if (!balanceResult.success) {
+        console.warn("Warning: Failed to create account balance:", balanceResult.error)
+        // Continue anyway, this is not critical
       }
     } catch (balanceError) {
-      console.error("Error creating account balance:", balanceError)
-      // Not critical, continue
+      console.warn("Exception creating account balance:", balanceError)
+      // Continue anyway, this is not critical
+    }
+
+    // Step 4: Create notification preferences
+    try {
+      const preferencesResult = await ensureNotificationPreferences(userId)
+      if (!preferencesResult.success) {
+        console.warn("Warning: Failed to create notification preferences:", preferencesResult.error)
+        // Continue anyway, this is not critical
+      }
+    } catch (preferencesError) {
+      console.warn("Exception creating notification preferences:", preferencesError)
+      // Continue anyway, this is not critical
     }
 
     return {
       success: true,
-      user: authData.user,
+      user: authResult.user,
       message: "Account created successfully! Please log in to continue.",
     }
   } catch (error) {
@@ -493,19 +1262,39 @@ export async function updateUserProfile(userId: string, profileData: any) {
   }
 }
 
+// Update the resetPassword function to use our custom implementation
 export async function resetPassword(formData: FormData) {
   const email = formData.get("email") as string
 
-  const supabase = createServerClient()
-
-  const { error } = await supabase.auth.resetPasswordForEmail(email)
-
-  if (error) {
-    console.error("Password reset error:", error.message)
-    return { error: error.message }
+  if (!email) {
+    return { error: "Email is required" }
   }
 
-  return { success: true }
+  try {
+    const adminClient = createAdminClient()
+
+    // Check if the user exists
+    const { data, error } = await adminClient.from("auth_users").select("id").eq("email", email.toLowerCase()).single()
+
+    if (error || !data) {
+      // Don't reveal if the email exists or not for security
+      return { success: true, message: "If your email is registered, you will receive password reset instructions." }
+    }
+
+    // In a real implementation, you would:
+    // 1. Generate a reset token
+    // 2. Store it in the database with an expiration
+    // 3. Send an email with a link containing the token
+
+    // For now, we'll just return success
+    return {
+      success: true,
+      message: "If your email is registered, you will receive password reset instructions.",
+    }
+  } catch (error) {
+    console.error("Error in resetPassword:", error)
+    return { error: "An unexpected error occurred" }
+  }
 }
 
 // Update the signOut function to clear JWT cookies
@@ -523,35 +1312,16 @@ export async function signOut() {
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
       })
+
+      // Clear custom auth token
+      cookieStore.set("custom-auth-token", "", {
+        path: "/",
+        expires: new Date(0),
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+      })
     } catch (cookieError) {
       console.error("Error setting signout cookie:", cookieError)
-    }
-
-    // Check if we're in offline mode
-    if (isOfflineMode()) {
-      console.log("Signing out in offline mode")
-      return { success: true, redirectUrl: "/?signout=true" }
-    }
-
-    // Try to sign out from Supabase, but don't wait for it
-    try {
-      const supabase = createServerClient()
-
-      // Use a promise with timeout to prevent hanging
-      const signOutPromise = supabase.auth.signOut({ scope: "global" })
-      const timeoutPromise = new Promise((resolve) => {
-        setTimeout(() => {
-          console.log("Supabase signout timed out, continuing anyway")
-          resolve({ error: null })
-        }, 2000) // 2 second timeout
-      })
-
-      // Race the promises
-      Promise.race([signOutPromise, timeoutPromise]).catch((error) => {
-        console.error("Supabase signout error (non-blocking):", error)
-      })
-    } catch (error) {
-      console.error("Error creating Supabase client for signout:", error)
     }
 
     // Return success immediately
@@ -564,9 +1334,10 @@ export async function signOut() {
 
 // Circuit breaker configuration
 const MAX_FAILURES = 3
-let connectionFailures = 0
-let lastFailureTime = 0
+const connectionFailures = 0
+const lastFailureTime = 0
 
+// Update the getUserProfile function to use our custom implementation
 export async function getUserProfile() {
   try {
     // Check if we're in offline mode
@@ -597,39 +1368,72 @@ export async function getUserProfile() {
       account: { balance: 120000, loan_balance: 50000 },
     }
 
-    // Add timeout to getSession with better error handling
-    let sessionData
-    let supabase
-    try {
-      supabase = createServerClient()
-      const sessionPromise = supabase.auth.getSession()
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error("Session fetch timed out")), 3000)
-      })
+    // Get user ID from JWT
+    const jwt = getJWTFromCookies()
+    let userId = null
 
-      const result = await Promise.race([sessionPromise, timeoutPromise]).catch((error) => {
-        console.error("Session fetch failed:", error.message)
-        forceOfflineMode(true)
-        return { data: { session: null } }
-      })
-
-      sessionData = result.data
-
-      if (!sessionData?.session?.user) {
-        console.log("No active session found in getUserProfile")
-        // Force offline mode if no session is found
-        forceOfflineMode(true)
-        return fallbackUserData
+    if (jwt) {
+      try {
+        const { payload, error } = await verifyJWT(jwt)
+        if (!error && payload && (payload.userId || payload.sub)) {
+          userId = payload.userId || payload.sub
+          console.log("Using userId from JWT:", userId)
+        }
+      } catch (error) {
+        console.error("Error verifying JWT:", error)
       }
-    } catch (sessionError) {
-      console.error("Error fetching session:", sessionError)
-      // Force offline mode if session fetch fails
-      forceOfflineMode(true)
+    }
+
+    // If no userId from JWT, try to get from custom auth token
+    if (!userId) {
+      try {
+        const cookieStore = cookies()
+        const authToken = cookieStore.get("custom-auth-token")?.value
+
+        if (authToken) {
+          const adminClient = createAdminClient()
+          const { data: userData, error } = await adminClient
+            .from("auth_users")
+            .select("id")
+            .eq("access_token", authToken)
+            .single()
+
+          if (!error && userData) {
+            userId = userData.id
+            console.log("Using userId from custom auth token:", userId)
+          }
+        }
+      } catch (error) {
+        console.error("Error getting userId from custom auth token:", error)
+      }
+    }
+
+    // If still no userId, return fallback data
+    if (!userId) {
+      console.log("No authenticated user found, returning fallback data")
       return fallbackUserData
     }
 
-    const userId = sessionData.session.user.id
     console.log("Getting profile for user:", userId)
+    const adminClient = createAdminClient()
+
+    // Get user data from auth_users
+    let userData = null
+    try {
+      const { data, error } = await adminClient.from("auth_users").select("*").eq("id", userId).single()
+
+      if (error) {
+        console.error("Error fetching user data:", error)
+      } else {
+        userData = {
+          id: data.id,
+          email: data.email,
+          user_metadata: data.raw_user_meta_data || {},
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching user data:", error)
+    }
 
     // Ensure the user has a profile
     try {
@@ -639,88 +1443,47 @@ export async function getUserProfile() {
       // Continue anyway to try to get whatever profile data exists
     }
 
-    // Get profile data with timeout and better error handling
+    // Get profile data
     let profileData = null
     try {
-      const profilePromise = supabase.from("profiles").select("*").eq("id", userId).single()
-      const profileTimeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error("Profile fetch timed out")), 3000)
-      })
+      const { data, error } = await adminClient.from("profiles").select("*").eq("id", userId).single()
 
-      try {
-        const result = await Promise.race([profilePromise, profileTimeoutPromise])
-        if (result.error) {
-          console.error("Error fetching profile:", result.error.message)
-          // Don't throw, just continue with null profileData
-        } else {
-          profileData = result.data
-        }
-      } catch (fetchError) {
-        console.error("Network error fetching profile:", fetchError)
-        // Increment failure count for circuit breaker
-        connectionFailures++
-        lastFailureTime = Date.now()
-
-        // If we've hit the failure threshold, force offline mode
-        if (connectionFailures >= MAX_FAILURES) {
-          console.log(`Circuit breaker tripped after profile fetch failure - enabling offline mode`)
-          forceOfflineMode(true)
-        }
+      if (error) {
+        console.error("Error fetching profile:", error)
+      } else {
+        profileData = data
       }
-    } catch (profileError) {
-      console.error("Unexpected error fetching profile:", profileError)
+    } catch (error) {
+      console.error("Error fetching profile:", error)
     }
 
-    // Get account data with timeout and better error handling
+    // Get account data
     let accountData = null
     try {
-      const accountPromise = supabase.from("account_balances").select("*").eq("user_id", userId).single()
-      const accountTimeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error("Account fetch timed out")), 3000)
-      })
+      const { data, error } = await adminClient.from("account_balances").select("*").eq("user_id", userId).single()
 
-      try {
-        const result = await Promise.race([accountPromise, accountTimeoutPromise])
-        if (result.error) {
-          console.error("Error fetching account balance:", result.error.message)
-          // Don't throw, just continue with null accountData
-        } else {
-          accountData = result.data
-        }
-      } catch (fetchError) {
-        console.error("Network error fetching account balance:", fetchError)
-        // Increment failure count for circuit breaker
-        connectionFailures++
-        lastFailureTime = Date.now()
-
-        // If we've hit the failure threshold, force offline mode
-        if (connectionFailures >= MAX_FAILURES) {
-          console.log(`Circuit breaker tripped after account fetch failure - enabling offline mode`)
-          forceOfflineMode(true)
-        }
+      if (error) {
+        console.error("Error fetching account balance:", error)
+      } else {
+        accountData = data
       }
-    } catch (accountError) {
-      console.error("Unexpected error fetching account balance:", accountError)
+    } catch (error) {
+      console.error("Error fetching account balance:", error)
     }
 
     // Return whatever data we have, even if some parts are missing
-    // If we couldn't fetch the data, provide fallback data
     return {
-      user: sessionData.session.user,
+      user: userData || { id: userId, email: "user@example.com" },
       profile: profileData || {
         id: userId,
-        first_name: "User",
-        last_name: "",
-        profile_picture_url: "/vibrant-street-market.png",
+        first_name: userData?.user_metadata?.first_name || "User",
+        last_name: userData?.user_metadata?.last_name || "",
+        profile_picture_url: userData?.user_metadata?.profile_picture_url || "/vibrant-street-market.png",
       },
       account: accountData || { balance: 120000, loan_balance: 50000 },
     }
   } catch (error) {
     console.error("Critical error in getUserProfile:", error)
-
-    // Force offline mode if we encounter a critical error
-    forceOfflineMode(true)
-
     // Return fallback data to prevent the application from crashing
     return {
       user: { id: "error-fallback", email: "user@example.com" },
@@ -732,5 +1495,35 @@ export async function getUserProfile() {
       },
       account: { balance: 120000, loan_balance: 50000 },
     }
+  }
+}
+
+// Add a function to reset password
+export async function resetPasswordCustom(email: string, newPassword: string) {
+  try {
+    const adminClient = createAdminClient()
+
+    // Hash the new password
+    const { hashPassword } = await import("@/lib/auth-utils/password")
+    const hashedPassword = await hashPassword(newPassword)
+
+    // Update the password in auth_users
+    const { error } = await adminClient
+      .from("auth_users")
+      .update({
+        encrypted_password: hashedPassword,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("email", email.toLowerCase())
+
+    if (error) {
+      console.error("Error resetting password:", error)
+      return { error: "Failed to reset password" }
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error("Unexpected error resetting password:", error)
+    return { error: "An unexpected error occurred" }
   }
 }

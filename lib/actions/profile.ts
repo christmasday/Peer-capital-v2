@@ -4,6 +4,8 @@ import { createServerClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { revalidatePath } from "next/cache"
 
+// Update the updateProfile function to handle all profile fields
+
 export async function updateProfile({
   firstName,
   middleName,
@@ -14,6 +16,8 @@ export async function updateProfile({
   state,
   zipCode,
   profilePictureUrl,
+  bvn,
+  dateOfBirth,
 }: {
   firstName: string
   middleName?: string
@@ -24,6 +28,8 @@ export async function updateProfile({
   state: string
   zipCode?: string
   profilePictureUrl?: string | null
+  bvn?: string
+  dateOfBirth?: string
 }) {
   try {
     const supabase = createServerClient()
@@ -51,6 +57,9 @@ export async function updateProfile({
         state: state,
         zip_code: zipCode || null,
         profile_picture_url: profilePictureUrl || null,
+        // Only update BVN and date_of_birth if they are provided
+        ...(bvn ? { bvn } : {}),
+        ...(dateOfBirth ? { date_of_birth: dateOfBirth } : {}),
         updated_at: new Date().toISOString(),
       })
       .eq("id", userId)

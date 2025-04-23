@@ -60,10 +60,16 @@
     "zod": "^3.24.1",
     "@emotion/is-prop-valid": "latest",
     "@supabase/supabase-js": "latest",
+    "@testing-library/dom": "latest",
     "framer-motion": "latest",
     "uuid": "latest",
     "@supabase/auth-helpers-nextjs": "latest",
-    "jose": "latest"
+    "jose": "latest",
+    "@jest/globals": "latest",
+    "@testing-library/react": "latest",
+    "fs": "latest",
+    "path": "latest",
+    "bcryptjs": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",

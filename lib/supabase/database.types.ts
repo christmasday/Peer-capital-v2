@@ -6,6 +6,7 @@ export interface Database {
       profiles: {
         Row: {
           id: string
+          email?: string | null
           first_name: string | null
           middle_name: string | null
           last_name: string | null
@@ -16,12 +17,14 @@ export interface Database {
           city: string | null
           state: string | null
           zip_code: string | null
+          country: string | null
           profile_picture_url: string | null
           created_at: string
           updated_at: string
         }
         Insert: {
           id: string
+          email?: string | null
           first_name?: string | null
           middle_name?: string | null
           last_name?: string | null
@@ -32,12 +35,14 @@ export interface Database {
           city?: string | null
           state?: string | null
           zip_code?: string | null
+          country?: string | null
           profile_picture_url?: string | null
           created_at?: string
           updated_at?: string
         }
         Update: {
           id?: string
+          email?: string | null
           first_name?: string | null
           middle_name?: string | null
           last_name?: string | null
@@ -48,6 +53,7 @@ export interface Database {
           city?: string | null
           state?: string | null
           zip_code?: string | null
+          country?: string | null
           profile_picture_url?: string | null
           created_at?: string
           updated_at?: string
@@ -75,6 +81,44 @@ export interface Database {
           user_id?: string
           balance?: number
           loan_balance?: number
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      notification_preferences: {
+        Row: {
+          id: string
+          user_id: string
+          email_notifications: boolean
+          sms_notifications: boolean
+          push_notifications: boolean
+          marketing_emails: boolean
+          transaction_alerts: boolean
+          security_alerts: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          email_notifications?: boolean
+          sms_notifications?: boolean
+          push_notifications?: boolean
+          marketing_emails?: boolean
+          transaction_alerts?: boolean
+          security_alerts?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          email_notifications?: boolean
+          sms_notifications?: boolean
+          push_notifications?: boolean
+          marketing_emails?: boolean
+          transaction_alerts?: boolean
+          security_alerts?: boolean
           created_at?: string
           updated_at?: string
         }

@@ -39,6 +39,8 @@ export function SignoutButton({ variant = "ghost", className, children, onClick 
         localStorage.removeItem("auth_bypass")
         localStorage.removeItem("auth_bypass_time")
         localStorage.removeItem("is_authenticated")
+        localStorage.removeItem("user_email")
+        localStorage.removeItem("user_id")
       }
 
       // Call the server action
