@@ -19,7 +19,6 @@ export function LoginForm() {
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [debugInfo, setDebugInfo] = useState<string | null>(null)
 
   // Check for loop detection
   useEffect(() => {
@@ -28,10 +27,8 @@ export function LoginForm() {
     const lastRedirect = Number.parseInt(localStorage.getItem("last_redirect") || "0", 10)
     const now = Date.now()
 
-    // If we've had more than 3 redirects in the last 10 seconds, show debug info
+    // If we've had more than 3 redirects in the last 10 seconds, set a bypass flag
     if (redirectCount > 3 && now - lastRedirect < 10000) {
-      setDebugInfo("Redirect loop detected! Authentication system will be simplified.")
-
       // Reset the counter and set a bypass flag
       localStorage.setItem("redirect_count", "0")
       localStorage.setItem("auth_bypass", "true")
@@ -54,7 +51,6 @@ export function LoginForm() {
     e.preventDefault()
     setError(null)
     setIsLoading(true)
-    setDebugInfo(null)
 
     try {
       // Create a FormData object to pass to the signIn function
@@ -67,7 +63,6 @@ export function LoginForm() {
 
       if (result.success) {
         console.log("Login successful, setting up session...")
-        setDebugInfo("Login successful, setting up session...")
 
         // Store JWT in localStorage if available
         if (result.jwt) {
@@ -102,7 +97,6 @@ export function LoginForm() {
     } catch (err) {
       console.error("Login error:", err)
       setError("An unexpected error occurred. Please try again.")
-      setDebugInfo(`Error: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setIsLoading(false)
     }
@@ -110,13 +104,6 @@ export function LoginForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {debugInfo && (
-        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded relative mb-4">
-          <strong className="font-bold">Debug info:</strong>
-          <p className="text-sm">{debugInfo}</p>
-        </div>
-      )}
-
       <div className="space-y-2">
         <Label htmlFor="email">Email</Label>
         <Input

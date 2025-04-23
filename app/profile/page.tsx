@@ -4,7 +4,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { Edit, Mail, Phone, MapPin, Calendar, User, CreditCard, Shield } from "lucide-react"
+import { Edit, Mail, Phone, MapPin, Calendar, User, CreditCard, Shield, Lock } from "lucide-react"
 import { MainLayout } from "@/components/layouts/main-layout"
 import { format } from "date-fns"
 import { checkAuth } from "@/lib/auth-utils"
@@ -70,13 +70,6 @@ export default async function ProfilePage() {
                 <Mail className="h-4 w-4" />
                 {user.email}
               </p>
-              <div className="w-full mt-6">
-                <Link href="/profile/edit" className="w-full">
-                  <Button variant="outline" className="w-full">
-                    Edit Profile
-                  </Button>
-                </Link>
-              </div>
             </CardHeader>
           </Card>
 
@@ -157,9 +150,12 @@ export default async function ProfilePage() {
               <div className="border-t pt-6">
                 <h3 className="text-lg font-semibold mb-4">Account Actions</h3>
                 <div className="flex flex-col sm:flex-row gap-3">
-                  <Button variant="outline" className="w-full">
-                    Change Password
-                  </Button>
+                  <Link href="/profile/change-password" className="w-full">
+                    <Button variant="outline" className="w-full">
+                      <Lock className="mr-2 h-4 w-4" />
+                      Change Password
+                    </Button>
+                  </Link>
                 </div>
               </div>
             </CardContent>

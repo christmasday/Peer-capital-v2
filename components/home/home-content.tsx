@@ -1,6 +1,6 @@
 "use client"
 
-import { Bell, Eye, Plus, ArrowRightLeft, TrendingUp, ArrowDown } from "lucide-react"
+import { Eye, Plus, ArrowRightLeft, TrendingUp, ArrowDown } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { HelperCard } from "@/components/helpers/helper-card"
 import { Button } from "@/components/ui/button"
@@ -28,12 +28,7 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
           <h1 className="text-2xl font-bold text-gray-900">
             Welcome back, {userProfile.profile?.first_name || "User"}
           </h1>
-          <div className="flex items-center gap-4">
-            <button className="p-2 relative bg-white rounded-full shadow-sm">
-              <Bell className="h-5 w-5 text-gray-700" />
-              <span className="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full"></span>
-            </button>
-          </div>
+          {/* Removed the notification button with Bell icon */}
         </div>
 
         {/* Dashboard Grid */}

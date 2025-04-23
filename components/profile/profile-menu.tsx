@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { User, Bell, Shield, CreditCard, LogOut } from "lucide-react"
+import { User, Bell, Shield, CreditCard, LogOut, Lock } from "lucide-react"
 import { SignoutButton } from "@/components/auth/signout-button"
 
 export function ProfileMenu() {
@@ -15,6 +15,11 @@ export function ProfileMenu() {
       label: "Personal Information",
       href: "/profile/edit",
       icon: <User className="h-4 w-4 mr-2" />,
+    },
+    {
+      label: "Change Password",
+      href: "/profile/change-password",
+      icon: <Lock className="h-4 w-4 mr-2" />,
     },
     {
       label: "Notification Settings",

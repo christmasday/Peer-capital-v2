@@ -2,6 +2,7 @@
 import { createAdminClient } from "@/lib/supabase/admin"
 import { v4 as uuidv4 } from "uuid"
 import { cookies } from "next/headers"
+import { createServerClient } from "@/lib/supabase/server"
 
 // Add the JWT imports at the top of the file
 import { generateJWT, setJWTCookie, clearJWTCookies, verifyJWT, getJWTFromCookies } from "@/lib/jwt"
@@ -1524,6 +1525,178 @@ export async function resetPasswordCustom(email: string, newPassword: string) {
     return { success: true }
   } catch (error) {
     console.error("Unexpected error resetting password:", error)
+    return { error: "An unexpected error occurred" }
+  }
+}
+
+// Verify a password reset token
+export async function verifyResetToken(token: string) {
+  try {
+    const adminClient = createAdminClient()
+
+    // In a real implementation, you would:
+    // 1. Query a password_reset_tokens table to find the token
+    // 2. Check if the token is expired
+    // 3. Return the user ID associated with the token
+
+    // For now, we'll simulate token verification
+    // In a real app, you would store tokens in a database table
+    if (token === "invalid") {
+      return { error: "Invalid or expired token" }
+    }
+
+    // Simulate a valid token
+    return { success: true, userId: "simulated-user-id" }
+  } catch (error) {
+    console.error("Error verifying reset token:", error)
+    return { error: "An unexpected error occurred" }
+  }
+}
+
+// Reset password with token
+export async function resetPasswordWithToken(token: string, newPassword: string) {
+  try {
+    // First verify the token
+    const tokenResult = await verifyResetToken(token)
+
+    if (tokenResult.error) {
+      return { error: tokenResult.error }
+    }
+
+    const userId = tokenResult.userId
+
+    // In a real implementation, you would:
+    // 1. Get the user ID from the token verification
+    // 2. Hash the new password
+    // 3. Update the user's password in the database
+    // 4. Invalidate the token so it can't be used again
+
+    const adminClient = createAdminClient()
+
+    // Hash the new password
+    const { hashPassword } = await import("@/lib/auth-utils/password")
+    const hashedPassword = await hashPassword(newPassword)
+
+    // Update the user's password
+    // In a real app, you would use the actual user ID from the token
+    const { error } = await adminClient
+      .from("auth_users")
+      .update({
+        encrypted_password: hashedPassword,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", userId)
+
+    if (error) {
+      console.error("Error updating password:", error)
+      return { error: "Failed to update password" }
+    }
+
+    // In a real app, you would invalidate the token here
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error resetting password with token:", error)
+    return { error: "An unexpected error occurred" }
+  }
+}
+
+// Change password for authenticated user
+export async function changePassword(currentPassword: string, newPassword: string) {
+  try {
+    const supabase = createServerClient()
+    const adminClient = createAdminClient()
+
+    // Get the current user
+    const { data: sessionData } = await supabase.auth.getSession()
+
+    // Try to get user ID from JWT if session is not available
+    let userId = sessionData.session?.user?.id
+
+    if (!userId) {
+      // Try to get user ID from JWT
+      const jwt = getJWTFromCookies()
+      if (jwt) {
+        try {
+          const { payload, error } = await verifyJWT(jwt)
+          if (!error && payload && (payload.userId || payload.sub)) {
+            userId = payload.userId || payload.sub
+            console.log("Using userId from JWT for password change:", userId)
+          }
+        } catch (error) {
+          console.error("Error verifying JWT during password change:", error)
+        }
+      }
+
+      // Try to get from custom auth token
+      if (!userId) {
+        try {
+          const cookieStore = cookies()
+          const authToken = cookieStore.get("custom-auth-token")?.value
+
+          if (authToken) {
+            const { data: userData, error } = await adminClient
+              .from("auth_users")
+              .select("id")
+              .eq("access_token", authToken)
+              .single()
+
+            if (!error && userData) {
+              userId = userData.id
+              console.log("Using userId from custom auth token for password change:", userId)
+            }
+          }
+        } catch (error) {
+          console.error("Error getting userId from custom auth token during password change:", error)
+        }
+      }
+    }
+
+    if (!userId) {
+      return { error: "You must be logged in to change your password" }
+    }
+
+    // Get the user's current password hash
+    const { data: userData, error: userError } = await adminClient
+      .from("auth_users")
+      .select("encrypted_password")
+      .eq("id", userId)
+      .single()
+
+    if (userError || !userData) {
+      console.error("Error fetching user data:", userError)
+      return { error: "Failed to verify current password" }
+    }
+
+    // Verify the current password
+    const { comparePassword } = await import("@/lib/auth-utils/password")
+    const passwordValid = await comparePassword(currentPassword, userData.encrypted_password)
+
+    if (!passwordValid) {
+      return { error: "Current password is incorrect" }
+    }
+
+    // Hash the new password
+    const { hashPassword } = await import("@/lib/auth-utils/password")
+    const hashedPassword = await hashPassword(newPassword)
+
+    // Update the user's password
+    const { error: updateError } = await adminClient
+      .from("auth_users")
+      .update({
+        encrypted_password: hashedPassword,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", userId)
+
+    if (updateError) {
+      console.error("Error updating password:", updateError)
+      return { error: "Failed to update password" }
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error changing password:", error)
     return { error: "An unexpected error occurred" }
   }
 }

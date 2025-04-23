@@ -1,5 +1,4 @@
 import Image from "next/image"
-import { Bell } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { AccountCard } from "@/components/account/account-card"
 import { HelperCard } from "@/components/helpers/helper-card"
@@ -54,10 +53,7 @@ export default async function HomePage() {
             </div>
             <h1 className="text-2xl font-bold text-blue-700">Hi, {userProfile.profile?.first_name || "User"}</h1>
           </div>
-          <button className="p-2 relative">
-            <Bell className="h-6 w-6 text-gray-700" />
-            <span className="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full"></span>
-          </button>
+          {/* Removed the Bell notification icon button here */}
         </div>
 
         {/* Account Card */}
