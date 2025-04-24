@@ -70,8 +70,8 @@ export function LoanHelperSettingsForm({ userId }: LoanHelperSettingsFormProps) 
       } else {
         setSuccess(true)
         toast({
-          title: "Loan Helper Settings Updated",
-          description: "Your loan helper settings have been updated successfully.",
+          title: "Helper Settings Updated",
+          description: "Your helper settings have been updated successfully.",
         })
       }
     } catch (e: any) {
@@ -84,7 +84,7 @@ export function LoanHelperSettingsForm({ userId }: LoanHelperSettingsFormProps) 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Loan Helper Settings</CardTitle>
+        <CardTitle></CardTitle>
         <CardDescription>Configure the settings for your loan offerings to other users.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -95,7 +95,7 @@ export function LoanHelperSettingsForm({ userId }: LoanHelperSettingsFormProps) 
         )}
         {success && (
           <Alert>
-            <AlertDescription>Loan helper settings updated successfully!</AlertDescription>
+            <AlertDescription>Helper settings updated successfully!</AlertDescription>
           </Alert>
         )}
         {isLoading ? (

@@ -1,18 +1,31 @@
+import Link from "next/link"
 import { getUserProfile } from "@/lib/actions/auth"
 import { redirect } from "next/navigation"
 import Image from "next/image"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { Mail, Phone, MapPin, Calendar, User, CreditCard, Shield, Briefcase, FileText, Upload } from "lucide-react"
+import {
+  Mail,
+  Phone,
+  MapPin,
+  Calendar,
+  User,
+  CreditCard,
+  Shield,
+  Briefcase,
+  FileText,
+  Upload,
+  AlertTriangle,
+  Wallet,
+} from "lucide-react"
 import { MainLayout } from "@/components/layouts/main-layout"
 import { format } from "date-fns"
 import { checkAuth } from "@/lib/auth-utils"
 import { Button } from "@/components/ui/button"
-import Link from "next/link"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { LoanHelperSettingsForm } from "@/components/profile/loan-helper-settings-form"
+import { LoanHelperSettingsDisplay } from "@/components/profile/loan-helper-settings-display"
 
-export const dynamic = "force-dynamic"
+export const dynamic = "force_dynamic"
 
 export default async function ProfilePage() {
   // Check authentication
@@ -77,6 +90,22 @@ export default async function ProfilePage() {
     return statuses[status] || status
   }
 
+  // Function to check if the profile is complete
+  const isProfileComplete = () => {
+    return (
+      profile?.first_name &&
+      profile?.last_name &&
+      profile?.phone_number &&
+      profile?.address &&
+      profile?.city &&
+      profile?.state &&
+      profile?.bvn &&
+      profile?.date_of_birth
+    )
+  }
+
+  const profileComplete = isProfileComplete()
+
   return (
     <MainLayout
       userName={profile?.first_name || "User"}
@@ -85,10 +114,21 @@ export default async function ProfilePage() {
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold text-gray-900">My Profile</h1>
-          <Link href="/profile/edit">
-            <Button>Edit Profile</Button>
-          </Link>
         </div>
+
+        {/* Profile Completion Status */}
+        {!profileComplete && (
+          <Card className="mb-6">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3 bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-sm text-yellow-800">
+                <AlertTriangle className="h-4 w-4" />
+                <div>
+                  Your profile is incomplete. Please provide all required information to unlock additional features.
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Tabs defaultValue="personal" className="w-full">
           <TabsList className="grid w-full grid-cols-4 mb-6">
@@ -460,7 +500,19 @@ export default async function ProfilePage() {
           <TabsContent value="loan">
             <Card>
               <CardContent className="p-6">
-                <LoanHelperSettingsForm userId={user.id} />
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                      <Wallet className="h-5 w-5 text-blue-600" />
+                      Helper Settings
+                    </h3>
+                    <Link href="/profile/loan-helper">
+                      <Button size="sm">Edit Settings</Button>
+                    </Link>
+                  </div>
+
+                  <LoanHelperSettingsDisplay userId={user.id} />
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
