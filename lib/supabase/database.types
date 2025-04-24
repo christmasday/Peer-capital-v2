@@ -1,10 +1,4 @@
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[]
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
 export interface Database {
   public: {
@@ -77,8 +71,8 @@ export interface Database {
         Insert: {
           id?: string
           user_id: string
-          balance?: number
-          loan_balance?: number
+          balance: number
+          loan_balance: number
           created_at?: string
           updated_at?: string
         }
@@ -107,12 +101,12 @@ export interface Database {
         Insert: {
           id?: string
           user_id: string
-          email_notifications?: boolean
-          sms_notifications?: boolean
-          push_notifications?: boolean
-          marketing_emails?: boolean
-          transaction_alerts?: boolean
-          security_alerts?: boolean
+          email_notifications: boolean
+          sms_notifications: boolean
+          push_notifications: boolean
+          marketing_emails: boolean
+          transaction_alerts: boolean
+          security_alerts: boolean
           created_at?: string
           updated_at?: string
         }
@@ -235,6 +229,74 @@ export interface Database {
           reference?: string
           status?: string
           created_at?: string
+        }
+      }
+      auth_users: {
+        Row: {
+          id: string
+          email: string | null
+          phone: string | null
+          encrypted_password: string | null
+          email_confirmed_at: string | null
+          phone_confirmed_at: string | null
+          confirmation_sent_at: string | null
+          recovery_sent_at: string | null
+          email_change_sent_at: string | null
+          email_change: string | null
+          last_sign_in_at: string | null
+          raw_app_meta_data: Json | null
+          raw_user_meta_data: Json | null
+          is_super_admin: boolean | null
+          created_at: string
+          updated_at: string
+          is_sso_user: boolean | null
+          banned_until: string | null
+          reauthentication_sent_at: string | null
+          is_anonymous: boolean | null
+        }
+        Insert: {
+          id: string
+          email: string | null
+          phone: string | null
+          encrypted_password: string | null
+          email_confirmed_at: string | null
+          phone_confirmed_at: string | null
+          confirmation_sent_at: string | null
+          recovery_sent_at: string | null
+          email_change_sent_at: string | null
+          email_change: string | null
+          last_sign_in_at: string | null
+          raw_app_meta_data: Json | null
+          raw_user_meta_data: Json | null
+          is_super_admin: boolean | null
+          created_at: string
+          updated_at: string
+          is_sso_user: boolean | null
+          banned_until: string | null
+          reauthentication_sent_at: string | null
+          is_anonymous: boolean | null
+        }
+        Update: {
+          id?: string
+          email?: string | null
+          phone?: string | null
+          encrypted_password?: string | null
+          email_confirmed_at?: string | null
+          phone_confirmed_at?: string | null
+          confirmation_sent_at?: string | null
+          recovery_sent_at?: string | null
+          email_change_sent_at?: string | null
+          email_change?: string | null
+          last_sign_in_at?: string | null
+          raw_app_meta_data?: Json | null
+          raw_user_meta_data?: Json | null
+          is_super_admin?: boolean | null
+          created_at?: string
+          updated_at?: string
+          is_sso_user?: boolean | null
+          banned_until?: string | null
+          reauthentication_sent_at?: string | null
+          is_anonymous?: boolean | null
         }
       }
     }

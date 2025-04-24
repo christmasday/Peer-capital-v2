@@ -21,6 +21,22 @@ export interface Database {
           profile_picture_url: string | null
           created_at: string
           updated_at: string
+          // ID verification fields
+          id_type?: string | null
+          id_number?: string | null
+          id_document_url?: string | null
+          id_verified?: boolean | null
+          id_verification_date?: string | null
+          // Employment information fields
+          employment_status?: string | null
+          employer_name?: string | null
+          employer_address?: string | null
+          work_phone?: string | null
+          job_title?: string | null
+          monthly_income?: number | null
+          employment_start_date?: string | null
+          employment_end_date?: string | null
+          employment_verified?: boolean | null
         }
         Insert: {
           id: string
@@ -39,6 +55,22 @@ export interface Database {
           profile_picture_url?: string | null
           created_at?: string
           updated_at?: string
+          // ID verification fields
+          id_type?: string | null
+          id_number?: string | null
+          id_document_url?: string | null
+          id_verified?: boolean | null
+          id_verification_date?: string | null
+          // Employment information fields
+          employment_status?: string | null
+          employer_name?: string | null
+          employer_address?: string | null
+          work_phone?: string | null
+          job_title?: string | null
+          monthly_income?: number | null
+          employment_start_date?: string | null
+          employment_end_date?: string | null
+          employment_verified?: boolean | null
         }
         Update: {
           id?: string
@@ -57,6 +89,20 @@ export interface Database {
           profile_picture_url?: string | null
           created_at?: string
           updated_at?: string
+          id_type?: string | null
+          id_number?: string | null
+          id_document_url?: string | null
+          id_verified?: boolean | null
+          id_verification_date?: string | null
+          employment_status?: string | null
+          employer_name?: string | null
+          employer_address?: string | null
+          work_phone?: string | null
+          job_title?: string | null
+          monthly_income?: number | null
+          employment_start_date?: string | null
+          employment_end_date?: string | null
+          employment_verified?: boolean | null
         }
       }
       account_balances: {
@@ -229,6 +275,74 @@ export interface Database {
           reference?: string
           status?: string
           created_at?: string
+        }
+      }
+      auth_users: {
+        Row: {
+          id: string
+          email: string | null
+          phone: string | null
+          encrypted_password: string | null
+          email_confirmed_at: string | null
+          phone_confirmed_at: string | null
+          confirmation_sent_at: string | null
+          recovery_sent_at: string | null
+          email_change_sent_at: string | null
+          email_change: string | null
+          last_sign_in_at: string | null
+          raw_app_meta_data: Json | null
+          raw_user_meta_data: Json | null
+          is_super_admin: boolean | null
+          created_at: string
+          updated_at: string
+          is_sso_user: boolean | null
+          banned_until: string | null
+          reauthentication_sent_at: string | null
+          is_anonymous: boolean | null
+        }
+        Insert: {
+          id: string
+          email: string | null
+          phone: string | null
+          encrypted_password: string | null
+          email_confirmed_at: string | null
+          phone_confirmed_at: string | null
+          confirmation_sent_at: string | null
+          recovery_sent_at: string | null
+          email_change_sent_at: string | null
+          email_change: string | null
+          last_sign_in_at: string | null
+          raw_app_meta_data: Json | null
+          raw_user_meta_data: Json | null
+          is_super_admin: boolean | null
+          created_at: string
+          updated_at: string
+          is_sso_user: boolean | null
+          banned_until: string | null
+          reauthentication_sent_at: string | null
+          is_anonymous: boolean | null
+        }
+        Update: {
+          id?: string
+          email?: string | null
+          phone?: string | null
+          encrypted_password?: string | null
+          email_confirmed_at?: string | null
+          phone_confirmed_at?: string | null
+          confirmation_sent_at?: string | null
+          recovery_sent_at?: string | null
+          email_change_sent_at?: string | null
+          email_change?: string | null
+          last_sign_in_at?: string | null
+          raw_app_meta_data?: Json | null
+          raw_user_meta_data?: Json | null
+          is_super_admin?: boolean | null
+          created_at?: string
+          updated_at?: string
+          is_sso_user?: boolean | null
+          banned_until?: string | null
+          reauthentication_sent_at?: string | null
+          is_anonymous?: boolean | null
         }
       }
     }
