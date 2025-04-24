@@ -345,6 +345,38 @@ export interface Database {
           is_anonymous?: boolean | null
         }
       }
+      loan_helper_settings: {
+        Row: {
+          id: string
+          user_id: string
+          loan_amount: number
+          interest_rate: number
+          repayment_time: number
+          terms_and_conditions: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          loan_amount: number
+          interest_rate: number
+          repayment_time: number
+          terms_and_conditions?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          loan_amount?: number
+          interest_rate?: number
+          repayment_time?: number
+          terms_and_conditions?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never

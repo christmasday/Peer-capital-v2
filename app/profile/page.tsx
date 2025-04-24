@@ -2,7 +2,7 @@ import { getUserProfile } from "@/lib/actions/auth"
 import { redirect } from "next/navigation"
 import Image from "next/image"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { Mail, Phone, MapPin, Calendar, User, CreditCard, Shield, Briefcase, FileText } from "lucide-react"
+import { Mail, Phone, MapPin, Calendar, User, CreditCard, Shield, Briefcase, FileText, Upload } from "lucide-react"
 import { MainLayout } from "@/components/layouts/main-layout"
 import { format } from "date-fns"
 import { checkAuth } from "@/lib/auth-utils"
@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
+import { LoanHelperSettingsForm } from "@/components/profile/loan-helper-settings-form"
 
 export const dynamic = "force-dynamic"
 
@@ -42,6 +43,7 @@ export default async function ProfilePage() {
     return new Intl.NumberFormat("en-NG", {
       style: "currency",
       currency: "NGN",
+      minimumFractionDigits: 2,
     }).format(amount)
   }
 
@@ -89,10 +91,11 @@ export default async function ProfilePage() {
         </div>
 
         <Tabs defaultValue="personal" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-6">
+          <TabsList className="grid w-full grid-cols-4 mb-6">
             <TabsTrigger value="personal">Personal Info</TabsTrigger>
             <TabsTrigger value="id">ID Verification</TabsTrigger>
             <TabsTrigger value="employment">Employment</TabsTrigger>
+            <TabsTrigger value="loan">Loan Helper</TabsTrigger>
           </TabsList>
 
           <TabsContent value="personal">
@@ -294,7 +297,7 @@ export default async function ProfilePage() {
                       ) : (
                         <div className="text-center">
                           <div className="bg-gray-100 p-3 rounded-full mb-3 inline-block">
-                            <FileText className="h-6 w-6 text-gray-400" />
+                            <Upload className="h-6 w-6 text-gray-500" />
                           </div>
                           <p className="font-medium mb-1">No ID Document</p>
                           <p className="text-sm text-gray-500 mb-3">You haven't uploaded an ID document yet</p>
@@ -451,6 +454,13 @@ export default async function ProfilePage() {
                     </Link>
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+          <TabsContent value="loan">
+            <Card>
+              <CardContent className="p-6">
+                <LoanHelperSettingsForm userId={user.id} />
               </CardContent>
             </Card>
           </TabsContent>
