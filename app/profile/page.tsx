@@ -25,7 +25,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { LoanHelperSettingsDisplay } from "@/components/profile/loan-helper-settings-display"
 
-export const dynamic = "force_dynamic"
+export const dynamic = "force-dynamic"
 
 export default async function ProfilePage() {
   // Check authentication
