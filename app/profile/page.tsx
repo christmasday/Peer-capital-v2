@@ -235,6 +235,23 @@ export default async function ProfilePage() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Withdrawal Account Information */}
+                  <h3 className="text-lg font-semibold mb-4">Withdrawal Account</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <p className="text-sm font-medium text-gray-500">Bank Name</p>
+                      <p className="font-medium">{profile?.bank_name || "Not provided"}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-500">Account Number</p>
+                      <p className="font-medium">{profile?.account_number || "Not provided"}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-500">Account Name</p>
+                      <p className="font-medium">{profile?.account_name || "Not provided"}</p>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
 
@@ -350,17 +367,17 @@ export default async function ProfilePage() {
                       )}
                     </div>
                   </div>
-                </div>
 
-                {!profile?.id_verified && (
-                  <div className="mt-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-sm text-yellow-800">
-                    <p className="font-medium mb-1">Verification Status:</p>
-                    <p>
-                      Your ID verification is pending. This process typically takes 1-2 business days after document
-                      submission. Once verified, you'll have access to higher loan limits and additional features.
-                    </p>
-                  </div>
-                )}
+                  {!profile?.id_verified && (
+                    <div className="mt-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-sm text-yellow-800">
+                      <p className="font-medium mb-1">Verification Status:</p>
+                      <p>
+                        Your ID verification is pending. This process typically takes 1-2 business days after document
+                        submission. Once verified, you'll have access to higher loan limits and additional features.
+                      </p>
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

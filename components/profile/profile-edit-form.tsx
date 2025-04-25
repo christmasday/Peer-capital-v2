@@ -5,7 +5,7 @@ import type React from "react"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
-import { Camera, Loader2, Upload, FileText, Briefcase } from "lucide-react"
+import { Camera, Loader2, Upload, FileText, Briefcase, CreditCard } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -56,6 +56,11 @@ export function ProfileEditForm({ profile, initialTab = "personal" }: ProfileEdi
   const [employmentEndDate, setEmploymentEndDate] = useState(
     profile?.employment_end_date ? new Date(profile.employment_end_date).toISOString().split("T")[0] : "",
   )
+
+  // Withdrawal Account Information
+  const [bankName, setBankName] = useState(profile?.bank_name || "")
+  const [accountNumber, setAccountNumber] = useState(profile?.account_number || "")
+  const [accountName, setAccountName] = useState(profile?.account_name || "")
 
   // Profile picture state
   const [profilePicture, setProfilePicture] = useState<File | null>(null)
@@ -193,6 +198,9 @@ export function ProfileEditForm({ profile, initialTab = "personal" }: ProfileEdi
         monthlyIncome: monthlyIncome,
         employmentStartDate: employmentStartDate,
         employmentEndDate: employmentEndDate,
+        bankName: bankName,
+        accountNumber: accountNumber,
+        accountName: accountName,
       })
 
       if (result.error) {
@@ -241,10 +249,11 @@ export function ProfileEditForm({ profile, initialTab = "personal" }: ProfileEdi
         )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid grid-cols-3 mb-6">
+          <TabsList className="grid w-full grid-cols-4 mb-6">
             <TabsTrigger value="personal">Personal Info</TabsTrigger>
             <TabsTrigger value="id">ID Verification</TabsTrigger>
             <TabsTrigger value="employment">Employment</TabsTrigger>
+            <TabsTrigger value="withdrawal">Withdrawal Account</TabsTrigger>
           </TabsList>
 
           <form onSubmit={onSubmit} className="space-y-6">
@@ -612,6 +621,51 @@ export function ProfileEditForm({ profile, initialTab = "personal" }: ProfileEdi
               </div>
             </TabsContent>
 
+            <TabsContent value="withdrawal">
+              <CardHeader className="px-0 pt-0">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <CreditCard className="h-5 w-5 text-blue-600" />
+                  Withdrawal Account
+                </CardTitle>
+                <p className="text-sm text-gray-500 mt-1">
+                  Please provide your withdrawal account details. This is where your funds will be sent when you make a
+                  withdrawal.
+                </p>
+              </CardHeader>
+
+              <div className="space-y-6">
+                <div>
+                  <Label htmlFor="bankName">Bank Name</Label>
+                  <Input
+                    id="bankName"
+                    placeholder="Enter your bank name"
+                    value={bankName}
+                    onChange={(e) => setBankName(e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="accountNumber">Account Number</Label>
+                  <Input
+                    id="accountNumber"
+                    placeholder="Enter your account number"
+                    value={accountNumber}
+                    onChange={(e) => setAccountNumber(e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="accountName">Account Name</Label>
+                  <Input
+                    id="accountName"
+                    placeholder="Enter your account name"
+                    value={accountName}
+                    onChange={(e) => setAccountName(e.target.value)}
+                  />
+                </div>
+              </div>
+            </TabsContent>
+
             <div className="flex justify-between pt-4 border-t">
               <Button
                 type="button"
@@ -627,17 +681,25 @@ export function ProfileEditForm({ profile, initialTab = "personal" }: ProfileEdi
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => setActiveTab(activeTab === "id" ? "personal" : "id")}
+                    onClick={() => {
+                      if (activeTab === "id") setActiveTab("personal")
+                      else if (activeTab === "employment") setActiveTab("id")
+                      else if (activeTab === "withdrawal") setActiveTab("employment")
+                    }}
                     disabled={isSubmitting || isUploading || isUploadingId}
                   >
                     Previous
                   </Button>
                 )}
 
-                {activeTab !== "employment" ? (
+                {activeTab !== "withdrawal" ? (
                   <Button
                     type="button"
-                    onClick={() => setActiveTab(activeTab === "personal" ? "id" : "employment")}
+                    onClick={() => {
+                      if (activeTab === "personal") setActiveTab("id")
+                      else if (activeTab === "id") setActiveTab("employment")
+                      else if (activeTab === "employment") setActiveTab("withdrawal")
+                    }}
                     disabled={isSubmitting || isUploading || isUploadingId}
                   >
                     Next

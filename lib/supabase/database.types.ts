@@ -37,6 +37,10 @@ export interface Database {
           employment_start_date?: string | null
           employment_end_date?: string | null
           employment_verified?: boolean | null
+          // Withdrawal account fields
+          bank_name?: string | null
+          account_number?: string | null
+          account_name?: string | null
         }
         Insert: {
           id: string
@@ -71,6 +75,10 @@ export interface Database {
           employment_start_date?: string | null
           employment_end_date?: string | null
           employment_verified?: boolean | null
+          // Withdrawal account fields
+          bank_name?: string | null
+          account_number?: string | null
+          account_name?: string | null
         }
         Update: {
           id?: string
@@ -103,6 +111,10 @@ export interface Database {
           employment_start_date?: string | null
           employment_end_date?: string | null
           employment_verified?: boolean | null
+          // Withdrawal account fields
+          bank_name?: string | null
+          account_number?: string | null
+          account_name?: string | null
         }
       }
       account_balances: {

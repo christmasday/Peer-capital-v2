@@ -30,6 +30,10 @@ export async function updateProfile({
   monthlyIncome,
   employmentStartDate,
   employmentEndDate,
+  // Withdrawal account fields
+  bankName,
+  accountNumber,
+  accountName,
 }: {
   firstName: string
   middleName?: string
@@ -55,6 +59,10 @@ export async function updateProfile({
   monthlyIncome?: number
   employmentStartDate?: string
   employmentEndDate?: string
+  // Withdrawal account fields
+  bankName?: string
+  accountNumber?: string
+  accountName?: string
 }) {
   try {
     const supabase = createServerClient()
@@ -197,6 +205,21 @@ export async function updateProfile({
       if (monthlyIncome !== undefined) await updateEmploymentField("monthly_income", monthlyIncome)
       if (employmentStartDate) await updateEmploymentField("employment_start_date", employmentStartDate)
       if (employmentEndDate) await updateEmploymentField("employment_end_date", employmentEndDate)
+    }
+
+    // Update withdrawal account fields
+    if (bankName || accountNumber || accountName) {
+      const withdrawalAccountObject: any = {}
+      if (bankName) withdrawalAccountObject.bank_name = bankName
+      if (accountNumber) withdrawalAccountObject.account_number = accountNumber
+      if (accountName) withdrawalAccountObject.account_name = accountName
+
+      try {
+        await adminClient.from("profiles").update(withdrawalAccountObject).eq("id", userId)
+      } catch (err) {
+        console.warn("Could not update withdrawal account fields:", err)
+        // Continue with other updates
+      }
     }
 
     revalidatePath("/profile")
