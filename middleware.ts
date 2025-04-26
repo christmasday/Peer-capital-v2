@@ -7,7 +7,15 @@ export async function middleware(req: NextRequest) {
   console.log("Middleware running - checking authentication")
 
   // Skip auth checks for public routes and static assets
-  const publicPaths = ["/", "/login", "/signup", "/forgot-password", "/api/auth"]
+  const publicPaths = [
+    "/",
+    "/login",
+    "/signup",
+    "/forgot-password",
+    "/reset-password",
+    "/api/auth/refresh",
+    "/api/sync-auth-users",
+  ]
   const path = req.nextUrl.pathname
 
   // Check if the path starts with any of the public paths
