@@ -131,7 +131,7 @@ export default function LandingPage() {
       </motion.header>
 
       {/* Hero Section */}
-      <section className="bg-gradient-to-b from-blue-50 to-white py-10 md:py-24 overflow-hidden">
+      <section className="bg-gray-100 py-10 md:py-24 overflow-hidden">
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row items-center gap-8 md:gap-12" ref={heroSection.ref}>
             <motion.div
@@ -423,7 +423,7 @@ export default function LandingPage() {
             animate={ctaSection.isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
             transition={{ duration: 0.6, delay: 0.1 }}
           >
-            Join thousands of users who are already benefiting from our peer-to-peer lending platform.
+            Join thousands of users who are already getting access to the funds they need.
           </motion.p>
           <motion.div
             className="flex flex-col sm:flex-row gap-4 justify-center"
