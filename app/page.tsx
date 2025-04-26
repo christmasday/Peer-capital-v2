@@ -147,8 +147,8 @@ export default function LandingPage() {
                 Peer-to-Peer Lending <span className="text-primary">Made Simple</span>
               </motion.h1>
               <motion.p className="text-base md:text-lg text-gray-600" variants={fadeIn}>
-                Peer Capital connects borrowers with lenders directly, cutting out the middleman and offering better
-                rates for everyone.
+                Peer Capital connects borrowers with multiple lenders and helpers, Ensuring everyone has access to the funds they need
+                to make life better.
               </motion.p>
               <motion.div
                 className="flex flex-col sm:flex-row gap-3 pt-2 md:pt-4 justify-center md:justify-start"
