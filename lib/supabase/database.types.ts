@@ -41,6 +41,8 @@ export interface Database {
           bank_name?: string | null
           account_number?: string | null
           account_name?: string | null
+          // Bio field
+          bio?: string | null
         }
         Insert: {
           id: string
@@ -79,6 +81,8 @@ export interface Database {
           bank_name?: string | null
           account_number?: string | null
           account_name?: string | null
+          // Bio field
+          bio?: string | null
         }
         Update: {
           id?: string
@@ -115,6 +119,34 @@ export interface Database {
           bank_name?: string | null
           account_number?: string | null
           account_name?: string | null
+          // Bio field
+          bio?: string | null
+        }
+      }
+      user_connections: {
+        Row: {
+          id: string
+          follower_id: string
+          following_id: string
+          created_at: string
+          updated_at: string
+          status: string
+        }
+        Insert: {
+          id?: string
+          follower_id: string
+          following_id: string
+          created_at?: string
+          updated_at?: string
+          status?: string
+        }
+        Update: {
+          id?: string
+          follower_id?: string
+          following_id?: string
+          created_at?: string
+          updated_at?: string
+          status?: string
         }
       }
       account_balances: {
@@ -387,6 +419,61 @@ export interface Database {
           terms_and_conditions?: string | null
           created_at?: string
           updated_at?: string
+        }
+      }
+      notifications: {
+        Row: {
+          id: string
+          user_id: string
+          actor_id: string | null // Updated to be nullable
+          type: string
+          data: Json | null
+          read: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          actor_id?: string | null // Updated to be nullable
+          type: string
+          data?: Json | null
+          read?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          actor_id?: string | null // Updated to be nullable
+          type?: string
+          data?: Json | null
+          read?: boolean
+          created_at?: string
+        }
+      }
+      messages: {
+        Row: {
+          id: string
+          sender_id: string
+          recipient_id: string
+          content: string
+          read: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          sender_id: string
+          recipient_id: string
+          content: string
+          read?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          sender_id?: string
+          recipient_id?: string
+          content?: string
+          read?: boolean
+          created_at?: string
         }
       }
     }

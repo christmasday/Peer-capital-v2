@@ -1,11 +1,10 @@
 "use client"
 
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
-
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Bell, Menu, X, Home, Wallet, BarChart2, User, MessageSquare } from "lucide-react"
+import { Menu, X, Home, Wallet, BarChart2, User, MessageCircle, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import {
@@ -18,14 +17,24 @@ import {
 import { SignoutButton } from "@/components/auth/signout-button"
 import { Logo } from "@/components/logo"
 import Image from "next/image"
+import { UserSearchDialog } from "@/components/search/user-search-dialog"
+import { getUnreadMessagesCount } from "@/lib/actions/messages"
+import { getUnreadNotificationsCount } from "@/lib/actions/notifications"
+import { NotificationsDropdown } from "@/components/notifications/notifications-dropdown"
 
 interface TopNavProps {
   userName?: string
   userImage?: string
+  hideSearch?: boolean
 }
 
-export function TopNav({ userName, userImage }: TopNavProps) {
+export function TopNav({ userName, userImage, hideSearch }: TopNavProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [unreadMessages, setUnreadMessages] = useState(0)
+  const [unreadNotifications, setUnreadNotifications] = useState(0)
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [fetchError, setFetchError] = useState(false)
   const pathname = usePathname()
 
   const navItems = [
@@ -34,8 +43,57 @@ export function TopNav({ userName, userImage }: TopNavProps) {
     { href: "/transactions", label: "Transactions", icon: BarChart2 },
   ]
 
+  useEffect(() => {
+    // Fetch unread counts on mount and periodically
+    const fetchUnreadCounts = async () => {
+      try {
+        setFetchError(false)
+
+        // Fetch messages count with error handling
+        let messagesCount = 0
+        try {
+          const messagesResult = await getUnreadMessagesCount()
+          messagesCount = messagesResult.count || 0
+        } catch (error) {
+          console.error("Error getting unread messages count:", error)
+          // Continue with other fetches even if this one fails
+        }
+
+        // Fetch notifications count with error handling
+        let notificationsCount = 0
+        try {
+          const notificationsResult = await getUnreadNotificationsCount()
+          notificationsCount = notificationsResult.count || 0
+        } catch (error) {
+          console.error("Error getting unread notifications count:", error)
+        }
+
+        // Update state with whatever data we were able to fetch
+        setUnreadMessages(messagesCount)
+        setUnreadNotifications(notificationsCount)
+      } catch (error) {
+        console.error("Error in fetchUnreadCounts:", error)
+        setFetchError(true)
+      }
+    }
+
+    fetchUnreadCounts()
+
+    // Poll for updates every 30 seconds, but only if the initial fetch was successful
+    const interval = setInterval(() => {
+      if (!fetchError) {
+        fetchUnreadCounts()
+      }
+    }, 30000)
+
+    return () => clearInterval(interval)
+  }, [fetchError])
+
   return (
     <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white">
+      {/* Search Dialog */}
+      <UserSearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
+
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         {/* Logo */}
         <div className="flex items-center">
@@ -62,23 +120,44 @@ export function TopNav({ userName, userImage }: TopNavProps) {
 
         {/* Right Side - Notifications & Profile */}
         <div className="flex items-center gap-4">
+          {/* Search */}
+          {!hideSearch && (
+            <Button variant="ghost" size="icon" className="relative" onClick={() => setSearchOpen(true)}>
+              <Search className="h-5 w-5 text-gray-700" />
+            </Button>
+          )}
+
           {/* Messages */}
-          <Button variant="ghost" size="icon" className="relative">
-            <MessageSquare className="h-5 w-5 text-gray-700" />
+          <Button variant="ghost" size="icon" className="relative" asChild>
+            <Link href="/messages">
+              <MessageCircle className="h-5 w-5 text-gray-700" />
+              {unreadMessages > 0 && (
+                <span className="absolute top-1 right-1 h-5 w-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+                  {unreadMessages > 9 ? "9+" : unreadMessages}
+                </span>
+              )}
+            </Link>
           </Button>
 
-          {/* Notifications */}
-          <Button variant="ghost" size="icon" className="relative">
-            <Bell className="h-5 w-5 text-gray-700" />
-            <span className="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full"></span>
-          </Button>
+          {/* Notifications - Using only the NotificationsDropdown component */}
+          <NotificationsDropdown
+            open={notificationsOpen}
+            onOpenChange={setNotificationsOpen}
+            onNotificationRead={() => setUnreadNotifications((prev) => Math.max(0, prev - 1))}
+          />
 
           {/* Profile Dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="rounded-full">
                 <div className="relative h-8 w-8 rounded-full overflow-hidden bg-blue-100">
-                  <Image src="/vibrant-street-market.png" alt="Profile" fill className="object-cover" priority />
+                  <Image
+                    src={userImage || "/vibrant-street-market.png"}
+                    alt="Profile"
+                    fill
+                    className="object-cover"
+                    priority
+                  />
                 </div>
               </Button>
             </DropdownMenuTrigger>
@@ -145,6 +224,25 @@ export function TopNav({ userName, userImage }: TopNavProps) {
                       </Link>
                     )
                   })}
+                  <Link
+                    href="/messages"
+                    onClick={() => setIsMenuOpen(false)}
+                    className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                      pathname.startsWith("/messages")
+                        ? "bg-blue-50 text-blue-700 font-medium"
+                        : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                    }`}
+                  >
+                    <div className="relative">
+                      <MessageCircle className="h-5 w-5" />
+                      {unreadMessages > 0 && (
+                        <span className="absolute -top-2 -right-2 h-4 w-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+                          {unreadMessages > 9 ? "9+" : unreadMessages}
+                        </span>
+                      )}
+                    </div>
+                    <span>Messages</span>
+                  </Link>
                 </nav>
                 <div className="mt-auto border-t py-4">
                   <div className="mt-6 pt-6 border-t">

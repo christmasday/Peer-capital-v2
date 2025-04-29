@@ -8,6 +8,7 @@ import { motion } from "framer-motion"
 import { useInView } from "@/hooks/use-in-view"
 import { useState, useEffect } from "react"
 import { Menu, X } from "lucide-react"
+import { UserSearchDialog } from "@/components/search/user-search-dialog"
 
 // Animation variants
 const fadeIn = {
@@ -52,6 +53,7 @@ const stepVariants = {
 
 export default function LandingPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [searchDialogOpen, setSearchDialogOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
 
   // Check if we're on a mobile device
@@ -73,6 +75,9 @@ export default function LandingPage() {
 
   return (
     <div className="flex flex-col min-h-screen">
+      {/* Search Dialog */}
+      <UserSearchDialog open={searchDialogOpen} onOpenChange={setSearchDialogOpen} />
+
       {/* Navigation */}
       <motion.header
         className="border-b bg-white sticky top-0 z-50"
@@ -84,7 +89,7 @@ export default function LandingPage() {
           <Logo width={110} height={10} className="w-32 md:w-auto" href="/" />
 
           {/* Mobile Menu Button */}
-          <div className="md:hidden">
+          <div className="md:hidden flex items-center gap-2">
             <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
               {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
             </Button>
@@ -147,8 +152,8 @@ export default function LandingPage() {
                 Peer-to-Peer Lending <span className="text-primary">Made Simple</span>
               </motion.h1>
               <motion.p className="text-base md:text-lg text-gray-600" variants={fadeIn}>
-                Peer Capital connects borrowers with multiple lenders and helpers, Ensuring everyone has access to the funds they need
-                to make life better.
+                Peer Capital connects borrowers with multiple lenders and helpers, Ensuring everyone has access to the
+                funds they need to make life better.
               </motion.p>
               <motion.div
                 className="flex flex-col sm:flex-row gap-3 pt-2 md:pt-4 justify-center md:justify-start"

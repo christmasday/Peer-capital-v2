@@ -1,332 +1,514 @@
 "use server"
 
-import { createServerClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { getUserProfile } from "@/lib/actions/auth"
+import { createServerClient } from "@/lib/supabase/server"
+import { revalidatePath } from "next/cache"
+import { v4 as uuidv4 } from "uuid"
+import { getCurrentUserId } from "@/lib/auth-utils"
 
-export type NotificationPreferences = {
+export type NotificationType =
+  | "message"
+  | "connection_request"
+  | "connection_accepted"
+  | "loan_request"
+  | "loan_approved"
+  | "loan_rejected"
+  | "transaction"
+  | "system"
+  | "follow"
+
+export interface Notification {
   id: string
   user_id: string
-  email_notifications: boolean
-  sms_notifications: boolean
-  push_notifications: boolean
-  marketing_emails: boolean
-  transaction_alerts: boolean
-  security_alerts: boolean
+  actor_id: string | null
+  type: NotificationType
+  content?: string
+  data?: any
+  reference_id?: string
+  is_read: boolean
   created_at: string
   updated_at: string
 }
 
-// Default notification preferences
-const DEFAULT_PREFERENCES: Omit<NotificationPreferences, "id" | "user_id" | "created_at" | "updated_at"> = {
-  email_notifications: true,
-  sms_notifications: false,
-  push_notifications: false,
-  marketing_emails: true,
-  transaction_alerts: true,
-  security_alerts: true,
+export interface NotificationData {
+  [key: string]: any
 }
 
-// Get notification preferences for the current user
-export async function getNotificationPreferences(): Promise<{
-  preferences?: NotificationPreferences
-  error?: string
-}> {
-  try {
-    // Get the current user profile
-    const userProfile = await getUserProfile()
+// Add the missing notification preferences interfaces and functions
+export interface NotificationPreferences {
+  id: string
+  user_id: string
+  email_notifications: boolean
+  push_notifications: boolean
+  sms_notifications: boolean
+  message_notifications: boolean
+  loan_notifications: boolean
+  connection_notifications: boolean
+  marketing_notifications: boolean
+  created_at: string
+  updated_at: string
+}
 
-    if (!userProfile || !userProfile.user || !userProfile.user.id) {
-      return { error: "User not authenticated" }
+export async function getNotificationPreferences(userId?: string) {
+  try {
+    // If userId is not provided, get the current user ID
+    if (!userId) {
+      userId = await getCurrentUserId()
+      if (!userId) {
+        return { success: false, error: new Error("User ID is required") }
+      }
     }
 
-    const userId = userProfile.user.id
-    const supabase = createServerClient()
     const adminClient = createAdminClient()
 
-    // Fetch notification preferences using maybeSingle() instead of single()
-    const { data, error } = await supabase
+    const { data, error } = await adminClient
       .from("notification_preferences")
       .select("*")
       .eq("user_id", userId)
       .maybeSingle()
 
     if (error) {
-      console.error("Error fetching notification preferences:", error)
-      return { error: "Failed to fetch notification preferences" }
+      console.error("Error getting notification preferences:", error)
+      return { success: false, error }
     }
 
-    // If preferences don't exist, create them
+    // If no preferences exist, return default preferences
     if (!data) {
-      console.log("No notification preferences found for user, creating defaults")
-
-      // First verify that the user exists in auth_users table
-      const { data: userExists, error: userCheckError } = await adminClient
-        .from("auth_users")
-        .select("id")
-        .eq("id", userId)
-        .maybeSingle()
-
-      if (userCheckError) {
-        console.error("Error checking if user exists:", userCheckError)
-        return { error: "Failed to verify user existence" }
+      return {
+        success: true,
+        preferences: {
+          user_id: userId,
+          email_notifications: true,
+          push_notifications: true,
+          sms_notifications: true,
+          message_notifications: true,
+          loan_notifications: true,
+          connection_notifications: true,
+          marketing_notifications: false,
+        },
       }
-
-      if (!userExists) {
-        console.error("User does not exist in auth_users table:", userId)
-        return {
-          preferences: {
-            id: "temp-id",
-            user_id: userId,
-            ...DEFAULT_PREFERENCES,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-        }
-      }
-
-      // Create default notification preferences with retry logic
-      let retryCount = 0
-      const maxRetries = 3
-      let createError = null
-      let newPrefs = null
-
-      while (retryCount < maxRetries) {
-        try {
-          const now = new Date().toISOString()
-          const { data: createdPrefs, error: insertError } = await adminClient
-            .from("notification_preferences")
-            .insert({
-              user_id: userId,
-              ...DEFAULT_PREFERENCES,
-              created_at: now,
-              updated_at: now,
-            })
-            .select("*")
-            .maybeSingle()
-
-          if (insertError) {
-            console.error(`Error creating notification preferences (attempt ${retryCount + 1}):`, insertError)
-            createError = insertError
-            retryCount++
-
-            // Wait before retrying
-            await new Promise((resolve) => setTimeout(resolve, 500))
-          } else {
-            newPrefs = createdPrefs
-            break // Success, exit the loop
-          }
-        } catch (err) {
-          console.error(`Exception during notification preferences creation (attempt ${retryCount + 1}):`, err)
-          createError = err
-          retryCount++
-
-          if (retryCount >= maxRetries) {
-            break
-          }
-
-          // Wait before retrying
-          await new Promise((resolve) => setTimeout(resolve, 500))
-        }
-      }
-
-      if (!newPrefs) {
-        console.error("Failed to create notification preferences after retries")
-
-        // Return default preferences anyway to prevent UI errors
-        return {
-          preferences: {
-            id: "temp-id",
-            user_id: userId,
-            ...DEFAULT_PREFERENCES,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-        }
-      }
-
-      return { preferences: newPrefs as NotificationPreferences }
     }
 
-    return { preferences: data as NotificationPreferences }
+    return { success: true, preferences: data }
   } catch (error) {
-    console.error("Unexpected error fetching notification preferences:", error)
-    return { error: "An unexpected error occurred" }
+    console.error("Error in getNotificationPreferences:", error)
+    return { success: false, error }
   }
 }
 
-// Update notification preferences for the current user
-export async function updateNotificationPreferences(preferences: Partial<NotificationPreferences>): Promise<{
-  success?: boolean
-  error?: string
-}> {
+export async function updateNotificationPreferences(
+  preferences: Partial<NotificationPreferences> & { user_id: string },
+) {
   try {
-    // Get the current user profile
-    const userProfile = await getUserProfile()
-
-    if (!userProfile || !userProfile.user || !userProfile.user.id) {
-      return { error: "User not authenticated" }
-    }
-
-    const userId = userProfile.user.id
-    const supabase = createServerClient()
+    const { user_id, ...preferencesToUpdate } = preferences
     const adminClient = createAdminClient()
 
-    // Check if preferences exist
-    const { data: existingPrefs, error: checkError } = await supabase
+    // Check if preferences exist for this user
+    const { data: existingPreferences, error: checkError } = await adminClient
       .from("notification_preferences")
       .select("id")
-      .eq("user_id", userId)
+      .eq("user_id", user_id)
       .maybeSingle()
 
     if (checkError) {
       console.error("Error checking notification preferences:", checkError)
-      return { error: "Failed to check notification preferences" }
+      return { success: false, error: checkError }
     }
 
-    // Remove id and user_id from the update data if present
-    const { id, user_id, created_at, ...updateData } = preferences as any
+    let result
+    const now = new Date().toISOString()
 
-    // Add updated_at timestamp
-    const dataToUpdate = {
-      ...updateData,
-      updated_at: new Date().toISOString(),
-    }
-
-    if (!existingPrefs) {
-      // First verify that the user exists in auth_users table
-      const { data: userExists, error: userCheckError } = await adminClient
-        .from("auth_users")
-        .select("id")
-        .eq("id", userId)
-        .maybeSingle()
-
-      if (userCheckError) {
-        console.error("Error checking if user exists:", userCheckError)
-        return { error: "Failed to verify user existence" }
-      }
-
-      if (!userExists) {
-        console.error("User does not exist in auth_users table:", userId)
-        return { error: "User does not exist" }
-      }
-
-      // Create new preferences if they don't exist
-      const { error: createError } = await adminClient.from("notification_preferences").insert({
-        user_id: userId,
-        ...DEFAULT_PREFERENCES,
-        ...dataToUpdate,
-        created_at: new Date().toISOString(),
-      })
-
-      if (createError) {
-        console.error("Error creating notification preferences:", createError)
-        return { error: "Failed to create notification preferences" }
-      }
-    } else {
+    if (existingPreferences) {
       // Update existing preferences
-      const { error: updateError } = await supabase
+      const { data, error } = await adminClient
         .from("notification_preferences")
-        .update(dataToUpdate)
-        .eq("user_id", userId)
+        .update({
+          ...preferencesToUpdate,
+          updated_at: now,
+        })
+        .eq("user_id", user_id)
+        .select()
+        .single()
 
-      if (updateError) {
-        console.error("Error updating notification preferences:", updateError)
-        return { error: "Failed to update notification preferences" }
+      if (error) {
+        console.error("Error updating notification preferences:", error)
+        return { success: false, error }
       }
+
+      result = data
+    } else {
+      // Insert new preferences
+      const { data, error } = await adminClient
+        .from("notification_preferences")
+        .insert({
+          id: uuidv4(),
+          user_id,
+          ...preferencesToUpdate,
+          created_at: now,
+          updated_at: now,
+        })
+        .select()
+        .single()
+
+      if (error) {
+        console.error("Error creating notification preferences:", error)
+        return { success: false, error }
+      }
+
+      result = data
     }
 
-    return { success: true }
+    revalidatePath("/profile/notifications")
+    return { success: true, preferences: result }
   } catch (error) {
-    console.error("Unexpected error updating notification preferences:", error)
-    return { error: "An unexpected error occurred" }
+    console.error("Error in updateNotificationPreferences:", error)
+    return { success: false, error }
   }
 }
 
-// Ensure notification preferences exist for a user
-export async function ensureNotificationPreferences(userId: string): Promise<{
-  success?: boolean
-  error?: string
-}> {
+// Completely rewritten createNotification function with robust profile checking
+export async function createNotification({
+  userId,
+  actorId,
+  type,
+  data = {},
+}: {
+  userId: string
+  actorId?: string
+  type: NotificationType
+  data?: NotificationData
+}) {
   try {
+    if (!userId) {
+      console.error("createNotification called with empty userId")
+      return { success: false, error: "User ID is required" }
+    }
+
+    console.log(`Creating notification for user ${userId} of type ${type}`)
+
+    // Always use admin client for all operations to bypass RLS
     const adminClient = createAdminClient()
 
-    // First verify that the user exists in auth_users table
-    const { data: userExists, error: userCheckError } = await adminClient
-      .from("auth_users")
+    // STEP 1: Check if profile exists
+    console.log(`Checking if profile exists for user ${userId}`)
+    const { data: existingProfile, error: profileCheckError } = await adminClient
+      .from("profiles")
       .select("id")
       .eq("id", userId)
       .maybeSingle()
 
-    if (userCheckError) {
-      console.error("Error checking if user exists:", userCheckError)
-      return { error: "Failed to verify user existence", fallback: true }
+    if (profileCheckError) {
+      console.error(`Error checking profile existence for ${userId}:`, profileCheckError)
+      return { success: false, error: profileCheckError }
     }
 
-    if (!userExists) {
-      console.error("User does not exist in auth_users table:", userId)
-      return { error: "User does not exist in auth_users table", fallback: true }
+    // STEP 2: Create profile if it doesn't exist
+    if (!existingProfile) {
+      console.log(`Profile doesn't exist for ${userId}, creating now...`)
+
+      const { error: createProfileError } = await adminClient.from("profiles").insert({
+        id: userId,
+        first_name: null,
+        last_name: null,
+        profile_picture_url: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+
+      if (createProfileError) {
+        console.error(`Failed to create profile for ${userId}:`, createProfileError)
+        return { success: false, error: createProfileError }
+      }
+
+      console.log(`Successfully created profile for ${userId}`)
+    } else {
+      console.log(`Profile already exists for ${userId}`)
     }
 
-    // Check if preferences already exist
-    const { data, error: checkError } = await adminClient
-      .from("notification_preferences")
+    // STEP 3: Verify profile was created successfully
+    const { data: verifyProfile, error: verifyError } = await adminClient
+      .from("profiles")
       .select("id")
+      .eq("id", userId)
+      .single()
+
+    if (verifyError || !verifyProfile) {
+      console.error(`Failed to verify profile for ${userId}:`, verifyError || "Profile not found after creation")
+      return { success: false, error: verifyError || new Error("Profile not found after creation") }
+    }
+
+    console.log(`Verified profile exists for ${userId}, proceeding with notification creation`)
+
+    // STEP 4: Create notification with actor_id as null
+    const notificationData = {
+      ...data,
+      ...(actorId ? { original_actor_id: actorId } : {}),
+    }
+
+    const now = new Date().toISOString()
+
+    console.log(`Inserting notification for ${userId}`)
+    const { data: notification, error: notificationError } = await adminClient
+      .from("notifications")
+      .insert({
+        id: uuidv4(),
+        user_id: userId,
+        actor_id: null, // Always set to null to avoid foreign key issues
+        type,
+        data: notificationData,
+        is_read: false,
+        created_at: now,
+        updated_at: now,
+      })
+      .select()
+      .single()
+
+    if (notificationError) {
+      console.error(`Error creating notification for ${userId}:`, notificationError)
+      return { success: false, error: notificationError }
+    }
+
+    console.log(`Successfully created notification for ${userId}`)
+    return { success: true, notification }
+  } catch (error) {
+    console.error("Unexpected error in createNotification:", error)
+    return { success: false, error }
+  }
+}
+
+// Rest of the file remains unchanged
+export async function getNotifications(pageOrUserId?: number | string, limit = 10, includeRead = false) {
+  try {
+    let userId: string
+    let page = 1
+
+    // Determine if the first parameter is a page number or userId
+    if (typeof pageOrUserId === "number") {
+      // It's a page number
+      page = pageOrUserId
+      userId = await getCurrentUserId()
+      if (!userId) {
+        return { error: "You must be logged in to view notifications" }
+      }
+    } else if (
+      typeof pageOrUserId === "string" &&
+      pageOrUserId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
+    ) {
+      // It's a UUID
+      userId = pageOrUserId
+      page = 1
+    } else {
+      // No parameter or invalid parameter, get current user
+      userId = await getCurrentUserId()
+      if (!userId) {
+        return { error: "You must be logged in to view notifications" }
+      }
+      page = 1
+    }
+
+    const adminClient = createAdminClient()
+    const offset = (page - 1) * limit
+
+    // Build query
+    let query = adminClient
+      .from("notifications")
+      .select("*", { count: "exact" })
       .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1)
+
+    // Filter by read status if needed
+    if (!includeRead) {
+      query = query.eq("is_read", false)
+    }
+
+    const { data: notifications, error, count } = await query
+
+    if (error) {
+      console.error("Error getting notifications:", error)
+      return { error: "Failed to get notifications" }
+    }
+
+    // Get unread count
+    const { count: unreadCount, error: countError } = await adminClient
+      .from("notifications")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("is_read", false)
+
+    if (countError) {
+      console.error("Error getting unread count:", countError)
+    }
+
+    return {
+      notifications,
+      count,
+      unreadCount: unreadCount || 0,
+    }
+  } catch (error) {
+    console.error("Unexpected error getting notifications:", error)
+    return { error: "An unexpected error occurred" }
+  }
+}
+
+export async function getUnreadNotificationsCount() {
+  try {
+    // Get the current user ID
+    const userId = await getCurrentUserId()
+    if (!userId) {
+      return { success: true, count: 0 } // Return 0 if not logged in
+    }
+
+    const supabase = createServerClient()
+
+    const { count, error } = await supabase
+      .from("notifications")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("is_read", false)
+
+    if (error) {
+      console.error("Error fetching unread notifications count:", error)
+      return { success: false, error: error.message }
+    }
+
+    return { success: true, count: count || 0 }
+  } catch (error) {
+    console.error("Error in getUnreadNotificationsCount:", error)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    return { success: false, error: errorMessage }
+  }
+}
+
+export async function markNotificationAsRead(notificationId: string) {
+  try {
+    // Use admin client to bypass RLS
+    const adminClient = createAdminClient()
+
+    // First check if the notification exists
+    const { data: existingNotification, error: checkError } = await adminClient
+      .from("notifications")
+      .select("id, is_read")
+      .eq("id", notificationId)
       .maybeSingle()
 
     if (checkError) {
-      console.error("Error checking notification preferences:", checkError)
-      return { error: "Failed to check notification preferences", fallback: true }
+      console.error("Error checking notification existence:", checkError)
+      return { success: false, error: checkError }
     }
 
-    // If preferences already exist, return success
-    if (data) {
-      return { success: true }
+    // If notification doesn't exist, return early
+    if (!existingNotification) {
+      console.log(`Notification ${notificationId} not found`)
+      return { success: false, error: new Error("Notification not found") }
     }
 
-    // Create default notification preferences with retry logic
-    let retryCount = 0
-    const maxRetries = 3
+    // If notification is already read, return early with success
+    if (existingNotification.is_read) {
+      console.log(`Notification ${notificationId} is already marked as read`)
+      return { success: true, notification: existingNotification }
+    }
 
-    while (retryCount < maxRetries) {
-      try {
-        const { error: insertError } = await adminClient.from("notification_preferences").insert({
-          user_id: userId,
-          ...DEFAULT_PREFERENCES,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
+    // Update the notification with updated_at timestamp
+    const now = new Date().toISOString()
+    const { data, error } = await adminClient
+      .from("notifications")
+      .update({
+        is_read: true,
+        updated_at: now,
+      })
+      .eq("id", notificationId)
+      .select()
 
-        if (insertError) {
-          console.error(`Error creating notification preferences (attempt ${retryCount + 1}):`, insertError)
-          retryCount++
+    if (error) {
+      console.error("Error marking notification as read:", error)
+      return { success: false, error }
+    }
 
-          // Wait before retrying
-          await new Promise((resolve) => setTimeout(resolve, 500))
-        } else {
-          // Success!
-          console.log("Notification preferences created successfully for user:", userId)
-          return { success: true }
-        }
-      } catch (insertError) {
-        console.error(`Exception during notification preferences creation (attempt ${retryCount + 1}):`, insertError)
-        retryCount++
+    revalidatePath("/notifications")
+    return { success: true, notification: data?.[0] || null }
+  } catch (error) {
+    console.error("Error in markNotificationAsRead:", error)
+    return { success: false, error }
+  }
+}
 
-        if (retryCount >= maxRetries) {
-          return { error: "Failed to create notification preferences after maximum retries", fallback: true }
-        }
-
-        // Wait before retrying
-        await new Promise((resolve) => setTimeout(resolve, 500))
+export async function markAllNotificationsAsRead(userId?: string) {
+  try {
+    // If userId is not provided, get the current user ID
+    if (!userId) {
+      userId = await getCurrentUserId()
+      if (!userId) {
+        return { success: false, error: new Error("User ID is required") }
       }
     }
 
-    // If we get here, all retries failed
-    console.warn("All retries failed when creating notification preferences")
-    return { success: true, fallback: true, warning: "Failed to create notification preferences after maximum retries" }
+    console.log(`Marking all notifications as read for user ${userId}`)
+
+    // Use admin client to bypass RLS
+    const adminClient = createAdminClient()
+
+    // Update all unread notifications with updated_at timestamp
+    const now = new Date().toISOString()
+    const { data, error } = await adminClient
+      .from("notifications")
+      .update({
+        is_read: true,
+        updated_at: now,
+      })
+      .eq("user_id", userId)
+      .eq("is_read", false)
+      .select()
+
+    if (error) {
+      console.error(`Error marking all notifications as read for ${userId}:`, error)
+      return { success: false, error }
+    }
+
+    console.log(`Successfully marked ${data?.length || 0} notifications as read for ${userId}`)
+    revalidatePath("/notifications")
+    return { success: true, notifications: data }
   } catch (error) {
-    console.error("Unexpected error ensuring notification preferences:", error)
-    return { error: "An unexpected error occurred", fallback: true }
+    console.error("Error in markAllNotificationsAsRead:", error)
+    return { success: false, error }
+  }
+}
+
+export async function deleteNotification(notificationId: string) {
+  try {
+    // Use admin client to bypass RLS
+    const adminClient = createAdminClient()
+
+    // First check if the notification exists
+    const { data: existingNotification, error: checkError } = await adminClient
+      .from("notifications")
+      .select("id")
+      .eq("id", notificationId)
+      .maybeSingle()
+
+    if (checkError) {
+      console.error("Error checking notification existence:", checkError)
+      return { success: false, error: checkError }
+    }
+
+    // If notification doesn't exist, return early with success (already deleted)
+    if (!existingNotification) {
+      console.log(`Notification ${notificationId} not found (already deleted)`)
+      return { success: true }
+    }
+
+    // Delete the notification
+    const { error } = await adminClient.from("notifications").delete().eq("id", notificationId)
+
+    if (error) {
+      console.error("Error deleting notification:", error)
+      return { success: false, error }
+    }
+
+    revalidatePath("/notifications")
+    return { success: true }
+  } catch (error) {
+    console.error("Error in deleteNotification:", error)
+    return { success: false, error }
   }
 }

@@ -9,46 +9,7 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
-      profiles: {
-        Row: any
-        Insert: any
-        Update: any
-      }
-      account_balances: {
-        Row: any
-        Insert: any
-        Update: any
-      }
-      notification_preferences: {
-        Row: any
-        Insert: any
-        Update: any
-      }
-      loan_helpers: {
-        Row: any
-        Insert: any
-        Update: any
-      }
-      loan_requests: {
-        Row: any
-        Insert: any
-      Update: any
-      }
-      transactions: {
-        Row: any
-        Insert: any
-        Update: any
-      }
-      auth_users: {
-        Row: any
-        Insert: any
-        Update: any
-      }
-      loan_helper_settings: {
-        Row: any
-        Insert: any
-        Update: any
-      }
+      [_ in never]: never
     }
     Views: {
       [_ in never]: never

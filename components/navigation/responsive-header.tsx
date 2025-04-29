@@ -1,6 +1,6 @@
 "use client"
 
-import { Bell, Menu, Home, Wallet, BarChart2, User, LogOut } from "lucide-react"
+import { Bell, Menu, Home, Wallet, BarChart2, User, LogOut, Search } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { useState } from "react"
@@ -8,6 +8,8 @@ import { usePathname } from "next/navigation"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { SignoutButton } from "@/components/auth/signout-button"
 import { Logo } from "@/components/logo"
+import { Button } from "@/components/ui/button"
+import { UserSearchDialog } from "@/components/search/user-search-dialog"
 
 interface ResponsiveHeaderProps {
   userName?: string
@@ -16,6 +18,7 @@ interface ResponsiveHeaderProps {
 
 export function ResponsiveHeader({ userName, userImage }: ResponsiveHeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
   const pathname = usePathname()
 
   const navItems = [
@@ -27,6 +30,9 @@ export function ResponsiveHeader({ userName, userImage }: ResponsiveHeaderProps)
 
   return (
     <>
+      {/* Search Dialog */}
+      <UserSearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
+
       <header className="lg:hidden sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-3">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2">
@@ -100,6 +106,9 @@ export function ResponsiveHeader({ userName, userImage }: ResponsiveHeaderProps)
             <Logo width={60} height={15} className="flex-shrink-0" />
           </div>
           <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" className="p-2 relative" onClick={() => setSearchOpen(true)}>
+              <Search className="h-5 w-5 text-gray-700" />
+            </Button>
             <button className="p-2 relative">
               <Bell className="h-5 w-5 text-gray-700" />
               <span className="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full"></span>
