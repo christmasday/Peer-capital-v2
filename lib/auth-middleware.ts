@@ -2,9 +2,21 @@ import { type NextRequest, NextResponse } from "next/server"
 import { verifyJWT } from "@/lib/jwt"
 import { createAdminClient, isOfflineMode } from "@/lib/supabase/admin"
 
-// Helper function to check if a path is public (doesn't require auth)
+// Update the publicPaths array in the isPublicPath function
 export function isPublicPath(path: string): boolean {
-  const publicPaths = ["/", "/login", "/signup", "/forgot-password", "/api/auth"]
+  const publicPaths = [
+    "/",
+    "/login",
+    "/signup",
+    "/forgot-password",
+    "/reset-password",
+    "/contact",
+    "/faq",
+    "/privacy-policy",
+    "/terms",
+    "/cookie-policy",
+    "/disclaimers",
+  ]
   return publicPaths.some((publicPath) => path === publicPath || path.startsWith(`${publicPath}/`))
 }
 

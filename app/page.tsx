@@ -536,12 +536,12 @@ export default function LandingPage() {
                   </Link>
                 </li>
                 <li>
-                  <Link href="#" className="hover:text-white">
+                  <Link href="/faq" className="hover:text-white" prefetch={false}>
                     FAQs
                   </Link>
                 </li>
                 <li>
-                  <Link href="#" className="hover:text-white">
+                  <Link href="/contact" className="hover:text-white" prefetch={false}>
                     Contact Us
                   </Link>
                 </li>
@@ -555,20 +555,25 @@ export default function LandingPage() {
               <h3 className="font-semibold text-white text-sm md:text-base mb-3 md:mb-4">Legal</h3>
               <ul className="space-y-1 md:space-y-2 text-xs md:text-sm">
                 <li>
-                  <Link href="#" className="hover:text-white">
+                  <Link href="privacy-policy" className="hover:text-white">
                     Privacy Policy
                   </Link>
                 </li>
                 <li>
-                  <Link href="#" className="hover:text-white">
+                  <Link href="/terms" className="hover:text-white">
                     Terms of Service
                   </Link>
                 </li>
                 <li>
-                  <Link href="#" className="hover:text-white">
+                  <Link href="/cookie-policy" className="hover:text-white">
                     Cookie Policy
                   </Link>
                 </li>
+                <li>
+                <Link href="/disclaimers" className="hover:text-white">
+                  Financial Disclaimers
+                </Link>
+              </li>
               </ul>
             </motion.div>
           </div>

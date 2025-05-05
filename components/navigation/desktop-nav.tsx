@@ -1,6 +1,15 @@
 "use client"
 
-import { Home, Wallet, User, BarChart2, LogOut, Menu, ChevronLeft } from "lucide-react"
+import {
+  Home,
+  Wallet,
+  User,
+  BarChart2,
+  LogOut,
+  Menu,
+  ChevronLeft,
+  MessageCircleQuestionIcon as QuestionMarkCircle,
+} from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState, useEffect } from "react"
@@ -50,6 +59,7 @@ export function DesktopNav({ userName, userImage }: DesktopNavProps) {
     { href: "/loans", label: "Loans", icon: Wallet },
     { href: "/transactions", label: "Transactions", icon: BarChart2 },
     { href: "/profile", label: "Profile", icon: User },
+    { href: "/faq", label: "FAQ", icon: QuestionMarkCircle },
   ]
 
   return (

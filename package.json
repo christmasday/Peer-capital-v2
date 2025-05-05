@@ -71,7 +71,9 @@
     "path": "latest",
     "bcryptjs": "latest",
     "html2canvas": "latest",
-    "jspdf": "latest"
+    "jspdf": "latest",
+    "crypto": "latest",
+    "js-cookie": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",

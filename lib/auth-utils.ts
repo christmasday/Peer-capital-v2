@@ -2,6 +2,7 @@ import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 import { getJWTFromCookies, verifyJWT } from "@/lib/jwt"
 import { createServerClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 
 // Function to check authentication on server components
 export async function checkAuth(redirectPath = "/?auth=required") {
@@ -106,9 +107,55 @@ export async function getCurrentUserId() {
       console.warn("User is authenticated but ID could not be determined")
     }
 
+    // Last resort for dev mode
+    if (process.env.NODE_ENV === "development") {
+      const adminClient = createAdminClient()
+      const { data: firstUser } = await adminClient.from("profiles").select("id").limit(1).single()
+
+      if (firstUser?.id) {
+        console.log("Development mode: Using first user from database:", firstUser.id)
+        return firstUser.id
+      }
+    }
+
     return null
   } catch (error) {
     console.error("Error getting current user ID:", error)
+    return null
+  }
+}
+
+// Helper function to get user email
+export async function getUserEmail(userId: string): Promise<string | null> {
+  try {
+    const adminClient = createAdminClient()
+
+    // Try to get from auth.users first
+    const { data: authUser, error: authError } = await adminClient
+      .from("auth.users")
+      .select("email")
+      .eq("id", userId)
+      .single()
+
+    if (!authError && authUser?.email) {
+      return authUser.email
+    }
+
+    // Try to get from profiles table
+    const { data: profile, error: profileError } = await adminClient
+      .from("profiles")
+      .select("email")
+      .eq("id", userId)
+      .single()
+
+    if (!profileError && profile?.email) {
+      return profile.email
+    }
+
+    // If all else fails, create a placeholder email
+    return `user-${userId}@example.com`
+  } catch (error) {
+    console.error("Error getting user email:", error)
     return null
   }
 }

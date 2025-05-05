@@ -2,22 +2,60 @@
 
 import { createAdminClient } from "@/lib/supabase/admin"
 
-// Add the missing executeMigration export
-export async function executeMigration() {
+// Add the missing executeSql function as a named export
+export async function executeSql(sql: string) {
   try {
-    console.log("Executing migration...")
+    console.log("Executing SQL:", sql.substring(0, 100) + (sql.length > 100 ? "..." : ""))
 
-    // Since this is a placeholder for the missing export, we'll return a success message
-    return {
-      success: true,
-      message: "Migration executed successfully",
+    const adminClient = createAdminClient()
+
+    // Execute the SQL using the execute_sql RPC function
+    const { data, error } = await adminClient.rpc("execute_sql", { sql_query: sql })
+
+    if (error) {
+      console.error("Error executing SQL:", error)
+      return { success: false, error: error.message }
     }
+
+    console.log("SQL executed successfully")
+    return { success: true, data }
   } catch (error) {
-    console.error("Error executing migration:", error)
+    console.error("Unexpected error executing SQL:", error)
     return {
       success: false,
-      error: "An error occurred while executing the migration",
+      error: `An unexpected error occurred: ${error instanceof Error ? error.message : String(error)}`,
     }
+  }
+}
+
+export async function executeMigration(migrationFile: string) {
+  try {
+    console.log(`Executing migration: ${migrationFile}`)
+
+    const adminClient = createAdminClient()
+
+    // Get the migration SQL
+    const response = await fetch(`/migrations/${migrationFile}`)
+    if (!response.ok) {
+      console.error(`Failed to fetch migration file: ${migrationFile}`)
+      return { error: `Failed to fetch migration file: ${migrationFile}` }
+    }
+
+    const sql = await response.text()
+
+    // Execute the SQL
+    const { error } = await adminClient.rpc("execute_sql", { sql_query: sql })
+
+    if (error) {
+      console.error(`Error executing migration: ${error.message}`)
+      return { error: error.message }
+    }
+
+    console.log(`Migration ${migrationFile} executed successfully`)
+    return { success: true }
+  } catch (error) {
+    console.error(`Unexpected error executing migration: ${error}`)
+    return { error: `An unexpected error occurred: ${error instanceof Error ? error.message : String(error)}` }
   }
 }
 

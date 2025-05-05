@@ -10,6 +10,8 @@ import { CancelLoanButton } from "@/components/loans/cancel-loan-button"
 import { MainLayout } from "@/components/layouts/main-layout"
 import { getUserProfile } from "@/lib/actions/auth"
 import { checkAuth } from "@/lib/auth-utils"
+// Import the FinancialDisclaimer component
+import { FinancialDisclaimer } from "@/components/disclaimers/financial-disclaimer"
 
 export const dynamic = "force-dynamic"
 
@@ -60,6 +62,10 @@ export default async function LoansPage() {
       userImage={userProfile.profile?.profile_picture_url || "/vibrant-street-market.png"}
     >
       <div className="max-w-4xl mx-auto">
+        {/* Add the disclaimer at the top of the page content, before the loans list */}
+        <div className="mb-6">
+          <FinancialDisclaimer />
+        </div>
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold text-gray-900">My Loans</h1>
           <Link href="/home">

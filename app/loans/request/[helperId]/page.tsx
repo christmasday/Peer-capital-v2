@@ -4,6 +4,8 @@ import { LoanRequestForm } from "@/components/loans/loan-request-form"
 import { MainLayout } from "@/components/layouts/main-layout"
 import { getUserProfile } from "@/lib/actions/auth"
 import { checkAuth } from "@/lib/auth-utils"
+// Import the FinancialDisclaimer component
+import { FinancialDisclaimer } from "@/components/disclaimers/financial-disclaimer"
 
 export default async function LoanRequestPage({ params }: { params: { helperId: string } }) {
   // Check authentication
@@ -31,6 +33,12 @@ export default async function LoanRequestPage({ params }: { params: { helperId: 
     >
       <div className="max-w-4xl mx-auto">
         <h1 className="text-2xl font-bold text-gray-900 mb-6">Request a Loan</h1>
+
+        {/* Add the disclaimer before the loan request form */}
+        {/* Inside the main content div, add: */}
+        <div className="mb-6">
+          <FinancialDisclaimer variant="compact" />
+        </div>
 
         <LoanRequestForm
           helperId={helper.id}

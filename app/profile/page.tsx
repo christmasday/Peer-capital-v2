@@ -16,6 +16,7 @@ import {
   Upload,
   AlertTriangle,
   Wallet,
+  CreditCardIcon,
 } from "lucide-react"
 import { MainLayout } from "@/components/layouts/main-layout"
 import { format } from "date-fns"
@@ -24,6 +25,8 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { LoanHelperSettingsDisplay } from "@/components/profile/loan-helper-settings-display"
+import { VirtualAccountButton } from "@/components/profile/virtual-account-button"
+import { getVirtualAccount } from "@/lib/actions/paystack"
 
 export const dynamic = "force-dynamic"
 
@@ -39,6 +42,10 @@ export default async function ProfilePage() {
 
   const profile = userProfile.profile
   const user = userProfile.user
+
+  // Get virtual account if exists
+  const virtualAccountResult = await getVirtualAccount(user.id)
+  const virtualAccount = virtualAccountResult.success ? virtualAccountResult.virtualAccount : null
 
   // Format date function
   const formatDate = (dateString: string | null) => {
@@ -131,11 +138,12 @@ export default async function ProfilePage() {
         )}
 
         <Tabs defaultValue="personal" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-6">
+          <TabsList className="grid w-full grid-cols-5 mb-6">
             <TabsTrigger value="personal">Personal Info</TabsTrigger>
             <TabsTrigger value="id">ID Verification</TabsTrigger>
             <TabsTrigger value="employment">Employment</TabsTrigger>
             <TabsTrigger value="loan">Loan Helper</TabsTrigger>
+            <TabsTrigger value="virtual">Virtual Account</TabsTrigger>
           </TabsList>
 
           <TabsContent value="personal">
@@ -514,6 +522,7 @@ export default async function ProfilePage() {
               </CardContent>
             </Card>
           </TabsContent>
+
           <TabsContent value="loan">
             <Card>
               <CardContent className="p-6">
@@ -532,6 +541,59 @@ export default async function ProfilePage() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="virtual">
+            <div className="grid grid-cols-1 gap-6">
+              <VirtualAccountButton virtualAccount={virtualAccount} />
+
+              <Card>
+                <CardContent className="p-6">
+                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <CreditCardIcon className="h-5 w-5 text-blue-600" />
+                    About Virtual Accounts
+                  </h3>
+
+                  <div className="space-y-4">
+                    <p>
+                      A virtual account is a dedicated bank account assigned to you for easy deposits into your Peer
+                      Capital wallet. Here's how it works:
+                    </p>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="bg-blue-50 p-4 rounded-lg">
+                        <h4 className="font-medium mb-2">Instant Funding</h4>
+                        <p className="text-sm text-gray-700">
+                          Transfers to your virtual account are automatically credited to your wallet within minutes.
+                        </p>
+                      </div>
+
+                      <div className="bg-blue-50 p-4 rounded-lg">
+                        <h4 className="font-medium mb-2">Dedicated Account</h4>
+                        <p className="text-sm text-gray-700">
+                          Your virtual account is uniquely yours and remains the same for all future transactions.
+                        </p>
+                      </div>
+
+                      <div className="bg-blue-50 p-4 rounded-lg">
+                        <h4 className="font-medium mb-2">No Transfer Fees</h4>
+                        <p className="text-sm text-gray-700">
+                          Fund your account without paying any additional transfer fees or charges.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-sm text-yellow-800">
+                      <p className="font-medium mb-1">Important Note:</p>
+                      <p>
+                        Your virtual account can only be used for deposits. For withdrawals, please use the withdrawal
+                        feature and provide your regular bank account details.
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
       </div>

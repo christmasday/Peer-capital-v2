@@ -15,6 +15,12 @@ export async function middleware(req: NextRequest) {
     "/reset-password",
     "/api/auth/refresh",
     "/api/sync-auth-users",
+    "/contact",
+    "/faq",
+    "/privacy-policy",
+    "/terms",
+    "/cookie-policy",
+    "/disclaimers",
   ]
   const path = req.nextUrl.pathname
 

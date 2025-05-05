@@ -1,6 +1,6 @@
 "use client"
 
-import { Home, Wallet, User, BarChart2 } from "lucide-react"
+import { Home, Wallet, User, BarChart2, HelpCircle } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
@@ -31,6 +31,10 @@ export function BottomNav() {
           <span className={`text-xs mt-1 ${pathname.startsWith("/profile") ? "text-white" : "text-blue-300"}`}>
             Profile
           </span>
+        </Link>
+        <Link href="/faq" className="flex flex-col items-center">
+          <HelpCircle className={`h-6 w-6 ${pathname === "/faq" ? "text-white" : "text-blue-300"}`} />
+          <span className={`text-xs mt-1 ${pathname === "/faq" ? "text-white" : "text-blue-300"}`}>FAQ</span>
         </Link>
       </div>
     </div>
