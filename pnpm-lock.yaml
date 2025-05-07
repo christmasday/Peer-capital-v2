@@ -136,7 +136,7 @@ importers:
         version: 8.5.1(react@19.0.0)
       framer-motion:
         specifier: latest
-        version: 12.9.7(@emotion/is-prop-valid@1.3.1)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
+        version: 12.10.0(@emotion/is-prop-valid@1.3.1)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
       fs:
         specifier: latest
         version: 0.0.1-security
@@ -237,8 +237,8 @@ packages:
     resolution: {integrity: sha512-cjQ7ZlQ0Mv3b47hABuTevyTuYN4i+loJKGeV9flcCgIK37cCXRh+L1bd3iBHlynerhQ7BhCkn2BPbQUL+rGqFg==}
     engines: {node: '>=6.9.0'}
 
-  '@babel/compat-data@7.27.1':
-    resolution: {integrity: sha512-Q+E+rd/yBzNQhXkG+zQnF58e4zoZfBedaxwzPmicKsiK3nt8iJYrSrDbjwFFDGC4f+rPafqRaPH6TsDoSvMf7A==}
+  '@babel/compat-data@7.27.2':
+    resolution: {integrity: sha512-TUtMJYRPyUb/9aU8f3K0mjmjf6M9N5Woshn2CS6nqJSeJtTtQcpLUXjGt9vbF8ZGff0El99sWkLgzwW3VXnxZQ==}
     engines: {node: '>=6.9.0'}
 
   '@babel/core@7.27.1':
@@ -249,8 +249,8 @@ packages:
     resolution: {integrity: sha512-UnJfnIpc/+JO0/+KRVQNGU+y5taA5vCbwN8+azkX6beii/ZF+enZJSOKo11ZSzGJjlNfJHfQtmQT8H+9TXPG2w==}
     engines: {node: '>=6.9.0'}
 
-  '@babel/helper-compilation-targets@7.27.1':
-    resolution: {integrity: sha512-2YaDd/Rd9E598B5+WIc8wJPmWETiiJXFYVE60oX8FDohv7rAUU3CQj+A1MgeEmcsk2+dQuEjIe/GDvig0SqL4g==}
+  '@babel/helper-compilation-targets@7.27.2':
+    resolution: {integrity: sha512-2+1thGUUWWjLTYTHZWK1n8Yga0ijBz1XAhUXcKy81rd5g6yh7hGqMp45v7cadSbEHc9G3OTv45SyneRN3ps4DQ==}
     engines: {node: '>=6.9.0'}
 
   '@babel/helper-module-imports@7.27.1':
@@ -283,8 +283,8 @@ packages:
     resolution: {integrity: sha512-FCvFTm0sWV8Fxhpp2McP5/W53GPllQ9QeQ7SiqGWjMf/LVG07lFa5+pgK05IRhVwtvafT22KF+ZSnM9I545CvQ==}
     engines: {node: '>=6.9.0'}
 
-  '@babel/parser@7.27.1':
-    resolution: {integrity: sha512-I0dZ3ZpCrJ1c04OqlNsQcKiZlsrXf/kkE4FXzID9rIOYICsAbA8mMDzhW/luRNAHdCNt7os/u8wenklZDlUVUQ==}
+  '@babel/parser@7.27.2':
+    resolution: {integrity: sha512-QYLs8299NA7WM/bZAdp+CviYYkVoYXlDW2rzliy3chxd1PQjej7JORuMJDJXJUb9g0TT+B99EwaVLKmX+sPXWw==}
     engines: {node: '>=6.0.0'}
     hasBin: true
 
@@ -383,8 +383,8 @@ packages:
     resolution: {integrity: sha512-1x3D2xEk2fRo3PAhwQwu5UubzgiVWSXTBfWpVd2Mx2AzRqJuDJCsgaDVZ7HB5iGzDW1Hl1sWN2mFyKjmR9uAog==}
     engines: {node: '>=6.9.0'}
 
-  '@babel/template@7.27.1':
-    resolution: {integrity: sha512-Fyo3ghWMqkHHpHQCoBs2VnYjR4iWFFjguTDEqA5WgZDOrFesVjMhMM2FSqTKSoUSDO1VQtavj8NFpdRBEvJTtg==}
+  '@babel/template@7.27.2':
+    resolution: {integrity: sha512-LPDZ85aEJyYSd18/DkjNh4/y1ntkE5KwUHWTiqgRxruuZL2F1yuHligVHLvcHY2vMHXttKFpJn6LwfI7cw7ODw==}
     engines: {node: '>=6.9.0'}
 
   '@babel/traverse@7.27.1':
@@ -1026,8 +1026,8 @@ packages:
       '@types/react-dom':
         optional: true
 
-  '@radix-ui/react-primitive@2.1.1':
-    resolution: {integrity: sha512-+YilAeO2cNOSdE7hh0lp5AJCRI8bwl2sNVWRdl9aQN3JUXZ1/TNZomOAHFvXamLXj1/KPSyjA2p+/Evl6rRrqA==}
+  '@radix-ui/react-primitive@2.1.2':
+    resolution: {integrity: sha512-uHa+l/lKfxuDD2zjN/0peM/RhhSmRjr5YWdk/37EnSv1nJ88uvG85DPexSm8HdFQROd2VdERJ6ynXbkCFi+APw==}
     peerDependencies:
       '@types/react': '*'
       '@types/react-dom': '*'
@@ -1139,8 +1139,8 @@ packages:
       '@types/react':
         optional: true
 
-  '@radix-ui/react-slot@1.2.1':
-    resolution: {integrity: sha512-RJMUK12Fr2fUEK18xtbY9akYytRqhPzbeTTlWZoCNfXjxCGDnprfBzpobZBS2oWHNtVZnrfTQ2iC8sdUFG3SvQ==}
+  '@radix-ui/react-slot@1.2.2':
+    resolution: {integrity: sha512-y7TBO4xN4Y94FvcWIOIh18fM4R1A8S4q1jhoz4PNzOoHsFcN8pogcFmZrTYAm4F9VRUrWP/Mw7xSKybIeRI+CQ==}
     peerDependencies:
       '@types/react': '*'
       react: ^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc
@@ -1821,8 +1821,8 @@ packages:
   fraction.js@4.3.7:
     resolution: {integrity: sha512-ZsDfxO51wGAXREY55a7la9LScWpwv9RxIrYABrlvOFBlH/ShPnrtsXeuUIfXKKOVicNxQ+o8JTbJvjS4M89yew==}
 
-  framer-motion@12.9.7:
-    resolution: {integrity: sha512-Eo5TYU6sEPPy82GDx32PJm++G+AkBCrzxtEQOWLnpQX896Q3LFrsYhMZ5YO5ct4wL7wyHU6hqlrpYXeexKAevg==}
+  framer-motion@12.10.0:
+    resolution: {integrity: sha512-fce/SPS/lrIHYLGfRNytdvzwotc43hBGnEGjXAS304xB+uX9iAm0BpPDx9SuO3TatJkQMm9mglVu94wIPdOTjw==}
     peerDependencies:
       '@emotion/is-prop-valid': '*'
       react: ^18.0.0 || ^19.0.0
@@ -2103,8 +2103,8 @@ packages:
     resolution: {integrity: sha512-qOOzS1cBTWYF4BH8fVePDBOO9iptMnGUEZwNc/cMWnTV2nVLZ7VoNWEPHkYczZA0pdoA7dl6e7FL659nX9S2aw==}
     engines: {node: '>=16 || 14 >=14.17'}
 
-  motion-dom@12.9.6:
-    resolution: {integrity: sha512-IK9pm5zU8BIp3FCoUGF3T7AHVLVOlXxlwco/bIbcnpBtyYb2gDQhdOzUh2KSDJVjYl1MZ9vdq8tnFTTahX2lfg==}
+  motion-dom@12.10.0:
+    resolution: {integrity: sha512-TbRFEjQmRIDEFXJFIHfvM3VW8PuQ8bSWwwYxWA5Elq+GCghzqYUQ1FDQK/K6PmtmOoLiQY3ttJE6CrOedRrGgw==}
 
   motion-utils@12.9.4:
     resolution: {integrity: sha512-BW3I65zeM76CMsfh3kHid9ansEJk9Qvl+K5cu4DVHKGsI52n76OJ4z2CUJUV+Mn3uEP9k1JJA3tClG0ggSrRcg==}
@@ -2716,18 +2716,18 @@ snapshots:
       js-tokens: 4.0.0
       picocolors: 1.1.1
 
-  '@babel/compat-data@7.27.1': {}
+  '@babel/compat-data@7.27.2': {}
 
   '@babel/core@7.27.1':
     dependencies:
       '@ampproject/remapping': 2.3.0
       '@babel/code-frame': 7.27.1
       '@babel/generator': 7.27.1
-      '@babel/helper-compilation-targets': 7.27.1
+      '@babel/helper-compilation-targets': 7.27.2
       '@babel/helper-module-transforms': 7.27.1(@babel/core@7.27.1)
       '@babel/helpers': 7.27.1
-      '@babel/parser': 7.27.1
-      '@babel/template': 7.27.1
+      '@babel/parser': 7.27.2
+      '@babel/template': 7.27.2
       '@babel/traverse': 7.27.1
       '@babel/types': 7.27.1
       convert-source-map: 2.0.0
@@ -2740,15 +2740,15 @@ snapshots:
 
   '@babel/generator@7.27.1':
     dependencies:
-      '@babel/parser': 7.27.1
+      '@babel/parser': 7.27.2
       '@babel/types': 7.27.1
       '@jridgewell/gen-mapping': 0.3.8
       '@jridgewell/trace-mapping': 0.3.25
       jsesc: 3.1.0
 
-  '@babel/helper-compilation-targets@7.27.1':
+  '@babel/helper-compilation-targets@7.27.2':
     dependencies:
-      '@babel/compat-data': 7.27.1
+      '@babel/compat-data': 7.27.2
       '@babel/helper-validator-option': 7.27.1
       browserslist: 4.24.5
       lru-cache: 5.1.1
@@ -2780,10 +2780,10 @@ snapshots:
 
   '@babel/helpers@7.27.1':
     dependencies:
-      '@babel/template': 7.27.1
+      '@babel/template': 7.27.2
       '@babel/types': 7.27.1
 
-  '@babel/parser@7.27.1':
+  '@babel/parser@7.27.2':
     dependencies:
       '@babel/types': 7.27.1
 
@@ -2874,18 +2874,18 @@ snapshots:
 
   '@babel/runtime@7.27.1': {}
 
-  '@babel/template@7.27.1':
+  '@babel/template@7.27.2':
     dependencies:
       '@babel/code-frame': 7.27.1
-      '@babel/parser': 7.27.1
+      '@babel/parser': 7.27.2
       '@babel/types': 7.27.1
 
   '@babel/traverse@7.27.1':
     dependencies:
       '@babel/code-frame': 7.27.1
       '@babel/generator': 7.27.1
-      '@babel/parser': 7.27.1
-      '@babel/template': 7.27.1
+      '@babel/parser': 7.27.2
+      '@babel/template': 7.27.2
       '@babel/types': 7.27.1
       debug: 4.4.0
       globals: 11.12.0
@@ -3541,9 +3541,9 @@ snapshots:
       '@types/react': 19.0.0
       '@types/react-dom': 19.0.0
 
-  '@radix-ui/react-primitive@2.1.1(@types/react-dom@19.0.0)(@types/react@19.0.0)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)':
+  '@radix-ui/react-primitive@2.1.2(@types/react-dom@19.0.0)(@types/react@19.0.0)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)':
     dependencies:
-      '@radix-ui/react-slot': 1.2.1(@types/react@19.0.0)(react@19.0.0)
+      '@radix-ui/react-slot': 1.2.2(@types/react@19.0.0)(react@19.0.0)
       react: 19.0.0
       react-dom: 19.0.0(react@19.0.0)
     optionalDependencies:
@@ -3676,7 +3676,7 @@ snapshots:
     optionalDependencies:
       '@types/react': 19.0.0
 
-  '@radix-ui/react-slot@1.2.1(@types/react@19.0.0)(react@19.0.0)':
+  '@radix-ui/react-slot@1.2.2(@types/react@19.0.0)(react@19.0.0)':
     dependencies:
       '@radix-ui/react-compose-refs': 1.1.2(@types/react@19.0.0)(react@19.0.0)
       react: 19.0.0
@@ -4168,7 +4168,7 @@ snapshots:
     dependencies:
       '@radix-ui/react-dialog': 1.1.4(@types/react-dom@19.0.0)(@types/react@19.0.0)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
       '@radix-ui/react-id': 1.1.1(@types/react@19.0.0)(react@19.0.0)
-      '@radix-ui/react-primitive': 2.1.1(@types/react-dom@19.0.0)(@types/react@19.0.0)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
+      '@radix-ui/react-primitive': 2.1.2(@types/react-dom@19.0.0)(@types/react@19.0.0)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
       react: 19.0.0
       react-dom: 19.0.0(react@19.0.0)
       use-sync-external-store: 1.5.0(react@19.0.0)
@@ -4366,9 +4366,9 @@ snapshots:
 
   fraction.js@4.3.7: {}
 
-  framer-motion@12.9.7(@emotion/is-prop-valid@1.3.1)(react-dom@19.0.0(react@19.0.0))(react@19.0.0):
+  framer-motion@12.10.0(@emotion/is-prop-valid@1.3.1)(react-dom@19.0.0(react@19.0.0))(react@19.0.0):
     dependencies:
-      motion-dom: 12.9.6
+      motion-dom: 12.10.0
       motion-utils: 12.9.4
       tslib: 2.8.1
     optionalDependencies:
@@ -4484,7 +4484,7 @@ snapshots:
   istanbul-lib-instrument@5.2.1:
     dependencies:
       '@babel/core': 7.27.1
-      '@babel/parser': 7.27.1
+      '@babel/parser': 7.27.2
       '@istanbuljs/schema': 0.1.3
       istanbul-lib-coverage: 3.2.2
       semver: 6.3.1
@@ -4675,7 +4675,7 @@ snapshots:
 
   minipass@7.1.2: {}
 
-  motion-dom@12.9.6:
+  motion-dom@12.10.0:
     dependencies:
       motion-utils: 12.9.4
 
