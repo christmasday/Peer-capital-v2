@@ -2,10 +2,112 @@
 
 import { createAdminClient } from "@/lib/supabase/admin"
 
+// Function to ensure the execute_sql function exists
+async function ensureExecuteSqlFunction() {
+  try {
+    console.log("Ensuring execute_sql function exists")
+    const adminClient = createAdminClient()
+
+    // Check if the function exists
+    const { data, error } = await adminClient
+      .from("information_schema.routines")
+      .select("routine_name")
+      .eq("routine_schema", "public")
+      .eq("routine_name", "execute_sql")
+      .maybeSingle()
+
+    if (error) {
+      console.error("Error checking if execute_sql function exists:", error)
+      return false
+    }
+
+    if (!data) {
+      console.log("Creating execute_sql function")
+
+      // Create the function directly
+      const createFunctionSQL = `
+        CREATE OR REPLACE FUNCTION public.execute_sql(sql_query TEXT)
+        RETURNS JSONB AS $$
+        DECLARE
+          result JSONB;
+        BEGIN
+          EXECUTE sql_query;
+          result := '{"success": true}'::JSONB;
+          RETURN result;
+        EXCEPTION WHEN OTHERS THEN
+          result := jsonb_build_object(
+            'success', false,
+            'error', SQLERRM,
+            'detail', SQLSTATE
+          );
+          RETURN result;
+        END;
+        $$ LANGUAGE plpgsql SECURITY DEFINER;
+      `
+
+      // Execute the SQL directly using the Supabase client
+      const { error: createError } = await adminClient
+        .rpc("execute_sql", { sql_query: createFunctionSQL })
+        .catch(async (e) => {
+          console.log("Failed to create execute_sql function using RPC, trying direct query")
+
+          // If the RPC fails (because the function doesn't exist yet), try a direct query
+          const { error: directError } = await adminClient
+            .from("_rpc")
+            .select("*")
+            .rpc("execute_sql", { sql_query: createFunctionSQL })
+
+          // If that also fails, try a raw query as a last resort
+          if (directError) {
+            console.log("Failed with direct RPC call, trying raw query")
+            try {
+              // This is a workaround since we can't use raw SQL queries directly with the Supabase client
+              // We'll create a temporary function to execute our SQL
+              const { error: tempError } = await adminClient.from("auth_users").select("id").limit(1)
+              if (!tempError) {
+                console.log("Raw query approach not implemented - would require custom SQL client")
+                return { error: "Could not create execute_sql function" }
+              }
+              return { error: tempError }
+            } catch (rawError) {
+              return { error: rawError }
+            }
+          }
+
+          return { error: directError }
+        })
+
+      if (createError) {
+        console.error("Error creating execute_sql function:", createError)
+        return false
+      }
+
+      console.log("execute_sql function created successfully")
+    } else {
+      console.log("execute_sql function already exists")
+    }
+
+    return true
+  } catch (error) {
+    console.error("Unexpected error in ensureExecuteSqlFunction:", error)
+    return false
+  }
+}
+
 // Add the missing executeSql function as a named export
 export async function executeSql(sql: string) {
   try {
     console.log("Executing SQL:", sql.substring(0, 100) + (sql.length > 100 ? "..." : ""))
+
+    // First ensure the execute_sql function exists
+    const functionExists = await ensureExecuteSqlFunction()
+    if (!functionExists) {
+      return {
+        success: false,
+        error:
+          "Could not ensure execute_sql function exists. Please run the create-execute-sql-function migration first.",
+      }
+    }
 
     const adminClient = createAdminClient()
 
@@ -31,6 +133,15 @@ export async function executeSql(sql: string) {
 export async function executeMigration(migrationFile: string) {
   try {
     console.log(`Executing migration: ${migrationFile}`)
+
+    // First ensure the execute_sql function exists
+    const functionExists = await ensureExecuteSqlFunction()
+    if (!functionExists) {
+      return {
+        error:
+          "Could not ensure execute_sql function exists. Please run the create-execute-sql-function migration first.",
+      }
+    }
 
     const adminClient = createAdminClient()
 
@@ -180,6 +291,16 @@ async function executeIndividualMigrations() {
 export async function executeMigrationFromFile(filename: string) {
   try {
     console.log(`Executing migration from file: ${filename}`)
+
+    // First ensure the execute_sql function exists
+    const functionExists = await ensureExecuteSqlFunction()
+    if (!functionExists) {
+      return {
+        success: false,
+        error: "Could not ensure execute_sql function exists. Please create this function first.",
+      }
+    }
+
     const adminClient = createAdminClient()
 
     // Get the SQL content from the migrations directory
@@ -257,7 +378,7 @@ export async function executeMigrationFromFile(filename: string) {
       case "create-check-table-exists-function.sql":
         sqlContent = `
           -- Create a function to check if a table exists
-          CREATE OR REPLACE FUNCTION check_table_exists(table_name TEXT)
+          CREATE OR REPLACE FUNCTION public.check_table_exists(table_name TEXT)
           RETURNS BOOLEAN AS $$
           DECLARE
             table_exists BOOLEAN;
@@ -273,11 +394,33 @@ export async function executeMigrationFromFile(filename: string) {
           $$ LANGUAGE plpgsql;
         `
         break
+      case "create-execute-sql-function.sql":
+        sqlContent = `
+          -- Create a function to execute SQL statements
+          CREATE OR REPLACE FUNCTION public.execute_sql(sql_query TEXT)
+          RETURNS JSONB AS $$
+          DECLARE
+            result JSONB;
+          BEGIN
+            EXECUTE sql_query;
+            result := '{"success": true}'::JSONB;
+            RETURN result;
+          EXCEPTION WHEN OTHERS THEN
+            result := jsonb_build_object(
+              'success', false,
+              'error', SQLERRM,
+              'detail', SQLSTATE
+            );
+            RETURN result;
+          END;
+          $$ LANGUAGE plpgsql SECURITY DEFINER;
+        `
+        break
       default:
         return { success: false, error: `Unknown migration file: ${filename}` }
     }
 
-    // Execute the SQL
+    // Execute the SQL directly using the Supabase client
     const { error } = await adminClient.rpc("execute_sql", { sql_query: sqlContent })
 
     if (error) {

@@ -67,8 +67,6 @@ export function ForgotPasswordForm() {
     <Card>
       <form onSubmit={handleSubmit}>
         <CardHeader>
-          <h2 className="text-xl font-semibold text-center">Forgot your password?</h2>
-          <p className="text-center text-muted-foreground mt-2">We'll send you a link to reset your password</p>
         </CardHeader>
         <CardContent className="space-y-4">
           {error && (

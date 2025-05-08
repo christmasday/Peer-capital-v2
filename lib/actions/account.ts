@@ -79,6 +79,33 @@ export async function fundAccount(data: FundAccountData) {
     revalidatePath("/home")
     revalidatePath("/profile")
 
+    // Send transaction email notification
+    try {
+      const { data: userData, error: userError } = await adminClient
+        .from("profiles")
+        .select("first_name, last_name, email")
+        .eq("id", userId)
+        .single()
+
+      if (!userError && userData && userData.email) {
+        const { sendTransactionEmail } = await import("@/lib/actions/email-notifications")
+        await sendTransactionEmail({
+          email: userData.email,
+          userName: `${userData.first_name || ""} ${userData.last_name || ""}`.trim(),
+          transactionType: "Account Funding",
+          amount: data.amount,
+          reference: reference,
+          status: "completed",
+        }).catch((err) => {
+          console.warn("Failed to send transaction email, but continuing:", err)
+          // Non-blocking - continue even if email fails
+        })
+      }
+    } catch (emailError) {
+      console.warn("Error sending transaction email:", emailError)
+      // Non-blocking - continue even if email fails
+    }
+
     return {
       success: true,
       transactionId,

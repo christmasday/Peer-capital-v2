@@ -2,31 +2,31 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
+import { ensureAdminAuditLogsTable } from "@/lib/actions/admin"
 import { toast } from "@/components/ui/use-toast"
-import { createCheckTableExistsFunction } from "@/lib/actions/database-functions"
 
-export default function CreateCheckTableExistsFunctionButton() {
+export function EnsureAdminAuditLogsTableButton() {
   const [isLoading, setIsLoading] = useState(false)
 
   const handleClick = async () => {
     setIsLoading(true)
     try {
-      const result = await createCheckTableExistsFunction()
+      const result = await ensureAdminAuditLogsTable()
 
-      if (result.success) {
+      if (result) {
         toast({
           title: "Success",
-          description: result.message || "check_table_exists function created successfully",
+          description: "Admin audit logs table created or verified successfully",
         })
       } else {
         toast({
           title: "Error",
-          description: result.error || "Failed to create check_table_exists function",
+          description: "Failed to create admin audit logs table",
           variant: "destructive",
         })
       }
     } catch (error) {
-      console.error("Error creating check_table_exists function:", error)
+      console.error("Error creating admin audit logs table:", error)
       toast({
         title: "Error",
         description: "An unexpected error occurred",
@@ -38,8 +38,8 @@ export default function CreateCheckTableExistsFunctionButton() {
   }
 
   return (
-    <Button onClick={handleClick} disabled={isLoading} className="w-full">
-      {isLoading ? "Creating..." : "Create Check Table Exists Function"}
+    <Button onClick={handleClick} disabled={isLoading}>
+      {isLoading ? "Processing..." : "Create Admin Audit Logs Table"}
     </Button>
   )
 }

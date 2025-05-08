@@ -6,7 +6,7 @@ import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
+import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -29,6 +29,7 @@ export function ResetPasswordForm() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [tokenValid, setTokenValid] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Verify the token when the component mounts
   useEffect(() => {
@@ -117,68 +118,51 @@ export function ResetPasswordForm() {
     validateConfirmPassword(value)
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    setError(null)
-
-    // Validate inputs
-    const isPasswordValid = validatePassword(password)
-    const isConfirmPasswordValid = validateConfirmPassword(confirmPassword)
-
-    if (!isPasswordValid || !isConfirmPasswordValid) {
-      return
-    }
+    setIsSubmitting(true)
+    setError("")
 
     try {
-      setIsLoading(true)
-
-      if (!token) {
-        setError("No reset token provided. Please request a new password reset link.")
+      if (password !== confirmPassword) {
+        setError("Passwords do not match")
+        setIsSubmitting(false)
         return
       }
 
       const result = await resetPasswordWithToken(token, password)
 
-      if (result.error) {
-        setError(result.error)
-        return
+      if (result.success) {
+        setSuccess(true)
+        // Redirect to login after a delay
+        setTimeout(() => {
+          router.push("/login")
+        }, 3000)
+      } else {
+        setError(result.error || "Failed to reset password")
       }
-
-      setSuccess(true)
-
-      // Redirect to login page after 3 seconds
-      setTimeout(() => {
-        router.push("/?passwordReset=true")
-      }, 3000)
-    } catch (err) {
-      setError("An unexpected error occurred. Please try again.")
-      console.error(err)
+    } catch (error) {
+      console.error("Error resetting password:", error)
+      setError("An unexpected error occurred")
     } finally {
-      setIsLoading(false)
+      setIsSubmitting(false)
     }
   }
 
   if (isVerifying) {
     return (
-      <Card>
-        <CardHeader>
-          <h2 className="text-xl font-semibold text-center">Verifying Reset Link</h2>
-          <p className="text-center text-muted-foreground mt-2">Please wait while we verify your reset link...</p>
-        </CardHeader>
-        <CardContent className="flex justify-center py-6">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
-        </CardContent>
-      </Card>
+      <div className="space-y-4">
+        <div className="text-center py-4">
+          <div className="h-8 w-8 mx-auto animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+          <p className="text-sm text-muted-foreground mt-2">Verifying your reset link...</p>
+        </div>
+      </div>
     )
   }
 
   return (
     <Card>
       <form onSubmit={handleSubmit}>
-        <CardHeader>
-          <h2 className="text-xl font-semibold text-center">Reset Your Password</h2>
-          <p className="text-center text-muted-foreground mt-2">Enter your new password below</p>
-        </CardHeader>
         <CardContent className="space-y-4">
           {error && (
             <Alert variant="destructive">
@@ -264,8 +248,8 @@ export function ResetPasswordForm() {
         </CardContent>
         <CardFooter className="flex flex-col space-y-3">
           {!success && tokenValid && (
-            <Button type="submit" className="w-full" disabled={isLoading || !tokenValid}>
-              {isLoading ? "Resetting Password..." : "Reset Password"}
+            <Button type="submit" className="w-full" disabled={isSubmitting || !tokenValid}>
+              {isSubmitting ? "Resetting Password..." : "Reset Password"}
             </Button>
           )}
           <Link href="/" className="text-sm text-center text-blue-600 hover:text-blue-800 w-full">
