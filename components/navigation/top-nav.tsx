@@ -1,10 +1,8 @@
 "use client"
-
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Menu, X, Home, Wallet, BarChart2, User, MessageCircle, Search } from "lucide-react"
+import { Menu, X, Home, Wallet, BarChart2, MessageCircle, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import {
@@ -162,25 +160,15 @@ export function TopNav({ userName, userImage, hideSearch }: TopNavProps) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>
-                <div className="flex flex-col">
-                  <span>{userName || "User"}</span>
-                  <span className="text-xs text-gray-500">View profile</span>
-                </div>
-              </DropdownMenuLabel>
+              <Link href="/profile" className="block">
+                <DropdownMenuLabel className="cursor-pointer hover:bg-gray-50">
+                  <div className="flex flex-col">
+                    <span>{userName || "User"}</span>
+                    <span className="text-xs text-gray-500">View profile</span>
+                  </div>
+                </DropdownMenuLabel>
+              </Link>
               <DropdownMenuSeparator />
-              <Link href="/profile">
-                <DropdownMenuItem>
-                  <User className="mr-2 h-4 w-4" />
-                  <span>Profile</span>
-                </DropdownMenuItem>
-              </Link>
-              <Link href="/profile/edit">
-                <DropdownMenuItem>
-                  <User className="mr-2 h-4 w-4" />
-                  <span>Edit Profile</span>
-                </DropdownMenuItem>
-              </Link>
               <DropdownMenuSeparator />
               <SignoutButton
                 variant="ghost"

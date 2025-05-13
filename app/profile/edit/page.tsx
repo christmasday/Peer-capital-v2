@@ -2,7 +2,6 @@ import { redirect } from "next/navigation"
 import { getUserProfile } from "@/lib/actions/auth"
 import { ProfileEditForm } from "@/components/profile/profile-edit-form"
 import { MainLayout } from "@/components/layouts/main-layout"
-import { ProfileMenu } from "@/components/profile/profile-menu"
 import { checkAuth } from "@/lib/auth-utils"
 import { executeProfileMigration } from "@/lib/actions/execute-migration"
 
@@ -39,15 +38,7 @@ export default async function ProfileEditPage({ searchParams }: { searchParams: 
       <div className="max-w-6xl mx-auto">
         <h1 className="text-2xl font-bold text-gray-900 mb-6">Edit Profile</h1>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="md:col-span-1">
-            <ProfileMenu />
-          </div>
-
-          <div className="md:col-span-3">
-            <ProfileEditForm profile={userProfile.profile} initialTab={activeTab} />
-          </div>
-        </div>
+        <ProfileEditForm profile={userProfile.profile} initialTab={activeTab} />
       </div>
     </MainLayout>
   )

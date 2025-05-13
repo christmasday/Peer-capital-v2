@@ -1586,7 +1586,13 @@ export async function getUserProfile() {
         const { payload, error } = await verifyJWT(jwt)
         if (!error && payload && (payload.userId || payload.sub)) {
           userId = payload.userId || payload.sub
-          console.log("Using userId from JWT:", userId)
+          // Validate userId is not "undefined" or empty
+          if (!userId || userId === "undefined") {
+            console.error("Invalid user ID found in JWT:", userId)
+            userId = null
+          } else {
+            console.log("Using userId from JWT:", userId)
+          }
         }
       } catch (error) {
         console.error("Error verifying JWT:", error)
@@ -1607,7 +1613,7 @@ export async function getUserProfile() {
             .eq("access_token", authToken)
             .single()
 
-          if (!error && userData) {
+          if (!error && userData && userData.id && userData.id !== "undefined") {
             userId = userData.id
             console.log("Using userId from custom auth token:", userId)
           }
@@ -1625,6 +1631,8 @@ export async function getUserProfile() {
 
     console.log("Getting profile for user:", userId)
     const adminClient = createAdminClient()
+
+    // Rest of the function remains the same...
 
     // Get user data from auth_users
     let userData = null

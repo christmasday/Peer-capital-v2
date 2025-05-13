@@ -6,7 +6,7 @@ import { executeMigrationFromFile } from "@/lib/actions/execute-migration"
 import { useToast } from "@/hooks/use-toast"
 import { Loader2 } from "lucide-react"
 
-export default function FixNotificationsSchemaButton() {
+export function FixNotificationsSchemaButton() {
   const [isLoading, setIsLoading] = useState(false)
   const { toast } = useToast()
 
@@ -45,3 +45,6 @@ export default function FixNotificationsSchemaButton() {
     </Button>
   )
 }
+
+// Also export as default for backward compatibility
+export default FixNotificationsSchemaButton

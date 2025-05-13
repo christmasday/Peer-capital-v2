@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache"
 import { v4 as uuidv4 } from "uuid"
 import { getCurrentUserId } from "@/lib/auth-utils"
 
+// Updated notification types to include all activity types
 export type NotificationType =
   | "message"
   | "connection_request"
@@ -16,6 +17,15 @@ export type NotificationType =
   | "transaction"
   | "system"
   | "follow"
+  | "deposit"
+  | "withdrawal"
+  | "virtual_account_created"
+  | "virtual_account_funded"
+  | "profile_updated"
+  | "verification_started"
+  | "verification_completed"
+  | "account_created"
+  | "security_alert"
 
 export interface Notification {
   id: string
@@ -34,17 +44,27 @@ export interface NotificationData {
   [key: string]: any
 }
 
-// Add the missing notification preferences interfaces and functions
+// Updated notification preferences interface with activity-specific settings
 export interface NotificationPreferences {
   id: string
   user_id: string
+  // Notification channels
   email_notifications: boolean
   push_notifications: boolean
   sms_notifications: boolean
-  message_notifications: boolean
-  loan_notifications: boolean
-  connection_notifications: boolean
-  marketing_notifications: boolean
+  marketing_emails: boolean
+  transaction_alerts: boolean
+  security_alerts: boolean
+
+  // Activity-specific notification settings
+  transaction_activity: boolean
+  loan_activity: boolean
+  connection_activity: boolean
+  message_activity: boolean
+  verification_activity: boolean
+  account_activity: boolean
+  system_activity: boolean
+
   created_at: string
   updated_at: string
 }
@@ -81,10 +101,18 @@ export async function getNotificationPreferences(userId?: string) {
           email_notifications: true,
           push_notifications: true,
           sms_notifications: true,
-          message_notifications: true,
-          loan_notifications: true,
-          connection_notifications: true,
-          marketing_notifications: false,
+          marketing_emails: false,
+          transaction_alerts: true,
+          security_alerts: true,
+
+          // Default activity-specific notification settings
+          transaction_activity: true,
+          loan_activity: true,
+          connection_activity: true,
+          message_activity: true,
+          verification_activity: true,
+          account_activity: true,
+          system_activity: true,
         },
       }
     }
@@ -166,7 +194,7 @@ export async function updateNotificationPreferences(
   }
 }
 
-// Completely rewritten createNotification function with robust profile checking
+// Rest of the file remains unchanged
 export async function createNotification({
   userId,
   actorId,
@@ -276,7 +304,6 @@ export async function createNotification({
   }
 }
 
-// Rest of the file remains unchanged
 export async function getNotifications(pageOrUserId?: number | string, limit = 10, includeRead = false) {
   try {
     let userId: string

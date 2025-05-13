@@ -6,7 +6,22 @@ import { useState } from "react"
 import type { Notification } from "@/lib/actions/notifications"
 import { markNotificationAsRead, deleteNotification } from "@/lib/actions/notifications"
 import { formatDistanceToNow } from "date-fns"
-import { Bell, UserPlus, CreditCard, Check, Trash2, MessageCircle } from "lucide-react"
+import {
+  Bell,
+  UserPlus,
+  CreditCard,
+  Check,
+  Trash2,
+  MessageCircle,
+  ArrowUpRight,
+  ArrowDownLeft,
+  FileText,
+  Briefcase,
+  BanknoteIcon as Bank,
+  CheckCircle2,
+  Shield,
+  User,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import Link from "next/link"
@@ -111,13 +126,30 @@ export function NotificationItem({ notification, onUpdate }: NotificationItemPro
         return <CreditCard className="h-5 w-5 text-green-500" />
       case "transaction":
         return <CreditCard className="h-5 w-5 text-purple-500" />
+      case "deposit":
+        return <ArrowDownLeft className="h-5 w-5 text-green-500" />
+      case "withdrawal":
+        return <ArrowUpRight className="h-5 w-5 text-orange-500" />
+      case "virtual_account_created":
+        return <Bank className="h-5 w-5 text-emerald-600" />
+      case "virtual_account_funded":
+        return <CheckCircle2 className="h-5 w-5 text-green-600" />
+      case "profile_updated":
+        return <Briefcase className="h-5 w-5 text-indigo-500" />
+      case "verification_started":
+      case "verification_completed":
+        return <FileText className="h-5 w-5 text-yellow-500" />
+      case "account_created":
+        return <User className="h-5 w-5 text-blue-600" />
+      case "security_alert":
+        return <Shield className="h-5 w-5 text-red-500" />
       case "system":
       default:
         return <Bell className="h-5 w-5 text-gray-500" />
     }
   }
 
-  // Update the getActionLink function to use data field instead of actor_id
+  // Update the getActionLink function to handle all activity types
   const getActionLink = () => {
     switch (notification.type) {
       case "follow":
@@ -133,7 +165,21 @@ export function NotificationItem({ notification, onUpdate }: NotificationItemPro
       case "loan_rejected":
         return notification.reference_id ? `/loans/${notification.reference_id}` : "/loans"
       case "transaction":
+      case "deposit":
+      case "withdrawal":
         return notification.reference_id ? `/transactions/receipt/${notification.reference_id}` : "/transactions"
+      case "virtual_account_created":
+      case "virtual_account_funded":
+        return "/profile/virtual-account"
+      case "profile_updated":
+        return "/profile/edit"
+      case "verification_started":
+      case "verification_completed":
+        return "/profile/edit"
+      case "account_created":
+        return "/profile"
+      case "security_alert":
+        return "/profile/change-password"
       default:
         return "#"
     }
@@ -170,6 +216,24 @@ export function NotificationItem({ notification, onUpdate }: NotificationItemPro
         return "Loan Rejected"
       case "transaction":
         return "Transaction"
+      case "deposit":
+        return "Account Funded"
+      case "withdrawal":
+        return "Withdrawal"
+      case "virtual_account_created":
+        return "Virtual Account Created"
+      case "virtual_account_funded":
+        return "Virtual Account Funded"
+      case "profile_updated":
+        return "Profile Updated"
+      case "verification_started":
+        return "Verification Started"
+      case "verification_completed":
+        return "Verification Completed"
+      case "account_created":
+        return "Account Created"
+      case "security_alert":
+        return "Security Alert"
       case "system":
         return "System Notification"
       default:

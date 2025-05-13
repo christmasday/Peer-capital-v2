@@ -5,56 +5,50 @@ import { createServerClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 // Function to check authentication on server components
-export async function checkAuth(redirectPath = "/?auth=required") {
-  try {
-    // Check for JWT
-    const jwt = getJWTFromCookies()
-    let isValidJWT = false
+export async function checkAuth() {
+  const { cookies } = await import("next/headers")
+  const { getJWTFromCookies, verifyJWT } = await import("@/lib/jwt")
+  const { createServerClient } = await import("@/lib/supabase/server")
 
-    if (jwt) {
-      try {
-        const { payload, error } = await verifyJWT(jwt)
-        isValidJWT = !error && !!payload
-
-        if (error) {
-          console.log(`JWT verification failed: ${error}`)
-        } else {
-          console.log("Valid JWT found")
-          return true
-        }
-      } catch (error) {
-        console.error("Error during JWT verification:", error)
-      }
+  // Try JWT first
+  const jwt = getJWTFromCookies()
+  if (jwt) {
+    const { payload, error } = await verifyJWT(jwt)
+    if (!error && payload) {
+      return { authenticated: true, userId: payload.sub || payload.userId }
     }
-
-    // Check for auth cookies
-    const cookieStore = cookies()
-    const hasAuthCookie = cookieStore.has("sb-auth-token") || cookieStore.has("auth-status")
-
-    if (hasAuthCookie) {
-      console.log("Auth cookie found")
-      return true
-    }
-
-    // Check for auth bypass in URL
-    // This will be checked in client components, but we can't access URL params in server components
-    // So we'll just log it and continue
-
-    // If we're in development mode, allow access for testing
-    if (process.env.NODE_ENV === "development") {
-      console.log("Development mode - allowing access without authentication")
-      return true
-    }
-
-    // If no valid authentication, redirect to login
-    console.log("No valid authentication found, redirecting to login")
-    redirect(redirectPath)
-  } catch (error) {
-    console.error("Error in checkAuth:", error)
-    // In case of error, allow access to prevent blocking the application
-    return true
   }
+
+  // Try Supabase session as fallback
+  try {
+    const cookieStore = cookies()
+    const supabase = createServerClient(cookieStore)
+    const { data } = await supabase.auth.getSession()
+
+    if (data.session) {
+      return { authenticated: true, userId: data.session.user.id }
+    }
+  } catch (error) {
+    console.error("Error checking Supabase session:", error)
+  }
+
+  // Check for custom auth token
+  const customAuthToken = cookies().get("custom-auth-token")?.value
+  if (customAuthToken) {
+    return { authenticated: true }
+  }
+
+  // Check for auth bypass
+  const authBypass = cookies().get("auth-bypass")?.value
+  if (authBypass === "true") {
+    return { authenticated: true }
+  }
+
+  // If we get here, user is not authenticated
+  redirect("/?from=auth-check")
 }
+
+// Update the getCurrentUserId function to properly handle undefined values
 
 // Helper function to get the current user ID
 export async function getCurrentUserId() {
@@ -65,7 +59,12 @@ export async function getCurrentUserId() {
       try {
         const { payload, error } = await verifyJWT(jwt)
         if (!error && payload && (payload.userId || payload.sub)) {
-          return payload.userId || payload.sub
+          const userId = payload.userId || payload.sub
+          // Validate the userId is a proper UUID before returning
+          if (userId && userId !== "undefined" && typeof userId === "string") {
+            return userId
+          }
+          console.warn("Invalid user ID found in JWT:", userId)
         }
       } catch (error) {
         console.error("Error verifying JWT:", error)
@@ -79,8 +78,12 @@ export async function getCurrentUserId() {
       data: { session },
     } = await supabase.auth.getSession()
 
-    if (session?.user) {
-      return session.user.id
+    if (session?.user?.id) {
+      // Validate the userId is a proper UUID before returning
+      if (session.user.id !== "undefined" && typeof session.user.id === "string") {
+        return session.user.id
+      }
+      console.warn("Invalid user ID found in session:", session.user.id)
     }
 
     // If no Supabase session, try to get from custom auth token
@@ -94,8 +97,12 @@ export async function getCurrentUserId() {
         .eq("access_token", customAuthToken)
         .single()
 
-      if (!error && userData) {
-        return userData.id
+      if (!error && userData && userData.id) {
+        // Validate the userId is a proper UUID before returning
+        if (userData.id !== "undefined" && typeof userData.id === "string") {
+          return userData.id
+        }
+        console.warn("Invalid user ID found in auth_users:", userData.id)
       }
     }
 

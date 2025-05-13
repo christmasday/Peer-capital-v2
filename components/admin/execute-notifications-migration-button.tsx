@@ -4,7 +4,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { executeMigration } from "@/lib/actions/execute-migration"
 
-export default function ExecuteNotificationsMigrationButton() {
+export function ExecuteNotificationsMigrationButton() {
   const [isLoading, setIsLoading] = useState(false)
   const [result, setResult] = useState<{ success?: boolean; error?: string } | null>(null)
 
@@ -40,3 +40,6 @@ export default function ExecuteNotificationsMigrationButton() {
     </div>
   )
 }
+
+// Also export as default for backward compatibility
+export default ExecuteNotificationsMigrationButton

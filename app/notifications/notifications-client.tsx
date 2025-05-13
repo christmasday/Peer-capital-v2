@@ -1,119 +1,192 @@
 "use client"
 
-import { useState } from "react"
-import { type Notification, markAllNotificationsAsRead } from "@/lib/actions/notifications"
+import { useState, useEffect } from "react"
+import { getNotifications, markAllNotificationsAsRead } from "@/lib/actions/notifications"
 import { NotificationItem } from "@/components/notifications/notification-item"
 import { Button } from "@/components/ui/button"
-import { Check, Bell, Loader2 } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
-import { Card } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Bell, CheckCheck } from "lucide-react"
+import { toast } from "@/hooks/use-toast"
 
-interface NotificationsClientProps {
-  initialNotifications: Notification[]
-  initialUnreadCount: number
-  error?: string
-}
+export function NotificationsClient() {
+  const [notifications, setNotifications] = useState<any[]>([])
+  const [unreadCount, setUnreadCount] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState("all")
 
-export function NotificationsClient({ initialNotifications, initialUnreadCount, error }: NotificationsClientProps) {
-  const [notifications, setNotifications] = useState<Notification[]>(initialNotifications)
-  const [unreadCount, setUnreadCount] = useState(initialUnreadCount)
-  const [isMarkingAllAsRead, setIsMarkingAllAsRead] = useState(false)
-  const { toast } = useToast()
-
-  const handleUpdate = () => {
-    // This is a placeholder for refreshing notifications
-    // In a real app, you would fetch the latest notifications here
-    const updatedNotifications = [...notifications]
-    setNotifications(updatedNotifications)
-
-    // Update unread count
-    const newUnreadCount = updatedNotifications.filter((n) => !n.is_read).length
-    setUnreadCount(newUnreadCount)
-  }
-
-  const handleMarkAllAsRead = async () => {
-    if (unreadCount === 0) return
-
-    setIsMarkingAllAsRead(true)
+  const fetchNotifications = async (includeRead = true) => {
+    setLoading(true)
     try {
-      const result = await markAllNotificationsAsRead()
-
+      const result = await getNotifications(1, 50, includeRead)
       if (result.error) {
+        console.error("Error fetching notifications:", result.error)
         toast({
           title: "Error",
-          description: result.error,
+          description: "Failed to load notifications. Please try again.",
           variant: "destructive",
         })
-        return
+        setNotifications([])
+        setUnreadCount(0)
+      } else {
+        setNotifications(result.notifications || [])
+        setUnreadCount(result.unreadCount || 0)
       }
-
-      // Update local state
-      const updatedNotifications = notifications.map((n) => ({ ...n, is_read: true }))
-      setNotifications(updatedNotifications)
-      setUnreadCount(0)
-
-      toast({
-        title: "Success",
-        description: "All notifications marked as read",
-      })
     } catch (error) {
+      console.error("Unexpected error fetching notifications:", error)
       toast({
         title: "Error",
-        description: "Failed to mark all notifications as read",
+        description: "An unexpected error occurred. Please try again.",
         variant: "destructive",
       })
+      setNotifications([])
+      setUnreadCount(0)
     } finally {
-      setIsMarkingAllAsRead(false)
+      setLoading(false)
     }
   }
 
-  if (error) {
-    return (
-      <Card className="p-6">
-        <div className="text-center">
-          <p className="text-red-500">{error}</p>
-        </div>
-      </Card>
-    )
+  useEffect(() => {
+    fetchNotifications(activeTab === "all")
+  }, [activeTab])
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      const result = await markAllNotificationsAsRead()
+      if (result.success) {
+        toast({
+          title: "Success",
+          description: "All notifications marked as read.",
+        })
+        fetchNotifications(activeTab === "all")
+      } else {
+        console.error("Error marking all notifications as read:", result.error)
+        toast({
+          title: "Error",
+          description: "Failed to mark all notifications as read. Please try again.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Unexpected error marking all notifications as read:", error)
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      })
+    }
   }
 
-  return (
-    <div>
-      <div className="flex justify-between items-center mb-4">
-        <div className="flex items-center gap-2">
-          <h2 className="text-xl font-semibold">All Notifications</h2>
-          {unreadCount > 0 && (
-            <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">{unreadCount} unread</span>
-          )}
-        </div>
+  // Filter notifications by type for activity categories
+  const getFilteredNotifications = () => {
+    if (activeTab === "all") {
+      return notifications
+    } else if (activeTab === "unread") {
+      return notifications.filter((notification) => !notification.is_read)
+    } else if (activeTab === "transactions") {
+      return notifications.filter((notification) =>
+        ["transaction", "deposit", "withdrawal"].includes(notification.type),
+      )
+    } else if (activeTab === "account") {
+      return notifications.filter((notification) =>
+        ["account_created", "security_alert", "virtual_account_created", "virtual_account_funded"].includes(
+          notification.type,
+        ),
+      )
+    } else if (activeTab === "connections") {
+      return notifications.filter((notification) =>
+        ["follow", "connection_request", "connection_accepted"].includes(notification.type),
+      )
+    } else if (activeTab === "profile") {
+      return notifications.filter((notification) =>
+        ["profile_updated", "verification_started", "verification_completed"].includes(notification.type),
+      )
+    } else if (activeTab === "loans") {
+      return notifications.filter((notification) =>
+        ["loan_request", "loan_approved", "loan_rejected"].includes(notification.type),
+      )
+    } else if (activeTab === "messages") {
+      return notifications.filter((notification) => notification.type === "message")
+    } else {
+      return notifications
+    }
+  }
 
+  const filteredNotifications = getFilteredNotifications()
+
+  return (
+    <div className="container max-w-4xl py-8">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">Notifications</h1>
         {unreadCount > 0 && (
-          <Button onClick={handleMarkAllAsRead} disabled={isMarkingAllAsRead} size="sm">
-            {isMarkingAllAsRead ? (
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-            ) : (
-              <Check className="h-4 w-4 mr-2" />
-            )}
+          <Button variant="outline" onClick={handleMarkAllAsRead}>
+            <CheckCheck className="h-4 w-4 mr-2" />
             Mark all as read
           </Button>
         )}
       </div>
 
-      <Card>
-        {notifications.length > 0 ? (
-          <div className="divide-y">
-            {notifications.map((notification) => (
-              <NotificationItem key={notification.id} notification={notification} onUpdate={handleUpdate} />
-            ))}
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center p-8 text-center">
-            <Bell className="h-12 w-12 text-muted-foreground mb-3" />
-            <h3 className="text-lg font-medium mb-1">No notifications</h3>
-            <p className="text-muted-foreground">You don't have any notifications yet.</p>
-          </div>
-        )}
-      </Card>
+      <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="mb-4 flex flex-wrap">
+          <TabsTrigger value="all">All</TabsTrigger>
+          {unreadCount > 0 && (
+            <TabsTrigger value="unread" className="relative">
+              Unread
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                {unreadCount}
+              </span>
+            </TabsTrigger>
+          )}
+          <TabsTrigger value="transactions">Transactions</TabsTrigger>
+          <TabsTrigger value="account">Account</TabsTrigger>
+          <TabsTrigger value="connections">Connections</TabsTrigger>
+          <TabsTrigger value="profile">Profile</TabsTrigger>
+          <TabsTrigger value="loans">Loans</TabsTrigger>
+          <TabsTrigger value="messages">Messages</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value={activeTab}>
+          {loading ? (
+            <div className="space-y-4">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="flex items-start gap-3 p-3 border rounded-md">
+                  <Skeleton className="h-10 w-10 rounded-full" />
+                  <div className="space-y-2 flex-1">
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-3 w-1/2" />
+                    <div className="flex gap-2 mt-2">
+                      <Skeleton className="h-8 w-16" />
+                      <Skeleton className="h-8 w-24" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : filteredNotifications.length > 0 ? (
+            <div className="space-y-4">
+              {filteredNotifications.map((notification) => (
+                <NotificationItem
+                  key={notification.id}
+                  notification={notification}
+                  onUpdate={() => fetchNotifications(activeTab === "all")}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <Bell className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+              <h3 className="text-lg font-medium mb-2">No notifications</h3>
+              <p className="text-muted-foreground">
+                {activeTab === "unread"
+                  ? "You have no unread notifications."
+                  : activeTab === "all"
+                    ? "You don't have any notifications yet."
+                    : `You don't have any ${activeTab} notifications yet.`}
+              </p>
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

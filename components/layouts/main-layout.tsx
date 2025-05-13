@@ -14,6 +14,7 @@ interface MainLayoutProps {
   requireAuth?: boolean
   user?: any
   unreadNotificationsCount?: number
+  className?: string
 }
 
 // Function to parse JWT (client-side only, for checking expiration)
@@ -42,6 +43,7 @@ export function MainLayout({
   userImage,
   user,
   unreadNotificationsCount,
+  className = "py-6 px-4 sm:px-6 lg:px-8",
 }: MainLayoutProps) {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(true)
@@ -64,9 +66,11 @@ export function MainLayout({
               jwtValid = true
             } else {
               console.log("JWT found but expired")
+              // Don't redirect yet, try other auth methods
             }
           } catch (error) {
             console.error("Error parsing JWT:", error)
+            // Continue checking other auth methods
           }
         }
 
@@ -81,7 +85,8 @@ export function MainLayout({
           document.cookie.includes("auth-status=authenticated") ||
           document.cookie.includes("sb-auth-token=") ||
           document.cookie.includes("auth-bypass=true") ||
-          document.cookie.includes("is_authenticated=true")
+          document.cookie.includes("is_authenticated=true") ||
+          document.cookie.includes("custom-auth-token=")
 
         if (hasAuthCookie) {
           console.log("Authentication confirmed via cookies")
@@ -124,12 +129,14 @@ export function MainLayout({
           return true
         }
 
-        console.log("No authentication found, redirecting to login")
-        router.push("/?from=layout")
+        // Don't redirect immediately, let the second useEffect handle it
+        setIsAuthenticated(false)
+        setIsLoading(false)
         return false
       } else {
         setIsAuthenticated(true)
         setIsLoading(false)
+        return true
       }
     }
 
@@ -141,11 +148,20 @@ export function MainLayout({
     if (requireAuth && !isAuthenticated) {
       const authStatus = Cookies.get("auth-status")
       const jwtToken = Cookies.get("jwt-token")
+      const customAuthToken = Cookies.get("custom-auth-token")
 
-      if (!authStatus && !jwtToken) {
-        console.log("No authentication found, redirecting to login")
-        router.push("/?redirectedFrom=" + router.pathname)
-      }
+      // Add a small delay to prevent immediate redirects
+      // This gives other auth methods time to initialize
+      const redirectTimer = setTimeout(() => {
+        if (!authStatus && !jwtToken && !customAuthToken) {
+          console.log("No authentication found after delay, redirecting to login")
+          // Store the current path for redirect after login
+          localStorage.setItem("redirectAfterLogin", router.pathname)
+          router.push("/?redirectedFrom=" + encodeURIComponent(router.pathname))
+        }
+      }, 500) // 500ms delay
+
+      return () => clearTimeout(redirectTimer)
     } else {
       setIsAuthenticated(true)
       setIsLoading(false)
@@ -167,7 +183,7 @@ export function MainLayout({
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
       <TopNav userName={userName} userImage={userImage} unreadNotificationsCount={unreadNotificationsCount} />
-      <main className="flex-1 w-full mx-auto py-6 px-4 sm:px-6 lg:px-8">{children}</main>
+      <main className={`flex-1 w-full mx-auto ${className}`}>{children}</main>
     </div>
   )
 }

@@ -4,6 +4,7 @@ import { createServerClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { v4 as uuidv4 } from "uuid"
 import { revalidatePath } from "next/cache"
+import { createTransactionActivityNotification } from "./activity-notifications"
 
 export type FundAccountData = {
   amount: number
@@ -72,6 +73,20 @@ export async function fundAccount(data: FundAccountData) {
     if (updateError) {
       console.error("Error updating account balance:", updateError)
       return { error: "Failed to update account balance" }
+    }
+
+    // Create activity notification
+    try {
+      await createTransactionActivityNotification({
+        userId,
+        amount: data.amount,
+        type: "deposit",
+        reference,
+        description: `Account funded with ₦${data.amount.toLocaleString()} via ${data.paymentMethod}`,
+      })
+    } catch (notificationError) {
+      console.error("Error creating activity notification:", notificationError)
+      // Non-blocking - continue even if notification fails
     }
 
     // Revalidate the account and home pages to reflect the new balance
@@ -193,6 +208,20 @@ export async function withdrawFromAccount(data: WithdrawAccountData) {
     if (updateError) {
       console.error("Error updating account balance:", updateError)
       return { error: "Failed to update account balance" }
+    }
+
+    // Create activity notification
+    try {
+      await createTransactionActivityNotification({
+        userId,
+        amount: -data.amount, // Negative amount for withdrawal
+        type: "withdrawal",
+        reference,
+        description: `Withdrawal of ₦${data.amount.toLocaleString()} to ${data.bankName} - ${data.accountNumber}`,
+      })
+    } catch (notificationError) {
+      console.error("Error creating activity notification:", notificationError)
+      // Non-blocking - continue even if notification fails
     }
 
     // Revalidate the account and home pages to reflect the new balance

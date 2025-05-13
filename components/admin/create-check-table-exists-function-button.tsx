@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { toast } from "@/components/ui/use-toast"
 import { createCheckTableExistsFunction } from "@/lib/actions/database-functions"
 
-export default function CreateCheckTableExistsFunctionButton() {
+export function CreateCheckTableExistsFunctionButton() {
   const [isLoading, setIsLoading] = useState(false)
 
   const handleClick = async () => {
@@ -43,3 +43,6 @@ export default function CreateCheckTableExistsFunctionButton() {
     </Button>
   )
 }
+
+// Also export as default for backward compatibility
+export default CreateCheckTableExistsFunctionButton

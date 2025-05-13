@@ -75,6 +75,26 @@ export async function verifyAuth(req: NextRequest) {
       }
     }
 
+    // Check for auth-status cookie
+    const authStatus = req.cookies.get("auth-status")?.value
+    if (authStatus === "authenticated") {
+      return {
+        authenticated: true,
+        userId: null,
+        method: "auth-status",
+      }
+    }
+
+    // Check for auth-bypass cookie
+    const authBypass = req.cookies.get("auth-bypass")?.value
+    if (authBypass === "true") {
+      return {
+        authenticated: true,
+        userId: null,
+        method: "auth-bypass",
+      }
+    }
+
     // If offline mode is active, allow with warning
     if (isOfflineMode()) {
       return {

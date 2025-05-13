@@ -1,10 +1,122 @@
 "use server"
 
 import { createServerClient } from "@/lib/supabase/server"
-import { createAdminClient, isOfflineMode } from "@/lib/supabase/admin"
+import { createAdminClient } from "@/lib/supabase/admin"
+import { cookies } from "next/headers"
 import { revalidatePath } from "next/cache"
+import { createProfileActivityNotification } from "./activity-notifications"
+import { v4 as uuidv4 } from "uuid"
 
-// Update the updateProfile function to handle schema issues
+// Function to determine if the app is running in offline mode
+function isOfflineMode(): boolean {
+  return process.env.OFFLINE_MODE === "true"
+}
+
+// Enhanced function to get the current user ID with multiple fallbacks
+async function getCurrentUserId() {
+  try {
+    const cookieStore = cookies()
+    const supabase = createServerClient(cookieStore)
+    const adminClient = createAdminClient()
+
+    // Method 1: Try to get user from Supabase session
+    try {
+      const { data: sessionData } = await supabase.auth.getSession()
+      if (sessionData.session?.user) {
+        return { userId: sessionData.session.user.id, method: "supabase-session" }
+      }
+    } catch (sessionError) {
+      console.error("Error getting session:", sessionError)
+      // Continue to next method
+    }
+
+    // Method 2: Try to get user from JWT
+    try {
+      const { getJWTFromCookies, verifyJWT } = await import("@/lib/jwt")
+      const jwt = getJWTFromCookies()
+      if (jwt) {
+        const { payload, error } = await verifyJWT(jwt)
+        if (!error && payload && (payload.userId || payload.sub)) {
+          return { userId: payload.userId || payload.sub, method: "jwt" }
+        }
+      }
+    } catch (jwtError) {
+      console.error("Error verifying JWT:", jwtError)
+      // Continue to next method
+    }
+
+    // Method 3: Try to get user from custom auth token
+    try {
+      const customAuthToken = cookieStore.get("custom-auth-token")?.value
+      if (customAuthToken) {
+        const { data, error } = await adminClient
+          .from("auth_users")
+          .select("id")
+          .eq("access_token", customAuthToken)
+          .single()
+
+        if (!error && data) {
+          return { userId: data.id, method: "custom-auth-token" }
+        }
+      }
+    } catch (customAuthError) {
+      console.error("Error checking custom auth token:", customAuthError)
+      // Continue to next method
+    }
+
+    // No valid authentication found
+    return { userId: null, method: "none" }
+  } catch (error) {
+    console.error("Error in getCurrentUserId:", error)
+    return { userId: null, method: "error" }
+  }
+}
+
+// Helper function to ensure a storage bucket exists
+async function ensureBucketExists(bucketName: string) {
+  try {
+    if (isOfflineMode()) {
+      console.log(`Skipping ${bucketName} bucket creation in offline mode`)
+      return { success: true }
+    }
+
+    const adminClient = createAdminClient()
+
+    // Check if the bucket exists
+    console.log(`Checking if ${bucketName} bucket exists...`)
+    const { data: buckets, error: listError } = await adminClient.storage.listBuckets()
+
+    if (listError) {
+      console.error(`Error listing buckets:`, listError)
+      return { error: `Failed to list buckets: ${listError.message}` }
+    }
+
+    const bucketExists = buckets?.some((bucket) => bucket.name === bucketName)
+
+    if (!bucketExists) {
+      console.log(`Creating ${bucketName} bucket...`)
+      const { error: createError } = await adminClient.storage.createBucket(bucketName, {
+        public: true,
+      })
+
+      if (createError) {
+        console.error(`Error creating ${bucketName} bucket:`, createError)
+        return { error: `Failed to create ${bucketName} bucket: ${createError.message}` }
+      }
+
+      console.log(`${bucketName} bucket created successfully`)
+    } else {
+      console.log(`${bucketName} bucket already exists`)
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error(`Unexpected error ensuring ${bucketName} bucket:`, error)
+    return { error: `An unexpected error occurred while checking/creating the ${bucketName} bucket` }
+  }
+}
+
+// Update the updateProfile function to validate userId before database operations
 export async function updateProfile({
   firstName,
   middleName,
@@ -102,8 +214,8 @@ export async function updateProfile({
     }
 
     // If we still don't have a user ID, return an error
-    if (!userId) {
-      console.error("No authenticated user found for profile update")
+    if (!userId || userId === "undefined") {
+      console.error("No authenticated user found for profile update or invalid user ID:", userId)
       return { error: "Authentication failed. Please try logging in again." }
     }
 
@@ -222,54 +334,23 @@ export async function updateProfile({
       }
     }
 
+    // Create activity notification for profile update
+    try {
+      await createProfileActivityNotification({
+        userId,
+        type: "updated",
+        details: "Your profile information has been updated successfully",
+      })
+    } catch (notificationError) {
+      console.error("Error creating profile update notification:", notificationError)
+      // Non-blocking - continue even if notification fails
+    }
+
     revalidatePath("/profile")
     return { success: true }
   } catch (error) {
     console.error("Unexpected error updating profile:", error)
     return { error: "An unexpected error occurred. Please try again." }
-  }
-}
-
-// Helper function to create the id_documents bucket if it doesn't exist
-async function ensureIdDocumentsBucket() {
-  try {
-    if (isOfflineMode()) {
-      console.log("Skipping id_documents bucket creation in offline mode")
-      return { success: true }
-    }
-
-    const adminClient = createAdminClient()
-
-    // Check if the bucket exists
-    const { data: buckets, error: listError } = await adminClient.storage.listBuckets()
-
-    if (listError) {
-      console.error("Error listing buckets:", listError)
-      return { error: "Failed to list buckets" }
-    }
-
-    const bucketExists = buckets?.some((bucket) => bucket.name === "id_documents")
-
-    if (!bucketExists) {
-      console.log("Creating id_documents bucket...")
-      const { error: createError } = await adminClient.storage.createBucket("id_documents", {
-        public: true,
-      })
-
-      if (createError) {
-        console.error("Error creating id_documents bucket:", createError)
-        return { error: "Failed to create id_documents bucket" }
-      }
-
-      console.log("id_documents bucket created successfully")
-    } else {
-      console.log("id_documents bucket already exists")
-    }
-
-    return { success: true }
-  } catch (error) {
-    console.error("Unexpected error ensuring id_documents bucket:", error)
-    return { error: "An unexpected error occurred" }
   }
 }
 
@@ -319,7 +400,7 @@ export async function uploadIdDocument(file: File) {
     }
 
     // Ensure the id_documents bucket exists
-    const bucketResult = await ensureIdDocumentsBucket()
+    const bucketResult = await ensureBucketExists("id_documents")
     if (bucketResult.error) {
       console.error("Error ensuring id_documents bucket:", bucketResult.error)
       return { error: bucketResult.error }
@@ -360,7 +441,147 @@ export async function uploadIdDocument(file: File) {
   }
 }
 
-// Keep the existing uploadProfilePicture function
+// Update the uploadBannerImage function with enhanced authentication and bucket check
+export async function uploadBannerImage(file: File) {
+  try {
+    const cookieStore = cookies()
+    const supabase = createServerClient(cookieStore)
+    const adminClient = createAdminClient()
+
+    // Get current user ID with enhanced method
+    const { userId, method } = await getCurrentUserId()
+
+    if (!userId) {
+      console.error("No authenticated user found for banner upload")
+      return { error: "You must be logged in to upload a banner image. Please refresh and try again." }
+    }
+
+    console.log(`User authenticated via ${method} for banner upload. User ID: ${userId}`)
+
+    // Ensure the profile-images bucket exists
+    const bucketResult = await ensureBucketExists("profile-images")
+    if (bucketResult.error) {
+      console.error("Error ensuring profile-images bucket:", bucketResult.error)
+      return { error: bucketResult.error }
+    }
+
+    // Generate a unique file name
+    const fileExt = file.name.split(".").pop()
+    const fileName = `${userId}-banner-${uuidv4()}.${fileExt}`
+    const filePath = `banners/${fileName}`
+
+    // Convert File to ArrayBuffer for more reliable upload
+    const arrayBuffer = await file.arrayBuffer()
+    const buffer = new Uint8Array(arrayBuffer)
+
+    // Upload the file to Supabase Storage using admin client for reliability
+    const { error: uploadError } = await adminClient.storage.from("profile-images").upload(filePath, buffer, {
+      contentType: file.type,
+      upsert: true,
+    })
+
+    if (uploadError) {
+      console.error("Error uploading banner image:", uploadError)
+      return { error: `Failed to upload banner image: ${uploadError.message}. Please try again.` }
+    }
+
+    // Get the public URL
+    const { data: publicUrlData } = adminClient.storage.from("profile-images").getPublicUrl(filePath)
+
+    if (!publicUrlData || !publicUrlData.publicUrl) {
+      return { error: "Failed to get public URL for the banner image" }
+    }
+
+    // Update the user's profile with the new banner image URL
+    const { error: updateError } = await adminClient
+      .from("profiles")
+      .update({
+        banner_image_url: publicUrlData.publicUrl,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", userId)
+
+    if (updateError) {
+      console.error("Error updating profile with banner image:", updateError)
+      return { error: "Failed to update profile with banner image. Please try again." }
+    }
+
+    // Create activity notification for profile update
+    try {
+      await createProfileActivityNotification({
+        userId,
+        type: "updated",
+        details: "Your profile banner has been updated",
+      })
+    } catch (notificationError) {
+      console.error("Error creating profile update notification:", notificationError)
+      // Non-blocking - continue even if notification fails
+    }
+
+    // Revalidate the profile page
+    revalidatePath("/profile")
+    revalidatePath(`/profile/${userId}`)
+
+    return { success: true, url: publicUrlData.publicUrl }
+  } catch (error) {
+    console.error("Error in uploadBannerImage:", error)
+    return { error: "An unexpected error occurred. Please try again." }
+  }
+}
+
+// Update the selectBannerImage function with enhanced authentication
+export async function selectBannerImage(bannerUrl: string) {
+  try {
+    const adminClient = createAdminClient()
+
+    // Get current user ID with enhanced method
+    const { userId, method } = await getCurrentUserId()
+
+    if (!userId) {
+      console.error("No authenticated user found for banner selection")
+      return { error: "You must be logged in to select a banner image. Please refresh and try again." }
+    }
+
+    console.log(`User authenticated via ${method} for banner selection. User ID: ${userId}`)
+
+    // Update the user's profile with the selected banner image URL
+    const { error: updateError } = await adminClient
+      .from("profiles")
+      .update({
+        banner_image_url: bannerUrl,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", userId)
+
+    if (updateError) {
+      console.error("Error updating profile with banner image:", updateError)
+      return { error: "Failed to update profile with banner image. Please try again." }
+    }
+
+    // Create activity notification for profile update
+    try {
+      await createProfileActivityNotification({
+        userId,
+        type: "updated",
+        details: "Your profile banner has been updated",
+      })
+    } catch (notificationError) {
+      console.error("Error creating profile update notification:", notificationError)
+      // Non-blocking - continue even if notification fails
+    }
+
+    // Revalidate the profile page
+    revalidatePath("/profile")
+    revalidatePath(`/profile/${userId}`)
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error in selectBannerImage:", error)
+    return { error: "An unexpected error occurred. Please try again." }
+  }
+}
+
+// Update the uploadProfilePicture function with bucket check
 export async function uploadProfilePicture(file: File) {
   try {
     const supabase = createServerClient()
@@ -403,6 +624,13 @@ export async function uploadProfilePicture(file: File) {
     if (!userId) {
       console.error("No authenticated user found for profile picture upload")
       return { error: "Authentication failed. Please try logging in again." }
+    }
+
+    // Ensure the profiles bucket exists
+    const bucketResult = await ensureBucketExists("profiles")
+    if (bucketResult.error) {
+      console.error("Error ensuring profiles bucket:", bucketResult.error)
+      return { error: bucketResult.error }
     }
 
     // Generate a unique file name

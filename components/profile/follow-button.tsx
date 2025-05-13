@@ -74,7 +74,7 @@ export function FollowButton({ userId, initialFollowingState, onFollowChange }: 
   return (
     <Button
       variant={isFollowing ? "outline" : "default"}
-      className="flex gap-2 items-center"
+      className={`flex gap-2 items-center ${isFollowing ? "border-red-200 hover:bg-red-50 hover:text-red-600" : ""}`}
       onClick={handleFollowToggle}
       disabled={isLoading}
     >

@@ -185,6 +185,14 @@ export interface Database {
           marketing_emails: boolean
           transaction_alerts: boolean
           security_alerts: boolean
+          // Activity-specific notification settings
+          transaction_activity: boolean
+          loan_activity: boolean
+          connection_activity: boolean
+          message_activity: boolean
+          verification_activity: boolean
+          account_activity: boolean
+          system_activity: boolean
           created_at: string
           updated_at: string
         }
@@ -197,6 +205,14 @@ export interface Database {
           marketing_emails?: boolean
           transaction_alerts?: boolean
           security_alerts?: boolean
+          // Activity-specific notification settings
+          transaction_activity?: boolean
+          loan_activity?: boolean
+          connection_activity?: boolean
+          message_activity?: boolean
+          verification_activity?: boolean
+          account_activity?: boolean
+          system_activity?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -209,6 +225,14 @@ export interface Database {
           marketing_emails?: boolean
           transaction_alerts?: boolean
           security_alerts?: boolean
+          // Activity-specific notification settings
+          transaction_activity?: boolean
+          loan_activity?: boolean
+          connection_activity?: boolean
+          message_activity?: boolean
+          verification_activity?: boolean
+          account_activity?: boolean
+          system_activity?: boolean
           created_at?: string
           updated_at?: string
         }

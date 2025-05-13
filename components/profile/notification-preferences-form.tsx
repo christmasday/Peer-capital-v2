@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Bell, Mail, MessageSquare, Shield, CreditCard } from "lucide-react"
 import {
   getNotificationPreferences,
@@ -14,6 +15,7 @@ import {
   type NotificationPreferences,
 } from "@/lib/actions/notifications"
 import { toast } from "@/hooks/use-toast"
+import { ActivityNotificationSettings } from "./activity-notification-settings"
 
 export function NotificationPreferencesForm() {
   const router = useRouter()
@@ -21,6 +23,7 @@ export function NotificationPreferencesForm() {
   const [isSaving, setIsSaving] = useState(false)
   const [preferences, setPreferences] = useState<NotificationPreferences | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState("channels")
 
   // Fetch notification preferences on component mount
   useEffect(() => {
@@ -32,7 +35,7 @@ export function NotificationPreferencesForm() {
         const result = await getNotificationPreferences()
 
         if (result.error) {
-          setError(result.error)
+          setError(result.error.message || "Failed to load notification preferences")
         } else if (result.preferences) {
           setPreferences(result.preferences)
         }
@@ -59,7 +62,7 @@ export function NotificationPreferencesForm() {
       if (result.error) {
         toast({
           title: "Error",
-          description: result.error,
+          description: result.error.message || "Failed to update notification preferences",
           variant: "destructive",
         })
       } else {
@@ -134,107 +137,124 @@ export function NotificationPreferencesForm() {
         <CardDescription>Manage how you receive notifications from Peer Capital</CardDescription>
       </CardHeader>
 
-      <CardContent className="space-y-6">
-        <div className="space-y-4">
-          <h3 className="text-lg font-medium">Notification Channels</h3>
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Mail className="h-4 w-4 text-gray-500" />
-              <Label htmlFor="email-notifications" className="flex-1">
-                Email Notifications
-                <p className="text-sm text-gray-500">Receive notifications via email</p>
-              </Label>
-            </div>
-            <Switch
-              id="email-notifications"
-              checked={preferences.email_notifications}
-              onCheckedChange={(checked) => handleToggle("email_notifications", checked)}
-            />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <MessageSquare className="h-4 w-4 text-gray-500" />
-              <Label htmlFor="sms-notifications" className="flex-1">
-                SMS Notifications
-                <p className="text-sm text-gray-500">Receive notifications via SMS</p>
-              </Label>
-            </div>
-            <Switch
-              id="sms-notifications"
-              checked={preferences.sms_notifications}
-              onCheckedChange={(checked) => handleToggle("sms_notifications", checked)}
-            />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Bell className="h-4 w-4 text-gray-500" />
-              <Label htmlFor="push-notifications" className="flex-1">
-                Push Notifications
-                <p className="text-sm text-gray-500">Receive push notifications on your device</p>
-              </Label>
-            </div>
-            <Switch
-              id="push-notifications"
-              checked={preferences.push_notifications}
-              onCheckedChange={(checked) => handleToggle("push_notifications", checked)}
-            />
-          </div>
+      <Tabs defaultValue="channels" value={activeTab} onValueChange={setActiveTab}>
+        <div className="px-6">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="channels">Notification Channels</TabsTrigger>
+            <TabsTrigger value="activities">Activity Settings</TabsTrigger>
+          </TabsList>
         </div>
 
-        <Separator />
+        <TabsContent value="channels">
+          <CardContent className="space-y-6">
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Notification Channels</h3>
 
-        <div className="space-y-4">
-          <h3 className="text-lg font-medium">Notification Types</h3>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Mail className="h-4 w-4 text-gray-500" />
+                  <Label htmlFor="email-notifications" className="flex-1">
+                    Email Notifications
+                    <p className="text-sm text-gray-500">Receive notifications via email</p>
+                  </Label>
+                </div>
+                <Switch
+                  id="email-notifications"
+                  checked={preferences.email_notifications}
+                  onCheckedChange={(checked) => handleToggle("email_notifications", checked)}
+                />
+              </div>
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Mail className="h-4 w-4 text-gray-500" />
-              <Label htmlFor="marketing-emails" className="flex-1">
-                Marketing Emails
-                <p className="text-sm text-gray-500">Receive promotional emails and offers</p>
-              </Label>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <MessageSquare className="h-4 w-4 text-gray-500" />
+                  <Label htmlFor="sms-notifications" className="flex-1">
+                    SMS Notifications
+                    <p className="text-sm text-gray-500">Receive notifications via SMS</p>
+                  </Label>
+                </div>
+                <Switch
+                  id="sms-notifications"
+                  checked={preferences.sms_notifications}
+                  onCheckedChange={(checked) => handleToggle("sms_notifications", checked)}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Bell className="h-4 w-4 text-gray-500" />
+                  <Label htmlFor="push-notifications" className="flex-1">
+                    Push Notifications
+                    <p className="text-sm text-gray-500">Receive push notifications on your device</p>
+                  </Label>
+                </div>
+                <Switch
+                  id="push-notifications"
+                  checked={preferences.push_notifications}
+                  onCheckedChange={(checked) => handleToggle("push_notifications", checked)}
+                />
+              </div>
             </div>
-            <Switch
-              id="marketing-emails"
-              checked={preferences.marketing_emails}
-              onCheckedChange={(checked) => handleToggle("marketing_emails", checked)}
-            />
-          </div>
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <CreditCard className="h-4 w-4 text-gray-500" />
-              <Label htmlFor="transaction-alerts" className="flex-1">
-                Transaction Alerts
-                <p className="text-sm text-gray-500">Get notified about account transactions</p>
-              </Label>
-            </div>
-            <Switch
-              id="transaction-alerts"
-              checked={preferences.transaction_alerts}
-              onCheckedChange={(checked) => handleToggle("transaction_alerts", checked)}
-            />
-          </div>
+            <Separator />
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Shield className="h-4 w-4 text-gray-500" />
-              <Label htmlFor="security-alerts" className="flex-1">
-                Security Alerts
-                <p className="text-sm text-gray-500">Get notified about security events</p>
-              </Label>
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Notification Types</h3>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Mail className="h-4 w-4 text-gray-500" />
+                  <Label htmlFor="marketing-emails" className="flex-1">
+                    Marketing Emails
+                    <p className="text-sm text-gray-500">Receive promotional emails and offers</p>
+                  </Label>
+                </div>
+                <Switch
+                  id="marketing-emails"
+                  checked={preferences.marketing_emails}
+                  onCheckedChange={(checked) => handleToggle("marketing_emails", checked)}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <CreditCard className="h-4 w-4 text-gray-500" />
+                  <Label htmlFor="transaction-alerts" className="flex-1">
+                    Transaction Alerts
+                    <p className="text-sm text-gray-500">Get notified about account transactions</p>
+                  </Label>
+                </div>
+                <Switch
+                  id="transaction-alerts"
+                  checked={preferences.transaction_alerts}
+                  onCheckedChange={(checked) => handleToggle("transaction_alerts", checked)}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Shield className="h-4 w-4 text-gray-500" />
+                  <Label htmlFor="security-alerts" className="flex-1">
+                    Security Alerts
+                    <p className="text-sm text-gray-500">Get notified about security events</p>
+                  </Label>
+                </div>
+                <Switch
+                  id="security-alerts"
+                  checked={preferences.security_alerts}
+                  onCheckedChange={(checked) => handleToggle("security_alerts", checked)}
+                />
+              </div>
             </div>
-            <Switch
-              id="security-alerts"
-              checked={preferences.security_alerts}
-              onCheckedChange={(checked) => handleToggle("security_alerts", checked)}
-            />
-          </div>
-        </div>
-      </CardContent>
+          </CardContent>
+        </TabsContent>
+
+        <TabsContent value="activities">
+          <CardContent>
+            <ActivityNotificationSettings />
+          </CardContent>
+        </TabsContent>
+      </Tabs>
 
       <CardFooter className="flex justify-end space-x-2">
         <Button variant="outline" onClick={() => router.back()}>
