@@ -116,6 +116,44 @@ async function ensureBucketExists(bucketName: string) {
   }
 }
 
+// Helper function to create a storage bucket if it doesn't exist
+async function createBucketIfNotExists(bucketName: string) {
+  try {
+    const adminClient = createAdminClient()
+
+    // Check if the bucket exists
+    const { data: buckets, error: listError } = await adminClient.storage.listBuckets()
+
+    if (listError) {
+      console.error(`Error listing buckets:`, listError)
+      return { success: false, error: `Failed to list buckets: ${listError.message}` }
+    }
+
+    const bucketExists = buckets?.some((bucket) => bucket.name === bucketName)
+
+    if (!bucketExists) {
+      // Create the bucket
+      const { error: createError } = await adminClient.storage.createBucket(bucketName, {
+        public: true,
+      })
+
+      if (createError) {
+        console.error(`Error creating ${bucketName} bucket:`, createError)
+        return { success: false, error: `Failed to create ${bucketName} bucket: ${createError.message}` }
+      }
+
+      console.log(`${bucketName} bucket created successfully`)
+    } else {
+      console.log(`${bucketName} bucket already exists`)
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error(`Error in createBucketIfNotExists:`, error)
+    return { success: false, error: `An unexpected error occurred: ${error.message}` }
+  }
+}
+
 // Update the updateProfile function to validate userId before database operations
 export async function updateProfile({
   firstName,
@@ -630,12 +668,23 @@ export async function uploadProfilePicture(file: File) {
     const bucketResult = await ensureBucketExists("profiles")
     if (bucketResult.error) {
       console.error("Error ensuring profiles bucket:", bucketResult.error)
-      return { error: bucketResult.error }
+
+      // Try to create bucket one more time with a different approach
+      try {
+        const { success: bucketSuccess } = await createBucketIfNotExists("profiles")
+        if (!bucketSuccess) {
+          return { error: "Unable to access storage system. Please try again later." }
+        }
+      } catch (createError) {
+        console.error("Second attempt to create bucket failed:", createError)
+        return { error: "Storage system is temporarily unavailable." }
+      }
     }
 
-    // Generate a unique file name
-    const fileExt = file.name.split(".").pop()
-    const fileName = `${userId}-${Date.now()}.${fileExt}`
+    // Generate a unique file name with sanitization
+    const fileExt = file.name.split(".").pop()?.toLowerCase() || "jpg"
+    // Create a clean filename with user ID and timestamp
+    const fileName = `avatar_${userId}_${Date.now()}.${fileExt}`
 
     // Convert File to ArrayBuffer
     const arrayBuffer = await file.arrayBuffer()
@@ -649,6 +698,36 @@ export async function uploadProfilePicture(file: File) {
 
     if (uploadError) {
       console.error("Error uploading profile picture:", uploadError)
+
+      if (uploadError.message.includes("Duplicate")) {
+        // If duplicate error, try with a different filename
+        const retryFileName = `avatar_${userId}_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`
+
+        const { error: retryError, data: retryData } = await adminClient.storage
+          .from("profiles")
+          .upload(retryFileName, buffer, {
+            contentType: file.type,
+            upsert: true,
+          })
+
+        if (retryError) {
+          return { error: `Failed to upload profile picture after retry: ${retryError.message}` }
+        }
+
+        // Get the public URL after successful retry
+        const {
+          data: { publicUrl },
+        } = adminClient.storage.from("profiles").getPublicUrl(retryFileName)
+
+        // Update the user's profile with the new profile picture URL
+        await adminClient
+          .from("profiles")
+          .update({ profile_picture_url: publicUrl, updated_at: new Date().toISOString() })
+          .eq("id", userId)
+
+        return { success: true, url: publicUrl }
+      }
+
       return { error: uploadError.message }
     }
 
@@ -656,6 +735,18 @@ export async function uploadProfilePicture(file: File) {
     const {
       data: { publicUrl },
     } = adminClient.storage.from("profiles").getPublicUrl(fileName)
+
+    // Update the user's profile with the new profile picture URL
+    const { error: updateError } = await adminClient
+      .from("profiles")
+      .update({ profile_picture_url: publicUrl, updated_at: new Date().toISOString() })
+      .eq("id", userId)
+
+    if (updateError) {
+      console.error("Error updating profile with new avatar URL:", updateError)
+      // Return success anyway as the image was uploaded successfully
+      return { success: true, url: publicUrl, warning: "Image uploaded but profile not updated" }
+    }
 
     return { success: true, url: publicUrl }
   } catch (error) {

@@ -6,11 +6,27 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { checkAuth } from "@/lib/auth-utils"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { AlertCircle } from "lucide-react"
+import { getCurrentUserId } from "@/lib/auth-utils"
 
-export default async function FundAccountPage() {
-  // Check authentication
-  await checkAuth()
+export const metadata = {
+  title: "Fund Account | PeerCapital",
+  description: "Fund your PeerCapital account",
+}
+
+export default async function FundAccountPage({
+  searchParams,
+}: {
+  searchParams: { error?: string }
+}) {
+  // Get the current user ID
+  const userId = await getCurrentUserId()
+
+  if (!userId) {
+    // Redirect to login if no user ID is found
+    redirect("/login?callbackUrl=/account/fund")
+  }
 
   // Get user profile
   const userProfile = await getUserProfile()
@@ -27,6 +43,18 @@ export default async function FundAccountPage() {
     }).format(amount)
   }
 
+  // Error messages
+  const errorMessages: Record<string, string> = {
+    missing_reference: "Payment reference is missing. Please try again.",
+    transaction_not_found: "Transaction not found. Please try again.",
+    configuration_error: "Payment provider configuration error. Please contact support.",
+    balance_update_failed: "Failed to update account balance. Please contact support.",
+  }
+
+  const errorMessage = searchParams.error
+    ? errorMessages[searchParams.error] || "An error occurred. Please try again."
+    : null
+
   return (
     <MainLayout
       userName={userProfile.profile?.first_name || "User"}
@@ -42,6 +70,14 @@ export default async function FundAccountPage() {
           </Link>
           <h1 className="text-2xl font-bold text-gray-900 ml-2">Fund Your Account</h1>
         </div>
+
+        {errorMessage && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{errorMessage}</AlertDescription>
+          </Alert>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="md:col-span-1">
@@ -95,7 +131,7 @@ export default async function FundAccountPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <FundAccountForm />
+                <FundAccountForm userId={userId} />
               </CardContent>
             </Card>
           </div>

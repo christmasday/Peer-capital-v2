@@ -168,6 +168,23 @@ export function MainLayout({
     }
   }, [isAuthenticated, router, requireAuth])
 
+  // Listen for avatar updates
+  useEffect(() => {
+    const handleAvatarUpdate = (event: Event) => {
+      const customEvent = event as CustomEvent
+      if (customEvent.detail?.url) {
+        // Force refresh router to update UI with new avatar
+        router.refresh()
+      }
+    }
+
+    window.addEventListener("avatar-updated", handleAvatarUpdate)
+
+    return () => {
+      window.removeEventListener("avatar-updated", handleAvatarUpdate)
+    }
+  }, [router])
+
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">

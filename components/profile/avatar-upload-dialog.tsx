@@ -29,7 +29,26 @@ export function AvatarUploadDialog({ userId, currentAvatarUrl, userName, childre
   const [success, setSuccess] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const validateImageDimensions = async (file: File): Promise<boolean> => {
+    return new Promise((resolve) => {
+      const img = new Image()
+      img.onload = () => {
+        // Check if image dimensions are reasonable (min 200x200)
+        const isValid = img.width >= 200 && img.height >= 200
+        if (!isValid) {
+          setError("Image should be at least 200x200 pixels")
+        }
+        resolve(isValid)
+      }
+      img.onerror = () => {
+        setError("Failed to load image. Please try another file.")
+        resolve(false)
+      }
+      img.src = URL.createObjectURL(file)
+    })
+  }
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null
     setError(null)
 
@@ -47,12 +66,15 @@ export function AvatarUploadDialog({ userId, currentAvatarUrl, userName, childre
         return
       }
 
-      setAvatarImage(file)
-
       // Create preview URL
       const reader = new FileReader()
-      reader.onload = () => {
+      reader.onload = async () => {
         setPreviewUrl(reader.result as string)
+        // After setting preview, validate dimensions
+        const dimensionsValid = await validateImageDimensions(file)
+        if (dimensionsValid) {
+          setAvatarImage(file)
+        }
       }
       reader.onerror = () => {
         setError("Failed to read the image file. Please try again.")
@@ -71,14 +93,37 @@ export function AvatarUploadDialog({ userId, currentAvatarUrl, userName, childre
       setIsUploading(true)
       setError(null)
 
+      // Check for storage bucket initialization
+      const bucketCheckResult = await fetch("/api/storage/check-bucket?bucket=profiles", {
+        method: "GET",
+      })
+
+      if (!bucketCheckResult.ok) {
+        console.warn("Storage bucket check failed, attempting to initialize...")
+        // Try to initialize storage if bucket check fails
+        await fetch("/api/storage/initialize", { method: "POST" })
+      }
+
       const result = await uploadProfilePicture(avatarImage)
 
       if (result.error) {
-        setError(result.error)
+        console.error("Profile picture upload error:", result.error)
+        setError(
+          result.error.includes("storage") ? "Storage system error. Please try again in a few moments." : result.error,
+        )
         return
       }
 
       setSuccess(true)
+
+      // Update URL immediately to refresh the avatar without page reload
+      if (result.url) {
+        // Update any local state or cache that might be showing the old avatar
+        const event = new CustomEvent("avatar-updated", {
+          detail: { url: result.url },
+        })
+        window.dispatchEvent(event)
+      }
 
       // Close dialog and refresh page after 1.5 seconds
       setTimeout(() => {
@@ -87,7 +132,9 @@ export function AvatarUploadDialog({ userId, currentAvatarUrl, userName, childre
       }, 1500)
     } catch (err) {
       console.error("Error uploading avatar:", err)
-      setError("An unexpected error occurred. Please try again.")
+      setError(
+        err instanceof Error ? `Upload failed: ${err.message}` : "An unexpected error occurred. Please try again.",
+      )
     } finally {
       setIsUploading(false)
     }
@@ -139,12 +186,16 @@ export function AvatarUploadDialog({ userId, currentAvatarUrl, userName, childre
 
         <div className="flex flex-col items-center justify-center gap-4 py-4">
           {/* Current or Preview Image */}
-          <div className="relative mb-2">
+          <div className="relative mb-4">
             <Avatar className="h-24 w-24 border-2 border-gray-200">
               {previewUrl ? (
-                <AvatarImage src={previewUrl || "/placeholder.svg"} alt="Preview" />
+                <AvatarImage src={previewUrl || "/placeholder.svg"} alt="Preview" className="object-cover" />
               ) : currentAvatarUrl ? (
-                <AvatarImage src={currentAvatarUrl || "/placeholder.svg"} alt={userName || "User"} />
+                <AvatarImage
+                  src={currentAvatarUrl || "/placeholder.svg"}
+                  alt={userName || "User"}
+                  className="object-cover"
+                />
               ) : (
                 <AvatarFallback className="bg-blue-100">
                   <User className="h-12 w-12 text-blue-500" />
@@ -154,6 +205,25 @@ export function AvatarUploadDialog({ userId, currentAvatarUrl, userName, childre
             {isUploading && (
               <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 rounded-full">
                 <Loader2 className="h-8 w-8 animate-spin text-white" />
+              </div>
+            )}
+            {previewUrl && !isUploading && (
+              <div className="absolute -right-2 -top-2">
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="destructive"
+                  className="h-6 w-6 rounded-full"
+                  onClick={() => {
+                    setPreviewUrl(null)
+                    setAvatarImage(null)
+                    if (fileInputRef.current) {
+                      fileInputRef.current.value = ""
+                    }
+                  }}
+                >
+                  <span className="sr-only">Remove preview</span>×
+                </Button>
               </div>
             )}
           </div>

@@ -16,6 +16,7 @@ export default async function UserProfileLayout({ children }: { children: ReactN
   // Get user profile if user is logged in
   let userName = undefined
   let userImage = undefined
+  const unreadNotificationsCount = 0 // Placeholder for unread notifications
 
   if (session?.user?.id) {
     const { data: profile } = await supabase
@@ -31,7 +32,12 @@ export default async function UserProfileLayout({ children }: { children: ReactN
   }
 
   return (
-    <MainLayout userName={userName} userImage={userImage} className="p-0">
+    <MainLayout
+      userName={userName}
+      userImage={userImage}
+      unreadNotificationsCount={unreadNotificationsCount}
+      className="p-0"
+    >
       {children}
     </MainLayout>
   )

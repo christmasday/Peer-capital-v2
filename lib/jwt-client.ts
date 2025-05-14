@@ -65,3 +65,61 @@ export function isJWTExpired(token: string) {
     return true // Assume expired on error
   }
 }
+
+// Get JWT from cookies on client
+export function getJWTFromClientCookies(): string | null {
+  if (typeof document === "undefined") return null
+
+  const value = `; ${document.cookie}`
+  const parts = value.split(`; jwt-token=`)
+  if (parts.length === 2) {
+    return parts.pop()?.split(";").shift() || null
+  }
+  return null
+}
+
+// Check if token is valid by checking with server
+export async function checkTokenValidity(token: string): Promise<boolean> {
+  try {
+    const response = await fetch("/api/auth/verify-token", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ token }),
+    })
+
+    if (!response.ok) {
+      return false
+    }
+
+    const data = await response.json()
+    return data.valid === true
+  } catch (error) {
+    console.error("Error checking token validity:", error)
+    return false
+  }
+}
+
+// Get user ID from token by checking with server
+export async function getUserIdFromToken(token: string): Promise<string | null> {
+  try {
+    const response = await fetch("/api/auth/get-user-id", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ token }),
+    })
+
+    if (!response.ok) {
+      return null
+    }
+
+    const data = await response.json()
+    return data.userId || null
+  } catch (error) {
+    console.error("Error getting user ID from token:", error)
+    return null
+  }
+}
