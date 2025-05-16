@@ -21,7 +21,7 @@ import { getUnreadNotificationsCount } from "@/lib/actions/notifications"
 import { NotificationsDropdown } from "@/components/notifications/notifications-dropdown"
 
 interface TopNavProps {
-  userName?: string
+  userName?: string // This should be the full name
   userImage?: string
   hideSearch?: boolean
 }
@@ -34,6 +34,9 @@ export function TopNav({ userName, userImage, hideSearch }: TopNavProps) {
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [fetchError, setFetchError] = useState(false)
   const pathname = usePathname()
+
+  // Ensure we have a valid user name to display
+  const displayName = userName && userName.trim() !== "" ? userName : "My Account"
 
   const navItems = [
     { href: "/home", label: "Home", icon: Home },
@@ -163,7 +166,7 @@ export function TopNav({ userName, userImage, hideSearch }: TopNavProps) {
               <Link href="/profile" className="block">
                 <DropdownMenuLabel className="cursor-pointer hover:bg-gray-50">
                   <div className="flex flex-col">
-                    <span>{userName || "User"}</span>
+                    <span>{displayName}</span>
                     <span className="text-xs text-gray-500">View profile</span>
                   </div>
                 </DropdownMenuLabel>

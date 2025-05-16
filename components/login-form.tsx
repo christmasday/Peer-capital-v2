@@ -67,10 +67,15 @@ export function LoginForm() {
         // Store JWT in localStorage if available
         if (result.jwt) {
           storeJWT(result.jwt)
+          // Also set it as a cookie for server-side access
+          document.cookie = `jwt-token=${result.jwt}; path=/; max-age=86400; SameSite=Lax` // 24 hours
         }
 
         // Set auth bypass cookie to prevent middleware redirects
         document.cookie = "auth-bypass=true; path=/; max-age=300; SameSite=Lax" // 5 minutes
+
+        // Set auth status cookie
+        document.cookie = "auth-status=authenticated; path=/; max-age=86400; SameSite=Lax" // 24 hours
 
         // Set bypass flag to prevent redirect loops
         localStorage.setItem("auth_bypass", "true")

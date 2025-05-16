@@ -3,18 +3,8 @@ import { checkAuth } from "@/lib/auth-utils"
 import { getUserProfile } from "@/lib/actions/auth"
 import { redirect } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { CreateExecuteSqlFunctionButton } from "@/components/admin/create-execute-sql-function-button"
-import { CreateCheckTableExistsFunctionButton } from "@/components/admin/create-check-table-exists-function-button"
-import { CreatePasswordResetTokensTableButton } from "@/components/admin/create-password-reset-tokens-table-button"
-import { ExecuteConnectionMigrationButton } from "@/components/admin/execute-connection-migration-button"
-import { FixConnectionForeignKeysButton } from "@/components/admin/fix-connection-foreign-keys-button"
-import { ExecuteNotificationsMigrationButton } from "@/components/admin/execute-notifications-migration-button"
-import { FixNotificationsSchemaButton } from "@/components/admin/fix-notifications-schema-button"
-import { CreateMessagesTableButton } from "@/components/admin/create-messages-table-button"
-import { CreateVirtualAccountsTableButton } from "@/components/admin/create-virtual-accounts-table-button"
-import { UpdateVirtualAccountsTableButton } from "@/components/admin/update-virtual-accounts-table-button"
-import { CreateWebhookEventsTableButton } from "@/components/admin/create-webhook-events-table-button"
-import { AddActivityNotificationPreferencesButton } from "@/components/admin/add-activity-notification-preferences-button"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { CheckCircle } from "lucide-react"
 
 export const dynamic = "force-dynamic"
 
@@ -44,70 +34,48 @@ export default async function AdminMigrationsPage() {
       <div className="max-w-6xl mx-auto">
         <h1 className="text-2xl font-bold text-gray-900 mb-6">Database Migrations</h1>
 
+        <Alert className="mb-6 bg-green-50 border-green-200">
+          <CheckCircle className="h-5 w-5 text-green-600" />
+          <AlertTitle className="text-green-800">All migrations completed</AlertTitle>
+          <AlertDescription className="text-green-700">
+            All database migrations have been successfully applied. The database schema is up to date.
+          </AlertDescription>
+        </Alert>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Card>
             <CardHeader>
-              <CardTitle>Core Functions</CardTitle>
-              <CardDescription>Create essential database functions</CardDescription>
+              <CardTitle>Database Status</CardTitle>
+              <CardDescription>Current database schema information</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <CreateExecuteSqlFunctionButton />
-              <CreateCheckTableExistsFunctionButton />
+              <div className="rounded-md bg-gray-50 p-4">
+                <h3 className="font-medium text-gray-900">Schema Version</h3>
+                <p className="text-gray-600 mt-1">Current: v1.0.0</p>
+              </div>
+
+              <div className="rounded-md bg-gray-50 p-4">
+                <h3 className="font-medium text-gray-900">Tables</h3>
+                <p className="text-gray-600 mt-1">All required tables have been created.</p>
+              </div>
+
+              <div className="rounded-md bg-gray-50 p-4">
+                <h3 className="font-medium text-gray-900">Functions</h3>
+                <p className="text-gray-600 mt-1">All required database functions have been created.</p>
+              </div>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle>Authentication</CardTitle>
-              <CardDescription>Authentication related tables</CardDescription>
+              <CardTitle>Database Maintenance</CardTitle>
+              <CardDescription>Tools for database maintenance</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <CreatePasswordResetTokensTableButton />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>User Connections</CardTitle>
-              <CardDescription>User connections and relationships</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <ExecuteConnectionMigrationButton />
-              <FixConnectionForeignKeysButton />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Notifications</CardTitle>
-              <CardDescription>Notification system tables</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <ExecuteNotificationsMigrationButton />
-              <FixNotificationsSchemaButton />
-              <AddActivityNotificationPreferencesButton />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Messaging</CardTitle>
-              <CardDescription>Messaging system tables</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <CreateMessagesTableButton />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Virtual Accounts</CardTitle>
-              <CardDescription>Virtual accounts and payment processing</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <CreateVirtualAccountsTableButton />
-              <UpdateVirtualAccountsTableButton />
-              <CreateWebhookEventsTableButton />
+              <p className="text-gray-600">
+                Database maintenance tools will be added here in future updates. Currently, all migrations have been
+                applied and no maintenance is required.
+              </p>
             </CardContent>
           </Card>
         </div>

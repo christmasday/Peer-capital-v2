@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache"
 import { v4 as uuidv4 } from "uuid"
 import { getCurrentUserId } from "@/lib/auth-utils"
 
-// Updated notification types to include all activity types
+// Updated notification types to include review type
 export type NotificationType =
   | "message"
   | "connection_request"
@@ -26,6 +26,7 @@ export type NotificationType =
   | "verification_completed"
   | "account_created"
   | "security_alert"
+  | "review" // Added review notification type
 
 export interface Notification {
   id: string
@@ -40,6 +41,7 @@ export interface Notification {
   updated_at: string
 }
 
+// Rest of the file remains unchanged
 export interface NotificationData {
   [key: string]: any
 }

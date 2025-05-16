@@ -28,7 +28,7 @@ import { SignoutButton } from "@/components/auth/signout-button"
 import { Logo } from "@/components/logo"
 
 interface DesktopNavProps {
-  userName?: string
+  userName?: string // This should be the full name
   userImage?: string
 }
 

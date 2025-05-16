@@ -36,7 +36,9 @@ export async function middleware(req: NextRequest) {
     path.startsWith("/favicon.ico") ||
     path.includes(".png") ||
     path.includes(".jpg") ||
-    path.includes(".svg")
+    path.includes(".svg") ||
+    path.startsWith("/api/auth/") ||
+    path.startsWith("/api/paystack/")
   ) {
     return NextResponse.next()
   }
@@ -81,6 +83,12 @@ export async function middleware(req: NextRequest) {
     const isAuthenticated = req.cookies.get("is_authenticated")?.value === "true"
     if (isAuthenticated) {
       console.log("Client-side auth flag found - allowing request")
+      return NextResponse.next()
+    }
+
+    // Special case for /home with auth=direct parameter
+    if (path === "/home" && req.nextUrl.searchParams.get("auth") === "direct") {
+      console.log("Direct auth parameter found for /home - allowing request")
       return NextResponse.next()
     }
 

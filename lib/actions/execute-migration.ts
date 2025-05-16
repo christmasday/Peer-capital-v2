@@ -130,6 +130,11 @@ export async function executeSql(sql: string) {
   }
 }
 
+// Add the missing executeSqlMigration export
+export async function executeSqlMigration(sql: string) {
+  return executeSql(sql)
+}
+
 export async function executeMigration(migrationFile: string) {
   try {
     console.log(`Executing migration: ${migrationFile}`)

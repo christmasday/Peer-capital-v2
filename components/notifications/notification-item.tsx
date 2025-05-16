@@ -21,6 +21,7 @@ import {
   CheckCircle2,
   Shield,
   User,
+  Star,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -143,6 +144,8 @@ export function NotificationItem({ notification, onUpdate }: NotificationItemPro
         return <User className="h-5 w-5 text-blue-600" />
       case "security_alert":
         return <Shield className="h-5 w-5 text-red-500" />
+      case "review":
+        return <Star className="h-5 w-5 text-amber-500" />
       case "system":
       default:
         return <Bell className="h-5 w-5 text-gray-500" />
@@ -174,12 +177,17 @@ export function NotificationItem({ notification, onUpdate }: NotificationItemPro
       case "profile_updated":
         return "/profile/edit"
       case "verification_started":
+        return "/profile/edit"
       case "verification_completed":
         return "/profile/edit"
       case "account_created":
         return "/profile"
       case "security_alert":
         return "/profile/change-password"
+      case "review":
+        return notification.data?.reviewerId
+          ? `/profile/${notification.data.reviewerId}?tab=reviews`
+          : "/profile?tab=reviews"
       default:
         return "#"
     }
@@ -234,6 +242,8 @@ export function NotificationItem({ notification, onUpdate }: NotificationItemPro
         return "Account Created"
       case "security_alert":
         return "Security Alert"
+      case "review":
+        return `New ${notification.data?.rating || ""}-Star Review`
       case "system":
         return "System Notification"
       default:
@@ -265,6 +275,10 @@ export function NotificationItem({ notification, onUpdate }: NotificationItemPro
 
         <p className="text-sm text-muted-foreground line-clamp-2">{notification.content}</p>
 
+        {notification.type === "review" && notification.data?.preview && (
+          <div className="mt-1 p-2 bg-muted/30 rounded text-sm italic line-clamp-2">"{notification.data.preview}"</div>
+        )}
+
         <div className="flex gap-2 mt-2">
           <Button variant="outline" size="sm" asChild>
             <Link href={getActionLink()}>View</Link>
@@ -284,3 +298,6 @@ export function NotificationItem({ notification, onUpdate }: NotificationItemPro
     </div>
   )
 }
+
+// Add default export that references the named export
+export default NotificationItem

@@ -3,15 +3,15 @@ import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 import AccountBalanceDisplay from "@/components/account-balance-display"
 import { FinancialDisclaimer } from "@/components/disclaimers/financial-disclaimer"
+import { checkAuth } from "@/lib/auth-utils"
+
 
 export default async function DashboardPage() {
   const supabase = createServerComponentClient({ cookies })
 
   // Check if user is authenticated
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-
+ await checkAuth()
+ 
   if (!session) {
     redirect("/login")
   }
