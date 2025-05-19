@@ -19,6 +19,8 @@ import {
   Shield,
   Check,
   ChevronRight,
+  CreditCardIcon,
+  CalendarDays,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -53,6 +55,12 @@ export function ProfileEditForm({ profile, initialTab = "personal" }: ProfileEdi
   const [city, setCity] = useState(profile?.city || "")
   const [state, setState] = useState(profile?.state || "")
   const [zipCode, setZipCode] = useState(profile?.zip_code || "")
+
+  // BVN and Date of Birth
+  const [bvn, setBvn] = useState(profile?.bvn || "")
+  const [dateOfBirth, setDateOfBirth] = useState(
+    profile?.date_of_birth ? new Date(profile.date_of_birth).toISOString().split("T")[0] : "",
+  )
 
   // ID Verification
   const [idType, setIdType] = useState(profile?.id_type || "")
@@ -206,8 +214,8 @@ export function ProfileEditForm({ profile, initialTab = "personal" }: ProfileEdi
         state: state,
         zipCode: zipCode,
         profilePictureUrl: pictureUrl,
-        bvn: profile?.bvn || undefined,
-        dateOfBirth: profile?.date_of_birth || undefined,
+        bvn: bvn || undefined,
+        dateOfBirth: dateOfBirth || undefined,
         idType: idType,
         idNumber: idNumber,
         idDocumentUrl: idDocumentUrl,
@@ -449,6 +457,43 @@ export function ProfileEditForm({ profile, initialTab = "personal" }: ProfileEdi
                             onChange={(e) => setPhoneNumber(e.target.value)}
                             className="pl-10 border-gray-300 focus:border-blue-500"
                             required
+                          />
+                        </div>
+                      </div>
+
+                      {/* BVN Field */}
+                      <div className="space-y-2">
+                        <Label htmlFor="bvn" className="text-sm font-medium">
+                          BVN (Bank Verification Number)
+                        </Label>
+                        <div className="relative">
+                          <CreditCardIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+                          <Input
+                            id="bvn"
+                            placeholder="Enter your BVN"
+                            value={bvn}
+                            onChange={(e) => setBvn(e.target.value)}
+                            className="pl-10 border-gray-300 focus:border-blue-500"
+                          />
+                        </div>
+                        <p className="text-xs text-gray-500">
+                          Your BVN is required for account verification and secure transactions.
+                        </p>
+                      </div>
+
+                      {/* Date of Birth Field */}
+                      <div className="space-y-2">
+                        <Label htmlFor="dateOfBirth" className="text-sm font-medium">
+                          Date of Birth
+                        </Label>
+                        <div className="relative">
+                          <CalendarDays className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+                          <Input
+                            id="dateOfBirth"
+                            type="date"
+                            value={dateOfBirth}
+                            onChange={(e) => setDateOfBirth(e.target.value)}
+                            className="pl-10 border-gray-300 focus:border-blue-500"
                           />
                         </div>
                       </div>

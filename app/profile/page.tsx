@@ -7,21 +7,38 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { User, Mail, Phone, MapPin, Settings, Briefcase, Building, Edit, Wallet } from "lucide-react"
+import {
+  User,
+  Mail,
+  Phone,
+  MapPin,
+  Settings,
+  Briefcase,
+  Edit,
+  Wallet,
+  MoreHorizontal,
+  Globe,
+  Home,
+  Rss,
+} from "lucide-react"
 import { ProfilePreviewBanner } from "@/components/profile/profile-preview-banner"
-import { VirtualAccountTransactions } from "@/components/profile/virtual-account-transactions"
 import { BannerUploadDialog } from "@/components/profile/banner-upload-dialog"
 import { AvatarUploadDialog } from "@/components/profile/avatar-upload-dialog"
 import { AuthStateMaintainer } from "@/components/auth/auth-state-maintainer"
 import { getUserProfile } from "@/lib/actions/auth"
 import { checkAuth } from "@/lib/auth-utils"
-import { format } from "date-fns"
 import { MainLayout } from "@/components/layouts/main-layout"
 import { cn } from "@/lib/utils"
+import { EditBioButton } from "@/components/profile/edit-bio-button"
+import { CreatePostCard } from "@/components/profile/create-post-card"
+import { getUserPosts } from "@/lib/actions/posts"
+import { PostsList } from "@/components/profile/posts-list"
+import { ProfileAbout } from "@/components/profile/profile-about"
 
 export const dynamic = "force-dynamic"
+export const revalidate = 0
 
-export default async function ProfilePage() {
+export default async function ProfilePage({ searchParams }: { searchParams: { tab?: string } }) {
   // Check authentication with a more reliable method
   await checkAuth()
 
@@ -52,14 +69,6 @@ export default async function ProfilePage() {
     .eq("user_id", user.id)
     .single()
 
-  // Get virtual account
-  const { data: virtualAccount } = await adminClient
-    .from("virtual_accounts")
-    .select("*")
-    .eq("user_id", user.id)
-    .eq("status", "active")
-    .single()
-
   // Get followers and following counts
   const { data: followersCount } = await adminClient
     .from("user_connections")
@@ -74,15 +83,6 @@ export default async function ProfilePage() {
   // Format name
   const fullName = `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "User"
 
-  // Format date
-  const formatDate = (dateString: string) => {
-    try {
-      return format(new Date(dateString), "MMMM d, yyyy")
-    } catch (error) {
-      return dateString
-    }
-  }
-
   // Default banner image or user's banner if they have one
   const bannerImage = profile.banner_image_url || "/abstract-geometric-shapes.png"
 
@@ -94,6 +94,16 @@ export default async function ProfilePage() {
       minimumFractionDigits: 0,
     }).format(amount)
   }
+
+  // Fetch user's posts
+  const { posts, error: postsError } = await getUserPosts(user.id, 10)
+
+  if (postsError) {
+    console.error("Error fetching posts:", postsError)
+  }
+
+  // Get active tab from search params or default to "posts"
+  const activeTab = searchParams?.tab || "posts"
 
   return (
     <MainLayout userName={fullName} userImage={profile.profile_picture_url}>
@@ -137,12 +147,18 @@ export default async function ProfilePage() {
           </div>
 
           {/* Action Buttons - positioned at farthest right */}
-          <div className="absolute -bottom-16 right-0 md:right-4">
-            <Button asChild variant="outline" className="bg-white">
+          <div className="absolute -bottom-16 right-0 md:right-4 flex gap-2">
+            <Button className="bg-blue-600 hover:bg-blue-700">
+              <span className="mr-1">+</span> Add to story
+            </Button>
+            <Button asChild variant="outline" className="bg-gray-200 border-gray-300 hover:bg-gray-300 text-black">
               <Link href="/profile/edit">
-                <Settings className="mr-2 h-4 w-4" />
-                Edit Profile
+                <Edit className="mr-2 h-4 w-4" />
+                Edit profile
               </Link>
+            </Button>
+            <Button variant="outline" size="icon" className="bg-gray-200 border-gray-300 hover:bg-gray-300 text-black">
+              <MoreHorizontal className="h-5 w-5" />
             </Button>
           </div>
         </div>
@@ -164,25 +180,6 @@ export default async function ProfilePage() {
                   </span>
                 )}
                 {profile.employer_name && <span>at {profile.employer_name}</span>}
-              </div>
-
-              <div className="flex flex-wrap gap-4 mt-3">
-                <div className="flex items-center">
-                  <Link
-                    href={`/profile/${user.id}/connections?tab=followers`}
-                    className="flex items-center hover:text-blue-600"
-                  >
-                    <span className="font-semibold mr-1">{followersCount?.length || 0}</span> Followers
-                  </Link>
-                </div>
-                <div className="flex items-center">
-                  <Link
-                    href={`/profile/${user.id}/connections?tab=following`}
-                    className="flex items-center hover:text-blue-600"
-                  >
-                    <span className="font-semibold mr-1">{followingCount?.length || 0}</span> Following
-                  </Link>
-                </div>
               </div>
             </div>
 
@@ -207,309 +204,234 @@ export default async function ProfilePage() {
         <div className="border-b border-gray-300 mb-6">
           <div className="flex space-x-1 overflow-x-auto">
             {[
-              { name: "Overview", href: "#overview", active: true },
-              { name: "Loans", href: "#loans" },
-              { name: "Transactions", href: "#transactions" },
-              { name: "Virtual Account", href: "#virtual-account" },
-              { name: "Connections", href: `/profile/${user.id}/connections` },
-              { name: "Activity", href: "#activity" },
+              { name: "Posts", href: "/profile", active: activeTab === "posts" },
+              { name: "About", href: "/profile?tab=about", active: activeTab === "about" },
+              { name: "Friends", href: `/profile/${user.id}/connections`, active: activeTab === "friends" },
+              { name: "Photos", href: "/profile?tab=photos", active: activeTab === "photos" },
+              { name: "Videos", href: "/profile?tab=videos", active: activeTab === "videos" },
+              { name: "Reels", href: "/profile?tab=reels", active: activeTab === "reels" },
+              { name: "More", href: "/profile?tab=more", active: activeTab === "more" },
             ].map((tab) => (
-              <a
+              <Link
                 key={tab.name}
                 href={tab.href}
                 className={cn(
-                  "px-4 py-2 text-sm font-medium transition-colors inline-block",
+                  "px-4 py-3 text-sm font-medium transition-colors inline-block",
                   tab.active
                     ? "text-blue-600 border-b-2 border-blue-600"
                     : "text-gray-600 hover:text-gray-900 hover:bg-gray-100",
                 )}
               >
                 {tab.name}
-              </a>
+              </Link>
             ))}
+            <div className="flex-grow"></div>
+            <Button variant="ghost" size="icon" className="text-gray-600">
+              <MoreHorizontal className="h-5 w-5" />
+            </Button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6" id="overview">
-          {/* Left Sidebar */}
-          <div className="lg:col-span-3 space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">About</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-start gap-2">
-                  <Mail className="h-5 w-5 text-muted-foreground mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Email</p>
-                    <p>{profile.email || "Not provided"}</p>
-                  </div>
-                </div>
+        {activeTab === "about" ? (
+          <ProfileAbout profile={profile} isCurrentUser={true} />
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6" id="overview">
+            {/* Left Sidebar - About section (4/12) */}
+            <div className="lg:col-span-4 space-y-6">
+              <Card className="shadow-sm">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-xl">Intro</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-gray-700 mb-4">{profile.bio || "No bio yet"}</p>
 
-                <div className="flex items-start gap-2">
-                  <Phone className="h-5 w-5 text-muted-foreground mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Phone</p>
-                    <p>{profile.phone_number || "Not provided"}</p>
-                  </div>
-                </div>
+                  {/* Replace the Link with our new EditBioButton component */}
+                  <EditBioButton userId={user.id} currentBio={profile.bio || ""} />
 
-                <div className="flex items-start gap-2">
-                  <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Address</p>
-                    <p>
-                      {[profile.address, profile.city, profile.state, profile.country].filter(Boolean).join(", ") ||
-                        "Not provided"}
-                    </p>
-                  </div>
-                </div>
-
-                {profile.employment_status && (
-                  <div className="flex items-start gap-2">
-                    <Briefcase className="h-5 w-5 text-muted-foreground mt-0.5" />
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Employment</p>
-                      <p>
-                        {profile.employment_status}
-                        {profile.employer_name && ` at ${profile.employer_name}`}
-                      </p>
+                  <div className="space-y-3 mt-4">
+                    <div className="flex items-center gap-2 text-gray-700">
+                      <Home className="h-5 w-5 text-gray-500" />
+                      <span>
+                        Lives in {profile.city || "Lagos"}, {profile.state || "Nigeria"}
+                      </span>
                     </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Main Content */}
-          <div className="lg:col-span-9">
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Personal Information Card */}
-                <Card>
-                  <CardHeader>
-                    <div className="flex justify-between items-center">
-                      <CardTitle>Personal Information</CardTitle>
-                      <Link href="/profile/edit">
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </Link>
+                    <div className="flex items-center gap-2 text-gray-700">
+                      <Rss className="h-5 w-5 text-gray-500" />
+                      <span>Followed by {followersCount?.length || 0} people</span>
                     </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div>
-                        <p className="text-sm text-gray-500">Full Name</p>
-                        <p className="font-medium">{fullName}</p>
-                      </div>
-
-                      <div>
-                        <p className="text-sm text-gray-500">Date of Birth</p>
-                        <p className="font-medium">
-                          {profile.date_of_birth ? formatDate(profile.date_of_birth) : "Not provided"}
-                        </p>
-                      </div>
-
-                      <div>
-                        <p className="text-sm text-gray-500">BVN</p>
-                        <p className="font-medium">{profile.bvn || "Not provided"}</p>
-                      </div>
-
-                      <div>
-                        <p className="text-sm text-gray-500">ID Verification</p>
-                        <p className="font-medium">
-                          {profile.id_verified ? (
-                            <Badge className="bg-green-500 hover:bg-green-600">Verified</Badge>
-                          ) : (
-                            <Badge variant="outline">Not Verified</Badge>
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Employment Information Card */}
-                <Card>
-                  <CardHeader>
-                    <div className="flex justify-between items-center">
-                      <CardTitle>Employment Information</CardTitle>
-                      <Link href="/profile/edit?tab=employment">
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </Link>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    {profile.employment_status ? (
-                      <div className="space-y-4">
-                        <div>
-                          <p className="text-sm text-gray-500">Employment Status</p>
-                          <p className="font-medium">{profile.employment_status}</p>
-                        </div>
-
-                        {profile.job_title && (
-                          <div>
-                            <p className="text-sm text-gray-500">Job Title</p>
-                            <p className="font-medium">{profile.job_title}</p>
-                          </div>
-                        )}
-
-                        {profile.employer_name && (
-                          <div>
-                            <p className="text-sm text-gray-500">Employer</p>
-                            <p className="font-medium">{profile.employer_name}</p>
-                          </div>
-                        )}
-
-                        {profile.monthly_income !== null && profile.monthly_income !== undefined && (
-                          <div>
-                            <p className="text-sm text-gray-500">Monthly Income</p>
-                            <p className="font-medium">₦{profile.monthly_income.toLocaleString()}</p>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="text-center py-4">
-                        <p className="text-gray-500 mb-3">No employment information added yet</p>
-                        <Link href="/profile/edit?tab=employment">
-                          <Button size="sm">Add Employment Details</Button>
-                        </Link>
+                    {profile.website && (
+                      <div className="flex items-center gap-2 text-gray-700">
+                        <Globe className="h-5 w-5 text-gray-500" />
+                        <a href={profile.website} className="text-blue-600 hover:underline">
+                          linktr.ee/mr.obi
+                        </a>
                       </div>
                     )}
-                  </CardContent>
-                </Card>
+                  </div>
 
-                {/* Loan Helper Settings Card */}
-                {loanHelperSettings && (
-                  <Card>
-                    <CardHeader>
-                      <div className="flex justify-between items-center">
-                        <CardTitle>Loan Helper Settings</CardTitle>
-                        <Link href="/profile/loan-helper">
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        </Link>
+                  <Button variant="outline" className="w-full mt-4" asChild>
+                    <Link href="/profile/edit">Edit details</Link>
+                  </Button>
+                </CardContent>
+                {profile.profile_picture_url && (
+                  <div className="px-6 pb-4">
+                    <div className="grid grid-cols-3 gap-1 mt-2 w-full">
+                      <div className="aspect-square bg-gray-200 rounded overflow-hidden">
+                        <img
+                          src={profile.profile_picture_url || "/placeholder.svg"}
+                          alt="Profile thumbnail"
+                          className="w-full h-full object-cover"
+                        />
                       </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="flex flex-col p-4 border rounded-lg">
-                          <span className="text-sm text-muted-foreground">Maximum Loan Amount</span>
-                          <span className="text-2xl font-bold">
-                            ₦{loanHelperSettings.loan_amount?.toLocaleString()}
-                          </span>
-                        </div>
-                        <div className="flex flex-col p-4 border rounded-lg">
-                          <span className="text-sm text-muted-foreground">Interest Rate</span>
-                          <span className="text-2xl font-bold">{loanHelperSettings.interest_rate}%</span>
-                        </div>
-                        <div className="flex flex-col p-4 border rounded-lg">
-                          <span className="text-sm text-muted-foreground">Status</span>
-                          <span className="mt-1">
-                            <Badge className="bg-green-500 hover:bg-green-600">Active</Badge>
-                          </span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                    </div>
+                  </div>
                 )}
-              </div>
-            </div>
-
-            {/* Loans Section */}
-            <div className="mt-12 pt-6 border-t border-gray-200" id="loans">
-              <h2 className="text-2xl font-bold mb-4">Loan History</h2>
-              <Card>
-                <CardContent className="py-6">
-                  <div className="text-center py-8">
-                    <p className="text-gray-500 mb-3">No loan history available</p>
-                    <Link href="/loans">
-                      <Button>View Loans</Button>
-                    </Link>
-                  </div>
-                </CardContent>
               </Card>
-            </div>
 
-            {/* Transactions Section */}
-            <div className="mt-12 pt-6 border-t border-gray-200" id="transactions">
-              <h2 className="text-2xl font-bold mb-4">Transaction History</h2>
+              {/* Keep the existing About card for additional info */}
               <Card>
-                <CardContent className="py-6">
-                  <div className="text-center py-8">
-                    <p className="text-gray-500 mb-3">No transaction history available</p>
-                    <Link href="/transactions">
-                      <Button>View Transactions</Button>
-                    </Link>
+                <CardHeader>
+                  <CardTitle className="text-lg">About</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-start gap-2">
+                    <Mail className="h-5 w-5 text-muted-foreground mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Email</p>
+                      <p>{profile.email || "Not provided"}</p>
+                    </div>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
 
-            {/* Virtual Account Section */}
-            <div className="mt-12 pt-6 border-t border-gray-200" id="virtual-account">
-              <h2 className="text-2xl font-bold mb-4">Virtual Account</h2>
-              <Card>
-                <CardContent className="py-6">
-                  {virtualAccount ? (
-                    <div className="space-y-6">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="flex flex-col p-4 border rounded-lg">
-                          <span className="text-sm text-muted-foreground">Account Number</span>
-                          <span className="text-xl font-semibold">{virtualAccount.account_number}</span>
-                        </div>
-                        <div className="flex flex-col p-4 border rounded-lg">
-                          <span className="text-sm text-muted-foreground">Bank Name</span>
-                          <span className="text-xl font-semibold">{virtualAccount.bank_name}</span>
-                        </div>
-                        <div className="flex flex-col p-4 border rounded-lg">
-                          <span className="text-sm text-muted-foreground">Account Name</span>
-                          <span className="text-xl font-semibold">{virtualAccount.account_name}</span>
-                        </div>
-                      </div>
+                  <div className="flex items-start gap-2">
+                    <Phone className="h-5 w-5 text-muted-foreground mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Phone</p>
+                      <p>{profile.phone_number || "Not provided"}</p>
+                    </div>
+                  </div>
 
-                      <div className="p-4 bg-blue-50 rounded-lg">
-                        <p className="text-blue-700">
-                          <strong>Note:</strong> You can fund your Peer Capital account by making a transfer to this
-                          virtual account. The funds will be credited automatically.
+                  <div className="flex items-start gap-2">
+                    <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Address</p>
+                      <p>
+                        {[profile.address, profile.city, profile.state, profile.country].filter(Boolean).join(", ") ||
+                          "Not provided"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {profile.employment_status && (
+                    <div className="flex items-start gap-2">
+                      <Briefcase className="h-5 w-5 text-muted-foreground mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Employment</p>
+                        <p>
+                          {profile.employment_status}
+                          {profile.employer_name && ` at ${profile.employer_name}`}
                         </p>
                       </div>
-
-                      <VirtualAccountTransactions userId={user.id} />
-                    </div>
-                  ) : (
-                    <div className="text-center py-8">
-                      <Building className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                      <h3 className="text-lg font-medium mb-2">No Virtual Account Yet</h3>
-                      <p className="text-muted-foreground mb-6">
-                        Create a virtual account to receive funds directly into your Peer Capital account.
-                      </p>
-                      <Button asChild>
-                        <Link href="/profile/virtual-account">Create Virtual Account</Link>
-                      </Button>
                     </div>
                   )}
                 </CardContent>
               </Card>
+
+              {/* Loan Helper Settings Card - Keep if it exists */}
+              {loanHelperSettings && (
+                <Card>
+                  <CardHeader>
+                    <div className="flex justify-between items-center">
+                      <CardTitle className="text-lg">Loan Helper Settings</CardTitle>
+                      <Link href="/profile/loan-helper">
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </Link>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="flex flex-col p-4 border rounded-lg">
+                        <span className="text-sm text-muted-foreground">Maximum Loan Amount</span>
+                        <span className="text-2xl font-bold">₦{loanHelperSettings.loan_amount?.toLocaleString()}</span>
+                      </div>
+                      <div className="flex flex-col p-4 border rounded-lg">
+                        <span className="text-sm text-muted-foreground">Interest Rate</span>
+                        <span className="text-2xl font-bold">{loanHelperSettings.interest_rate}%</span>
+                      </div>
+                      <div className="flex flex-col p-4 border rounded-lg">
+                        <span className="text-sm text-muted-foreground">Status</span>
+                        <span className="mt-1">
+                          <Badge className="bg-green-500 hover:bg-green-600">Active</Badge>
+                        </span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </div>
 
-            {/* Activity Section */}
-            <div className="mt-12 pt-6 border-t border-gray-200" id="activity">
-              <h2 className="text-2xl font-bold mb-4">Recent Activity</h2>
-              <Card>
-                <CardContent className="py-6">
-                  <div className="text-center py-8">
-                    <p className="text-gray-500 mb-3">No recent activity</p>
+            {/* Main Content - Posts section (8/12) */}
+            <div className="lg:col-span-8">
+              {/* Create post card */}
+              <CreatePostCard
+                userId={user.id}
+                userName={fullName}
+                userImage={profile.profile_picture_url}
+                onPostCreated={() => {
+                  // In a real implementation, this would refresh the posts
+                }}
+              />
+
+              {/* Posts header */}
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold">Posts</h2>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" className="text-gray-700 flex items-center gap-1">
+                    <Settings className="h-4 w-4" />
+                    Filters
+                  </Button>
+                  <Button variant="outline" className="text-gray-700 flex items-center gap-1">
+                    <Settings className="h-4 w-4" />
+                    Manage posts
+                  </Button>
+                </div>
+              </div>
+
+              {/* View toggle */}
+              <Card className="mb-4 shadow-sm">
+                <CardContent className="py-2">
+                  <div className="flex items-center">
+                    <Button
+                      variant="ghost"
+                      className="text-blue-600 border-b-2 border-blue-600 rounded-none flex-1 py-2"
+                    >
+                      <Rss className="h-4 w-4 mr-2" />
+                      List view
+                    </Button>
+                    <Button variant="ghost" className="text-gray-600 hover:bg-gray-100 rounded-none flex-1 py-2">
+                      <div className="grid grid-cols-2 gap-0.5 mr-2">
+                        <div className="w-1.5 h-1.5 bg-gray-600"></div>
+                        <div className="w-1.5 h-1.5 bg-gray-600"></div>
+                        <div className="w-1.5 h-1.5 bg-gray-600"></div>
+                        <div className="w-1.5 h-1.5 bg-gray-600"></div>
+                      </div>
+                      Grid view
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Posts list - Using the PostsList component */}
+              <PostsList
+                userId={user.id}
+                userName={fullName}
+                userImage={profile.profile_picture_url}
+                initialPosts={posts || []}
+              />
             </div>
           </div>
-        </div>
+        )}
       </div>
     </MainLayout>
   )

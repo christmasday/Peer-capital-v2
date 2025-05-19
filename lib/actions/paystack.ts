@@ -110,10 +110,12 @@ export async function createVirtualAccount() {
       middle_name: profile.middle_name || "",
       last_name: profile.last_name || "Account",
       phone: profile.phone_number || "00000000000",
-      preferred_bank: "wema-bank", // You can make this configurable
+      preferred_bank: process.env.PAYSTACK_PREFERRED_BANK || "providus-bank", // Using environment variable with fallback
       country: "NG",
       bvn: profile.bvn || "",
     }
+
+    console.log(`Using preferred bank: ${process.env.PAYSTACK_PREFERRED_BANK || "providus-bank"}`)
 
     console.log("Sending request to Paystack with payload:", {
       ...payload,

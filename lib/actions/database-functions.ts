@@ -338,3 +338,94 @@ export async function createExecuteSqlFunction(): Promise<{
     }
   }
 }
+
+// Check if a column exists in a table
+export async function checkColumnExists(tableName: string, columnName: string): Promise<boolean> {
+  try {
+    const adminClient = createAdminClient()
+
+    // First check if the function exists
+    const { data: functionExists } = await adminClient.rpc("check_function_exists", {
+      function_name: "check_column_exists",
+    })
+
+    // If the function doesn't exist, create it
+    if (!functionExists) {
+      await adminClient.rpc("execute_sql", {
+        sql_query: `
+          CREATE OR REPLACE FUNCTION check_column_exists(table_name text, column_name text)
+          RETURNS boolean
+          LANGUAGE plpgsql
+          AS $$
+          DECLARE
+            column_exists boolean;
+          BEGIN
+            SELECT EXISTS (
+              SELECT FROM information_schema.columns 
+              WHERE table_schema = 'public' 
+              AND table_name = $1
+              AND column_name = $2
+            ) INTO column_exists;
+            
+            RETURN column_exists;
+          END;
+          $$;
+        `,
+      })
+    }
+
+    // Now check if the column exists
+    const { data: columnExists, error } = await adminClient.rpc("check_column_exists", {
+      table_name: tableName,
+      column_name: columnName,
+    })
+
+    if (error) {
+      console.error("Error checking if column exists:", error)
+      return false
+    }
+
+    return !!columnExists
+  } catch (error) {
+    console.error("Error in checkColumnExists:", error)
+    return false
+  }
+}
+
+// Add a column to a table if it doesn't exist
+export async function addColumnIfNotExists(
+  tableName: string,
+  columnName: string,
+  columnType: string,
+  defaultValue?: string,
+): Promise<boolean> {
+  try {
+    // Check if column already exists
+    const columnExists = await checkColumnExists(tableName, columnName)
+
+    if (columnExists) {
+      return true // Column already exists
+    }
+
+    // Add the column
+    const adminClient = createAdminClient()
+
+    let sql = `ALTER TABLE ${tableName} ADD COLUMN IF NOT EXISTS ${columnName} ${columnType}`
+
+    if (defaultValue !== undefined) {
+      sql += ` DEFAULT ${defaultValue}`
+    }
+
+    const { error } = await adminClient.rpc("execute_sql", { sql_query: sql })
+
+    if (error) {
+      console.error(`Error adding column ${columnName} to ${tableName}:`, error)
+      return false
+    }
+
+    return true
+  } catch (error) {
+    console.error("Error in addColumnIfNotExists:", error)
+    return false
+  }
+}
