@@ -392,6 +392,56 @@ export async function updateProfile({
   }
 }
 
+// Update the bio function to use 140 character limit
+export async function updateBio(userId: string, bio: string) {
+  try {
+    if (!userId) {
+      return { error: "User ID is required" }
+    }
+
+    // Changed from 250 to 140 character limit
+    if (bio.length > 140) {
+      return { error: "Bio cannot exceed 140 characters" }
+    }
+
+    const adminClient = createAdminClient()
+
+    // Update just the bio field
+    const { error } = await adminClient
+      .from("profiles")
+      .update({
+        bio: bio,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", userId)
+
+    if (error) {
+      console.error("Error updating bio:", error)
+      return { error: error.message }
+    }
+
+    // Create activity notification for profile update
+    try {
+      await createProfileActivityNotification({
+        userId,
+        type: "updated",
+        details: "Your profile bio has been updated",
+      })
+    } catch (notificationError) {
+      console.error("Error creating profile update notification:", notificationError)
+      // Non-blocking - continue even if notification fails
+    }
+
+    revalidatePath("/profile")
+    revalidatePath(`/profile/${userId}`)
+
+    return { success: true }
+  } catch (error) {
+    console.error("Unexpected error updating bio:", error)
+    return { error: "An unexpected error occurred. Please try again." }
+  }
+}
+
 // Add a function to upload ID document
 export async function uploadIdDocument(file: File) {
   try {
