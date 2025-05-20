@@ -21,6 +21,7 @@ export async function middleware(req: NextRequest) {
     "/terms",
     "/cookie-policy",
     "/disclaimers",
+    "/about-us"
   ]
   const path = req.nextUrl.pathname
 

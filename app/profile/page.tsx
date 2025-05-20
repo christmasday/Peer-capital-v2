@@ -34,6 +34,9 @@ import { CreatePostCard } from "@/components/profile/create-post-card"
 import { getUserPosts } from "@/lib/actions/posts"
 import { PostsList } from "@/components/profile/posts-list"
 import { ProfileAbout } from "@/components/profile/profile-about"
+import { ProfilePostsWrapper } from "@/components/profile/profile-posts-wrapper"
+import { ConnectionsList } from "@/components/profile/connections-list"
+import { getFollowersCount, getFollowingCount } from "@/lib/actions/connections"
 
 export const dynamic = "force-dynamic"
 export const revalidate = 0
@@ -52,7 +55,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
   const user = userProfile.user
 
   const cookieStore = cookies()
-  const supabase = createServerClient(cookieStore)
+  const supabase = createServerClient()
   const adminClient = createAdminClient()
 
   // Get account balance
@@ -68,17 +71,6 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
     .select("*")
     .eq("user_id", user.id)
     .single()
-
-  // Get followers and following counts
-  const { data: followersCount } = await adminClient
-    .from("user_connections")
-    .select("id", { count: "exact" })
-    .eq("following_id", user.id)
-
-  const { data: followingCount } = await adminClient
-    .from("user_connections")
-    .select("id", { count: "exact" })
-    .eq("follower_id", user.id)
 
   // Format name
   const fullName = `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "User"
@@ -101,6 +93,12 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
   if (postsError) {
     console.error("Error fetching posts:", postsError)
   }
+
+  // Fetch followers and following counts for friends tab
+  const followersResult = await getFollowersCount(user.id)
+  const followingResult = await getFollowingCount(user.id)
+  const followersCount = followersResult.count || 0
+  const followingCount = followingResult.count || 0
 
   // Get active tab from search params or default to "posts"
   const activeTab = searchParams?.tab || "posts"
@@ -206,10 +204,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
             {[
               { name: "Posts", href: "/profile", active: activeTab === "posts" },
               { name: "About", href: "/profile?tab=about", active: activeTab === "about" },
-              { name: "Friends", href: `/profile/${user.id}/connections`, active: activeTab === "friends" },
-              { name: "Photos", href: "/profile?tab=photos", active: activeTab === "photos" },
-              { name: "Videos", href: "/profile?tab=videos", active: activeTab === "videos" },
-              { name: "Reels", href: "/profile?tab=reels", active: activeTab === "reels" },
+              { name: "Friends", href: "/profile/?tab=friends", active: activeTab === "friends" },
               { name: "More", href: "/profile?tab=more", active: activeTab === "more" },
             ].map((tab) => (
               <Link
@@ -232,7 +227,13 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
           </div>
         </div>
 
-        {activeTab === "about" ? (
+        {activeTab === "friends" ? (
+          <ConnectionsList
+            userId={user.id}
+            initialFollowersCount={followersCount}
+            initialFollowingCount={followingCount}
+          />
+        ) : activeTab === "about" ? (
           <ProfileAbout profile={profile} isCurrentUser={true} />
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6" id="overview">
@@ -373,57 +374,8 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
 
             {/* Main Content - Posts section (8/12) */}
             <div className="lg:col-span-8">
-              {/* Create post card */}
-              <CreatePostCard
-                userId={user.id}
-                userName={fullName}
-                userImage={profile.profile_picture_url}
-                onPostCreated={() => {
-                  // In a real implementation, this would refresh the posts
-                }}
-              />
-
-              {/* Posts header */}
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold">Posts</h2>
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" className="text-gray-700 flex items-center gap-1">
-                    <Settings className="h-4 w-4" />
-                    Filters
-                  </Button>
-                  <Button variant="outline" className="text-gray-700 flex items-center gap-1">
-                    <Settings className="h-4 w-4" />
-                    Manage posts
-                  </Button>
-                </div>
-              </div>
-
-              {/* View toggle */}
-              <Card className="mb-4 shadow-sm">
-                <CardContent className="py-2">
-                  <div className="flex items-center">
-                    <Button
-                      variant="ghost"
-                      className="text-blue-600 border-b-2 border-blue-600 rounded-none flex-1 py-2"
-                    >
-                      <Rss className="h-4 w-4 mr-2" />
-                      List view
-                    </Button>
-                    <Button variant="ghost" className="text-gray-600 hover:bg-gray-100 rounded-none flex-1 py-2">
-                      <div className="grid grid-cols-2 gap-0.5 mr-2">
-                        <div className="w-1.5 h-1.5 bg-gray-600"></div>
-                        <div className="w-1.5 h-1.5 bg-gray-600"></div>
-                        <div className="w-1.5 h-1.5 bg-gray-600"></div>
-                        <div className="w-1.5 h-1.5 bg-gray-600"></div>
-                      </div>
-                      Grid view
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Posts list - Using the PostsList component */}
-              <PostsList
+              {/* Create post card and posts list now handled by ProfilePostsWrapper */}
+              <ProfilePostsWrapper
                 userId={user.id}
                 userName={fullName}
                 userImage={profile.profile_picture_url}

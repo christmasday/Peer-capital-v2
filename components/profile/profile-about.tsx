@@ -18,9 +18,7 @@ export function ProfileAbout({ profile, isCurrentUser = false }: ProfileAboutPro
     { id: "work", name: "Work and education", icon: Briefcase },
     { id: "places", name: "Places lived", icon: MapPin },
     { id: "contact", name: "Contact and basic info", icon: Phone },
-    { id: "relationships", name: "Family and relationships", icon: Heart },
     { id: "details", name: "Details about you", icon: User },
-    { id: "events", name: "Life events", icon: Calendar },
   ]
 
   return (
@@ -328,41 +326,6 @@ export function ProfileAbout({ profile, isCurrentUser = false }: ProfileAboutPro
           </div>
         )}
 
-        {activeSection === "relationships" && (
-          <div className="space-y-6">
-            <h2 className="text-xl font-medium">Relationship</h2>
-            <div className="flex items-start gap-4">
-              <div className="mt-1">
-                <Heart className="h-10 w-10 p-2 bg-gray-100 text-gray-500 rounded-full" />
-              </div>
-              <div className="flex-grow">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h3 className="text-lg font-medium">{profile.relationship_status || "Single"}</h3>
-                  </div>
-                  {isCurrentUser && (
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" asChild>
-                      <Link href="/profile/edit?tab=personal">
-                        <Edit className="h-4 w-4" />
-                      </Link>
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <h2 className="text-xl font-medium mt-8">Family Members</h2>
-            <div className="flex items-center gap-4 text-gray-500">
-              <span>No family members to show</span>
-              {isCurrentUser && (
-                <Button variant="outline" size="sm">
-                  <Edit className="h-4 w-4 mr-2" /> Add family member
-                </Button>
-              )}
-            </div>
-          </div>
-        )}
-
         {activeSection === "details" && (
           <div className="space-y-6">
             <h2 className="text-xl font-medium">About You</h2>
@@ -383,21 +346,6 @@ export function ProfileAbout({ profile, isCurrentUser = false }: ProfileAboutPro
               {isCurrentUser && (
                 <Button variant="outline" size="sm">
                   <Edit className="h-4 w-4 mr-2" /> Add pronunciation
-                </Button>
-              )}
-            </div>
-          </div>
-        )}
-
-        {activeSection === "events" && (
-          <div className="space-y-6">
-            <h2 className="text-xl font-medium">Life Events</h2>
-
-            <div className="p-4 text-center text-gray-500 border border-dashed rounded-lg">
-              <p>No life events to show</p>
-              {isCurrentUser && (
-                <Button variant="outline" className="mt-4">
-                  <Edit className="h-4 w-4 mr-2" /> Add life event
                 </Button>
               )}
             </div>

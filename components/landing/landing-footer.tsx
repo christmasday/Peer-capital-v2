@@ -29,7 +29,7 @@ export function LandingFooter() {
             <h3 className="font-semibold text-white text-sm md:text-base mb-3 md:mb-4">Company</h3>
             <ul className="space-y-1 md:space-y-2 text-xs md:text-sm">
               <li>
-                <Link href="/" className="hover:text-white">
+                <Link href="/about-us" className="hover:text-white">
                   About Us
                 </Link>
               </li>
