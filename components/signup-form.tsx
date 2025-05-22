@@ -34,6 +34,7 @@ export type SignupFormData = {
   confirmPassword: string
   profilePicture: File | null
   acceptTerms: boolean
+  referralCode: string
 }
 
 export function SignupForm() {
@@ -56,6 +57,7 @@ export function SignupForm() {
     confirmPassword: "",
     profilePicture: null,
     acceptTerms: false,
+    referralCode: "",
   })
   const [formErrors, setFormErrors] = useState<string[]>([])
   const [stepErrors, setStepErrors] = useState<{ [key: number]: boolean }>({
@@ -140,6 +142,10 @@ export function SignupForm() {
             errors.push("You must be at least 18 years old")
             isValid = false
           }
+        }
+        if (!formData.referralCode.trim()) {
+          errors.push("Referral code is required")
+          isValid = false
         }
         break
       case 2:
@@ -444,7 +450,7 @@ export function SignupForm() {
 
         try {
           // Add timeout to prevent hanging
-          const signupPromise = signUp({
+          const signupResult = await signUp({
             email: formData.email,
             password: formData.password,
             firstName: formData.firstName,
@@ -459,6 +465,7 @@ export function SignupForm() {
             zipCode: formData.zipCode,
             country: formData.country,
             profilePictureUrl: pictureUrl,
+            referralCode: formData.referralCode,
           })
 
           const signupTimeoutPromise = new Promise<{ error: string }>((resolve) => {
@@ -468,7 +475,7 @@ export function SignupForm() {
             }, 15000)
           })
 
-          const result = await Promise.race([signupPromise, signupTimeoutPromise])
+          const result = await Promise.race([signupResult, signupTimeoutPromise])
 
           if (result.error) {
             console.error("Signup error:", result.error)
@@ -493,48 +500,43 @@ export function SignupForm() {
             return
           }
 
-          // Handle warnings from the server
-          if (result.warning) {
-            console.warn("Signup warning:", result.warning)
-            // Show the warning but still proceed with success
-            setFormErrors([result.warning])
-            // Wait a moment to show the warning
-            await new Promise((resolve) => setTimeout(resolve, 2000))
-            setFormErrors([])
+            // Only set signup success and message if result is an object with 'success' and 'message'
+            if (result && typeof result === 'object' && 'success' in result && 'message' in result) {
+              setSignupSuccess(result.success === true)
+              setSuccessMessage(
+                typeof result.message === 'string'
+                  ? result.message
+                  : 'Account created successfully! You will be redirected to the login page in a moment.'
+              )
+            }
+
+            // Redirect to login page on successful signup after 2 seconds
+            setTimeout(() => {
+              router.push("/")
+            }, 2000)
+          } catch (signupError) {
+            console.error("Signup request error:", signupError)
+            setFormErrors(["An error occurred during signup. Please try again later."])
           }
-
-          console.log("Signup successful:", result)
-          setSignupSuccess(true)
-          setSuccessMessage(
-            result.message || "Account created successfully! You will be redirected to the login page in a moment.",
-          )
-
-          // Redirect to login page on successful signup after 2 seconds
-          setTimeout(() => {
-            router.push("/")
-          }, 2000)
-        } catch (signupError) {
-          console.error("Signup request error:", signupError)
-          setFormErrors(["An error occurred during signup. Please try again later."])
+        } catch (error) {
+          console.error("Unexpected signup error:", error)
+          setFormErrors(["An unexpected error occurred. Please try again."])
+        } finally {
+          setIsSubmitting(false)
         }
-      } catch (error) {
-        console.error("Unexpected signup error:", error)
-        setFormErrors(["An unexpected error occurred. Please try again."])
-      } finally {
-        setIsSubmitting(false)
-      }
-    } else {
-      // Find the first step with errors and navigate to it
-      for (let i = 1; i <= totalSteps; i++) {
-        const stepValid = validateStep(i)
-        if (!stepValid) {
-          setCurrentStep(i)
-          window.scrollTo(0, 0)
-          break
+      } else {
+        // Find the first step with errors and navigate to it
+        for (let i = 1; i <= totalSteps; i++) {
+          const stepValid = validateStep(i)
+          if (!stepValid) {
+            setCurrentStep(i)
+            window.scrollTo(0, 0)
+            break
+          }
         }
       }
     }
-  }
+  
 
   // Validate current step when it changes or when form data changes
   useEffect(() => {
@@ -595,7 +597,26 @@ export function SignupForm() {
   const renderStep = () => {
     switch (currentStep) {
       case 1:
-        return <PersonalInfoStep formData={formData} updateFormData={updateFormData} />
+        return (
+          <>
+            <PersonalInfoStep formData={formData} updateFormData={updateFormData} />
+            <div className="mb-4">
+              <label htmlFor="referralCode" className="block text-sm font-medium text-gray-700">
+                Referral Code
+              </label>
+              <input
+                id="referralCode"
+                name="referralCode"
+                type="text"
+                autoComplete="off"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                value={formData.referralCode}
+                onChange={e => updateFormData({ referralCode: e.target.value })}
+                required
+              />
+            </div>
+          </>
+        )
       case 2:
         return <AddressStep formData={formData} updateFormData={updateFormData} />
       case 3:
@@ -607,7 +628,7 @@ export function SignupForm() {
     }
   }
 
-  // Replace the Card wrapper with a div since the Card is now in the parent component
+  // Ensure the function returns JSX
   return (
     <div className="w-full">
       <form onSubmit={handleSubmit}>
@@ -710,3 +731,4 @@ export function SignupForm() {
     </div>
   )
 }
+

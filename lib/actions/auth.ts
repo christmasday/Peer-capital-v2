@@ -67,7 +67,7 @@ export async function refreshJWT(currentToken: string) {
         } else {
           userEmail = userData.user.email
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error getting user email for JWT refresh:", error)
         // Continue with just the user ID
       }
@@ -154,7 +154,7 @@ async function createAuthUser(userData: {
       email: userData.email.toLowerCase(),
       phone: userData.phoneNumber, // Explicitly set the phone field
       encrypted_password: hashedPassword,
-      raw_user_meta_data: userMetadata,
+      raw_user_meta_data: userMetadata as any, // Cast userMetadata to any
       created_at: now,
       updated_at: now,
       email_confirmed_at: now, // Auto-confirm email
@@ -179,12 +179,12 @@ async function createAuthUser(userData: {
       user: {
         id: userId,
         email: userData.email,
-        user_metadata: userMetadata,
+        user_metadata: userMetadata as any, // Cast userMetadata to any
       },
     }
-  } catch (error) {
+  } catch (error: any) { // Explicitly type error
     console.error("Unexpected error creating auth user:", error)
-    return { error: `An unexpected error occurred: ${error instanceof Error ? error.message : String(error)}` }
+    return { error: `An unexpected error occurred: ${error.message}` }
   }
 }
 
@@ -229,7 +229,7 @@ export async function signIn(formData: FormData) {
         last_sign_in_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
-      .eq("id", userData.id)
+      .eq("id", userData.id) // Await update before eq
 
     console.log("User signed in successfully:", userData.id)
 
@@ -896,6 +896,8 @@ async function createUserProfile(
     zipCode?: string
     country: string
     profilePictureUrl?: string | null
+    referred_by: string
+    referral_code: string
   },
 ) {
   try {
@@ -954,6 +956,8 @@ async function createUserProfile(
       zip_code: userData.zipCode || null,
       country: userData.country || "Nigeria", // Default to Nigeria if not provided
       profile_picture_url: userData.profilePictureUrl || null,
+      referred_by: userData.referred_by,
+      referral_code: userData.referral_code,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }
@@ -1025,12 +1029,24 @@ export async function signUp(userData: {
   zipCode?: string
   country: string
   profilePictureUrl?: string | null
+  referralCode: string
 }) {
   try {
     console.log("Starting signup process with data:", {
       ...userData,
       password: "***REDACTED***", // Don't log the password
     })
+
+    // Validate referral code
+    const adminClient = createAdminClient()
+    const { data: referrer, error: referrerError } = await adminClient
+      .from("profiles")
+      .select("id, referral_code")
+      .eq("referral_code", userData.referralCode)
+      .single()
+    if (referrerError || !referrer) {
+      return { error: "Invalid referral code. Please enter a valid code from an existing user." }
+    }
 
     // First check if user with email already exists
     const existsCheck = await checkEmailExists(userData.email)
@@ -1051,11 +1067,15 @@ export async function signUp(userData: {
     const userId = authResult.user.id
     console.log("Auth user created successfully with ID:", userId)
 
-    // Add a small delay to ensure the auth user is fully committed to the database
-    await new Promise((resolve) => setTimeout(resolve, 500))
+    // Generate a unique referral code for the new user
+    const newReferralCode = Math.random().toString(36).substring(2, 10).toUpperCase()
 
-    // Step 2: Create the user profile
-    const profileResult = await createUserProfile(userId, userData)
+    // Step 2: Create the user profile, including referred_by and referral_code
+    const profileResult = await createUserProfile(userId, {
+      ...userData,
+      referred_by: userData.referralCode,
+      referral_code: newReferralCode,
+    })
 
     if (!profileResult.success) {
       console.error("Failed to create user profile:", profileResult.error)
@@ -1254,38 +1274,21 @@ async function ensurePasswordResetTokensTable() {
     }
 
     // Fallback to executeSQL function
-    const { success, error } = await executeSQL(createTableSQL)
+    const { success, result, error } = await executeSQL(createTableSQL)
 
-    if (!success) {
-      console.error("Error creating password_reset_tokens table:", error)
-
-      // One last attempt - try a simpler table structure
-      const simpleCreateTableSQL = `
-        CREATE TABLE IF NOT EXISTS password_reset_tokens (
-          id TEXT PRIMARY KEY,
-          user_id TEXT NOT NULL,
-          token TEXT NOT NULL,
-          created_at TEXT NOT NULL,
-          expires_at TEXT NOT NULL,
-          used BOOLEAN NOT NULL DEFAULT FALSE
-        );
-      `
-
-      const { success: simpleSuccess, error: simpleError } = await executeSQL(simpleCreateTableSQL)
-
-      if (!simpleSuccess) {
-        console.error("Error creating simplified password_reset_tokens table:", simpleError)
-        return false
-      }
-
-      console.log("Simplified password_reset_tokens table created successfully")
-      return true
+    if (success && result && result.length > 0) {
+      const exists = result[0].exists
+      console.log(`Table password_reset_tokens exists: ${exists} (method 3)`)
+      return exists
+    } else if (error) {
+      console.log(`Error with executeSQL method:`, error)
     }
 
-    console.log("password_reset_tokens table created successfully using executeSQL")
-    return true
+    // If all methods fail, assume the table doesn't exist
+    console.log(`Could not definitively determine if table password_reset_tokens exists, assuming it doesn't`)
+    return false
   } catch (error) {
-    console.error("Unexpected error in ensurePasswordResetTokensTable:", error)
+    console.error(`Unexpected error in ensurePasswordResetTokensTable:`, error)
     return false
   }
 }
@@ -1632,46 +1635,18 @@ export async function getUserProfile() {
     console.log("Getting profile for user:", userId)
     const adminClient = createAdminClient()
 
-    // Rest of the function remains the same...
+    // Fetch user profile data using admin client to bypass RLS
+    const { data: profile, error: profileError } = await adminClient
+      .from("profiles")
+      .select("*" // Select all columns to include new social media fields
+      )
+      .eq("id", userId)
+      .single()
 
-    // Get user data from auth_users
-    let userData = null
-    try {
-      const { data, error } = await adminClient.from("auth_users").select("*").eq("id", userId).single()
-
-      if (error) {
-        console.error("Error fetching user data:", error)
-      } else {
-        userData = {
-          id: data.id,
-          email: data.email,
-          user_metadata: data.raw_user_meta_data || {},
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching user data:", error)
-    }
-
-    // Ensure the user has a profile
-    try {
-      await ensureUserProfile(userId)
-    } catch (profileError) {
-      console.error("Error ensuring user profile:", profileError)
-      // Continue anyway to try to get whatever profile data exists
-    }
-
-    // Get profile data
-    let profileData = null
-    try {
-      const { data, error } = await adminClient.from("profiles").select("*").eq("id", userId).single()
-
-      if (error) {
-        console.error("Error fetching profile:", error)
-      } else {
-        profileData = data
-      }
-    } catch (error) {
-      console.error("Error fetching profile:", error)
+    if (profileError) {
+      console.error("Error fetching profile:", profileError)
+      // Continue with fallback data
+      return fallbackUserData
     }
 
     // Get account data
@@ -1690,13 +1665,8 @@ export async function getUserProfile() {
 
     // Return whatever data we have, even if some parts are missing
     return {
-      user: userData || { id: userId, email: "user@example.com" },
-      profile: profileData || {
-        id: userId,
-        first_name: userData?.user_metadata?.first_name || "User",
-        last_name: userData?.user_metadata?.last_name || "",
-        profile_picture_url: userData?.user_metadata?.profile_picture_url || "/vibrant-street-market.png",
-      },
+      user: { id: userId, email: "user@example.com" },
+      profile: profile,
       account: accountData || { balance: 120000, loan_balance: 50000 },
     }
   } catch (error) {

@@ -6,6 +6,7 @@ import { cookies } from "next/headers"
 import { revalidatePath } from "next/cache"
 import { createProfileActivityNotification } from "./activity-notifications"
 import { v4 as uuidv4 } from "uuid"
+import { Database } from "@/lib/supabase/database.types"
 
 // Function to determine if the app is running in offline mode
 function isOfflineMode(): boolean {
@@ -16,7 +17,7 @@ function isOfflineMode(): boolean {
 async function getCurrentUserId() {
   try {
     const cookieStore = cookies()
-    const supabase = createServerClient(cookieStore)
+    const supabase = createServerClient()
     const adminClient = createAdminClient()
 
     // Method 1: Try to get user from Supabase session
@@ -25,7 +26,7 @@ async function getCurrentUserId() {
       if (sessionData.session?.user) {
         return { userId: sessionData.session.user.id, method: "supabase-session" }
       }
-    } catch (sessionError) {
+    } catch (sessionError: any) {
       console.error("Error getting session:", sessionError)
       // Continue to next method
     }
@@ -47,7 +48,8 @@ async function getCurrentUserId() {
 
     // Method 3: Try to get user from custom auth token
     try {
-      const customAuthToken = cookieStore.get("custom-auth-token")?.value
+      const cookieStoreResolved = cookies()
+      const customAuthToken = cookieStoreResolved.get("custom-auth-token")?.value
       if (customAuthToken) {
         const { data, error } = await adminClient
           .from("auth_users")
@@ -91,7 +93,7 @@ async function ensureBucketExists(bucketName: string) {
       return { error: `Failed to list buckets: ${listError.message}` }
     }
 
-    const bucketExists = buckets?.some((bucket) => bucket.name === bucketName)
+    const bucketExists = buckets?.some((bucket: { name: string }) => bucket.name === bucketName)
 
     if (!bucketExists) {
       console.log(`Creating ${bucketName} bucket...`)
@@ -110,9 +112,9 @@ async function ensureBucketExists(bucketName: string) {
     }
 
     return { success: true }
-  } catch (error) {
+  } catch (error: any) {
     console.error(`Unexpected error ensuring ${bucketName} bucket:`, error)
-    return { error: `An unexpected error occurred while checking/creating the ${bucketName} bucket` }
+    return { error: `An unexpected error occurred while checking/creating the ${bucketName} bucket: ${error.message}` }
   }
 }
 
@@ -129,7 +131,7 @@ async function createBucketIfNotExists(bucketName: string) {
       return { success: false, error: `Failed to list buckets: ${listError.message}` }
     }
 
-    const bucketExists = buckets?.some((bucket) => bucket.name === bucketName)
+    const bucketExists = buckets?.some((bucket: { name: string }) => bucket.name === bucketName)
 
     if (!bucketExists) {
       // Create the bucket
@@ -148,7 +150,7 @@ async function createBucketIfNotExists(bucketName: string) {
     }
 
     return { success: true }
-  } catch (error) {
+  } catch (error: any) {
     console.error(`Error in createBucketIfNotExists:`, error)
     return { success: false, error: `An unexpected error occurred: ${error.message}` }
   }
@@ -302,9 +304,10 @@ export async function updateProfile({
       if (dateOfBirth) bvnDateObject.date_of_birth = dateOfBirth
 
       try {
-        await adminClient.from("profiles").update(bvnDateObject).eq("id", userId)
-      } catch (err) {
-        console.warn("Could not update BVN or date of birth fields:", err)
+        const { error: bvnDateError } = await adminClient.from("profiles").update(bvnDateObject).eq("id", userId)
+        if (bvnDateError) console.warn("Could not update BVN or date of birth fields:", bvnDateError)
+      } catch (err: any) {
+        console.warn("Could not update BVN or date of birth fields (catch):", err)
         // Continue with other updates
       }
     }
@@ -317,9 +320,10 @@ export async function updateProfile({
       if (idDocumentUrl) idVerificationObject.id_document_url = idDocumentUrl
 
       try {
-        await adminClient.from("profiles").update(idVerificationObject).eq("id", userId)
-      } catch (err) {
-        console.warn("Could not update ID verification fields:", err)
+        const { error: idVerificationError } = await adminClient.from("profiles").update(idVerificationObject).eq("id", userId)
+        if (idVerificationError) console.warn("Could not update ID verification fields:", idVerificationError)
+      } catch (err: any) {
+        console.warn("Could not update ID verification fields (catch):", err)
         // Continue with other updates
       }
     }
@@ -340,9 +344,10 @@ export async function updateProfile({
         try {
           const updateObj: any = {}
           updateObj[fieldName] = value
-          await adminClient.from("profiles").update(updateObj).eq("id", userId)
-        } catch (err) {
-          console.warn(`Could not update ${fieldName} field:`, err)
+          const { error: employmentError } = await adminClient.from("profiles").update(updateObj).eq("id", userId)
+          if (employmentError) console.warn(`Could not update ${fieldName} field:`, employmentError)
+        } catch (err: any) {
+          console.warn(`Could not update ${fieldName} field (catch):`, err)
           // Continue with other fields
         }
       }
@@ -365,30 +370,29 @@ export async function updateProfile({
       if (accountName) withdrawalAccountObject.account_name = accountName
 
       try {
-        await adminClient.from("profiles").update(withdrawalAccountObject).eq("id", userId)
-      } catch (err) {
-        console.warn("Could not update withdrawal account fields:", err)
+        const { error: withdrawalError } = await adminClient.from("profiles").update(withdrawalAccountObject).eq("id", userId)
+        if (withdrawalError) console.warn("Could not update withdrawal account fields:", withdrawalError)
+      } catch (err: any) {
+        console.warn("Could not update withdrawal account fields (catch):", err)
         // Continue with other updates
       }
     }
 
     // Create activity notification for profile update
     try {
-      await createProfileActivityNotification({
-        userId,
-        type: "updated",
-        details: "Your profile information has been updated successfully",
-      })
-    } catch (notificationError) {
+      if (userId) {
+        await createProfileActivityNotification({ userId: userId as string, type: "updated", details: "Your profile information has been updated successfully" })
+      }
+    } catch (notificationError: any) {
       console.error("Error creating profile update notification:", notificationError)
       // Non-blocking - continue even if notification fails
     }
 
     revalidatePath("/profile")
     return { success: true }
-  } catch (error) {
+  } catch (error: any) {
     console.error("Unexpected error updating profile:", error)
-    return { error: "An unexpected error occurred. Please try again." }
+    return { error: `An unexpected error occurred. ${error.message}` }
   }
 }
 
@@ -802,5 +806,41 @@ export async function uploadProfilePicture(file: File) {
   } catch (error) {
     console.error("Unexpected error uploading profile picture:", error)
     return { error: "An unexpected error occurred. Please try again." }
+  }
+}
+
+export async function updateSocialMedia(
+  userId: string,
+  socialMediaData: {
+    facebook_url: string;
+    linkedin_url: string;
+    twitter_url: string;
+    website: string;
+  }
+) {
+  try {
+    // Use the admin client for direct database operations within server actions
+    const adminClient = createAdminClient();
+
+    const { data, error } = await adminClient
+      .from("profiles")
+      .update({
+        facebook_url: socialMediaData.facebook_url || null,
+        linkedin_url: socialMediaData.linkedin_url || null,
+        twitter_url: socialMediaData.twitter_url || null,
+        website: socialMediaData.website || null,
+      })
+      .eq("id", userId); // Await update before eq
+
+    if (error) {
+      console.error("Error updating social media:", error)
+      return { success: false, error: error.message }
+    }
+
+    console.log("Social media updated successfully for user:", userId)
+    return { success: true }
+  } catch (error: any) {
+    console.error("Unexpected error updating social media:", error)
+    return { success: false, error: "An unexpected error occurred." }
   }
 }

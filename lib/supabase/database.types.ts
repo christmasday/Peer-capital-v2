@@ -43,6 +43,14 @@ export interface Database {
           account_name?: string | null
           // Bio field
           bio?: string | null
+          // Referral fields
+          referral_code?: string | null
+          referred_by?: string | null
+          // Social Media fields
+          facebook_url?: string | null
+          linkedin_url?: string | null
+          twitter_url?: string | null
+          website?: string | null
         }
         Insert: {
           id: string
@@ -83,6 +91,14 @@ export interface Database {
           account_name?: string | null
           // Bio field
           bio?: string | null
+          // Referral fields
+          referral_code?: string | null
+          referred_by?: string | null
+          // Social Media fields
+          facebook_url?: string | null
+          linkedin_url?: string | null
+          twitter_url?: string | null
+          website?: string | null
         }
         Update: {
           id?: string
@@ -121,6 +137,14 @@ export interface Database {
           account_name?: string | null
           // Bio field
           bio?: string | null
+          // Referral fields
+          referral_code?: string | null
+          referred_by?: string | null
+          // Social Media fields
+          facebook_url?: string | null
+          linkedin_url?: string | null
+          twitter_url?: string | null
+          website?: string | null
         }
       }
       user_connections: {
