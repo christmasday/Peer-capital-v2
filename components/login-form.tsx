@@ -118,7 +118,8 @@ export function LoginForm() {
           onChange={(e) => setEmail(e.target.value)}
           placeholder="name@example.com"
           required
-          className="w-full"
+          className="w-full border-x-0 border-t-0 border-b-3 rounded-none"
+          isError={!!error}
         />
       </div>
 
@@ -136,7 +137,8 @@ export function LoginForm() {
           onChange={(e) => setPassword(e.target.value)}
           placeholder="••••••••"
           required
-          className="w-full"
+          className="w-full border-x-0 border-t-0 border-b-3 rounded-none"
+          isError={!!error}
         />
       </div>
 

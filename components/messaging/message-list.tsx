@@ -5,6 +5,7 @@ import { type MessageWithProfile, getMessages } from "@/lib/actions/messages"
 import { MessageItem } from "@/components/messaging/message-item"
 import { Button } from "@/components/ui/button"
 import { Loader2 } from "lucide-react"
+import { useSupabaseClient } from "@/components/supabase/SupabaseProvider"
 
 interface MessageListProps {
   otherUserId: string
@@ -20,6 +21,7 @@ export function MessageList({ otherUserId, currentUserId, onNewMessage }: Messag
   const [hasMore, setHasMore] = useState(true)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const { supabase } = useSupabaseClient()
 
   const fetchMessages = async (pageNum = 1, append = false) => {
     try {
@@ -59,16 +61,40 @@ export function MessageList({ otherUserId, currentUserId, onNewMessage }: Messag
 
   useEffect(() => {
     loadMessages()
-
-    // Set up polling for new messages
-    const interval = setInterval(() => {
-      if (!isLoading && !isLoadingMore) {
-        fetchMessages()
-      }
-    }, 10000) // Poll every 10 seconds
-
-    return () => clearInterval(interval)
-  }, [otherUserId])
+    // Set up Supabase Realtime subscription for new messages
+    if (!supabase || !currentUserId || !otherUserId) return
+    const channel = supabase
+      .channel('user-messages')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `or(recipient_id.eq.${currentUserId},sender_id.eq.${currentUserId})`,
+        },
+        (payload) => {
+          const msg = payload.new as MessageWithProfile
+          // Only add if it's for this conversation
+          if (
+            (msg.sender_id === currentUserId && msg.recipient_id === otherUserId) ||
+            (msg.sender_id === otherUserId && msg.recipient_id === currentUserId)
+          ) {
+            setMessages((prev) => [...prev, msg])
+            setTimeout(() => {
+              if (messagesEndRef.current) {
+                messagesEndRef.current.scrollIntoView({ behavior: "smooth" })
+              }
+            }, 100)
+            new Audio("/message.mp3").play()
+          }
+        }
+      )
+      .subscribe()
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [supabase, currentUserId, otherUserId])
 
   useEffect(() => {
     // Scroll to bottom when messages change

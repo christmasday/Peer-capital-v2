@@ -6,6 +6,7 @@ import { useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import type { SignupFormData } from "@/components/signup-form"
+import { cn } from "@/lib/utils"
 
 interface PersonalInfoStepProps {
   formData: SignupFormData
@@ -116,7 +117,8 @@ export function PersonalInfoStep({ formData, updateFormData }: PersonalInfoStepP
           value={formData.firstName}
           onChange={handleChange}
           onBlur={handleBlur}
-          className={errors.firstName ? "border-red-500" : ""}
+          className="w-full"
+          isError={!!errors.firstName}
         />
         {errors.firstName && <p className="text-sm text-red-500">{errors.firstName}</p>}
       </div>
@@ -128,6 +130,7 @@ export function PersonalInfoStep({ formData, updateFormData }: PersonalInfoStepP
           name="middleName"
           value={formData.middleName}
           onChange={(e) => updateFormData({ middleName: e.target.value })}
+          className="w-full"
         />
       </div>
 
@@ -141,7 +144,8 @@ export function PersonalInfoStep({ formData, updateFormData }: PersonalInfoStepP
           value={formData.lastName}
           onChange={handleChange}
           onBlur={handleBlur}
-          className={errors.lastName ? "border-red-500" : ""}
+          className="w-full"
+          isError={!!errors.lastName}
         />
         {errors.lastName && <p className="text-sm text-red-500">{errors.lastName}</p>}
       </div>
@@ -157,7 +161,8 @@ export function PersonalInfoStep({ formData, updateFormData }: PersonalInfoStepP
           value={formData.email}
           onChange={handleChange}
           onBlur={handleBlur}
-          className={errors.email ? "border-red-500" : ""}
+          className="w-full"
+          isError={!!errors.email}
         />
         {errors.email && <p className="text-sm text-red-500">{errors.email}</p>}
       </div>
@@ -174,7 +179,8 @@ export function PersonalInfoStep({ formData, updateFormData }: PersonalInfoStepP
           onChange={handleChange}
           onBlur={handleBlur}
           maxLength={11}
-          className={errors.phoneNumber ? "border-red-500" : ""}
+          className="w-full"
+          isError={!!errors.phoneNumber}
         />
         {errors.phoneNumber && <p className="text-sm text-red-500">{errors.phoneNumber}</p>}
       </div>
@@ -190,7 +196,8 @@ export function PersonalInfoStep({ formData, updateFormData }: PersonalInfoStepP
           onChange={handleChange}
           onBlur={handleBlur}
           maxLength={11}
-          className={errors.bvn ? "border-red-500" : ""}
+          className="w-full"
+          isError={!!errors.bvn}
         />
         {errors.bvn && <p className="text-sm text-red-500">{errors.bvn}</p>}
       </div>
@@ -206,7 +213,8 @@ export function PersonalInfoStep({ formData, updateFormData }: PersonalInfoStepP
           value={formData.dateOfBirth}
           onChange={handleChange}
           onBlur={handleBlur}
-          className={errors.dateOfBirth ? "border-red-500" : ""}
+          className="w-full"
+          isError={!!errors.dateOfBirth}
         />
         {errors.dateOfBirth && <p className="text-sm text-red-500">{errors.dateOfBirth}</p>}
       </div>

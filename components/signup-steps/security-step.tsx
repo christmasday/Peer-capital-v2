@@ -7,6 +7,7 @@ import { Eye, EyeOff } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import type { SignupFormData } from "@/components/signup-form"
+import { cn } from "@/lib/utils"
 
 interface SecurityStepProps {
   formData: SignupFormData
@@ -88,7 +89,8 @@ export function SecurityStep({ formData, updateFormData }: SecurityStepProps) {
             type={showPassword ? "text" : "password"}
             value={formData.password}
             onChange={handlePasswordChange}
-            className={errors.password ? "border-red-500 pr-10" : "pr-10"}
+            className="w-full pr-10"
+            isError={!!errors.password}
           />
           <button
             type="button"
@@ -122,7 +124,8 @@ export function SecurityStep({ formData, updateFormData }: SecurityStepProps) {
             type={showConfirmPassword ? "text" : "password"}
             value={formData.confirmPassword}
             onChange={handleConfirmPasswordChange}
-            className={errors.confirmPassword ? "border-red-500 pr-10" : "pr-10"}
+            className="w-full pr-10"
+            isError={!!errors.confirmPassword}
           />
           <button
             type="button"

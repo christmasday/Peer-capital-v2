@@ -4,12 +4,16 @@ import { cn } from "@/lib/utils"
 
 const Textarea = React.forwardRef<
   HTMLTextAreaElement,
-  React.ComponentProps<"textarea">
->(({ className, ...props }, ref) => {
+  React.ComponentPropsWithoutRef<"textarea"> & { isError?: boolean }
+>(({ className, isError, ...props }, ref) => {
   return (
     <textarea
       className={cn(
-        "flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+        "flex min-h-[80px] w-full bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:border-b-3 focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-50 rounded-none md:text-sm",
+        "border-b-3 border-solid !important",
+        isError ? "border-b-red-500 !important" : "",
+        !isError && "focus-visible:border-b-green-600 !important",
+        !isError && "border-b-blue-600 !important",
         className
       )}
       ref={ref}

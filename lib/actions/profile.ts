@@ -10,7 +10,7 @@ import { Database } from "@/lib/supabase/database.types"
 
 // Function to determine if the app is running in offline mode
 function isOfflineMode(): boolean {
-  return process.env.OFFLINE_MODE === "true"
+  return process.env.OFFLINE_MODE === 'true'
 }
 
 // Enhanced function to get the current user ID with multiple fallbacks
@@ -48,7 +48,7 @@ async function getCurrentUserId() {
 
     // Method 3: Try to get user from custom auth token
     try {
-      const cookieStoreResolved = cookies()
+      const cookieStoreResolved = await cookies()
       const customAuthToken = cookieStoreResolved.get("custom-auth-token")?.value
       if (customAuthToken) {
         const { data, error } = await adminClient
@@ -78,7 +78,7 @@ async function getCurrentUserId() {
 async function ensureBucketExists(bucketName: string) {
   try {
     if (isOfflineMode()) {
-      console.log(`Skipping ${bucketName} bucket creation in offline mode`)
+      console.log(`Skipping ${bucketName} bucket check/creation in offline mode`)
       return { success: true }
     }
 
@@ -86,7 +86,8 @@ async function ensureBucketExists(bucketName: string) {
 
     // Check if the bucket exists
     console.log(`Checking if ${bucketName} bucket exists...`)
-    const { data: buckets, error: listError } = await adminClient.storage.listBuckets()
+    const { data: buckets, error: listError } = await adminClient.storage
+      .listBuckets()
 
     if (listError) {
       console.error(`Error listing buckets:`, listError)
@@ -97,9 +98,12 @@ async function ensureBucketExists(bucketName: string) {
 
     if (!bucketExists) {
       console.log(`Creating ${bucketName} bucket...`)
-      const { error: createError } = await adminClient.storage.createBucket(bucketName, {
-        public: true,
-      })
+      const { error: createError } = await adminClient.storage.createBucket(
+        bucketName,
+        {
+          public: true,
+        }
+      )
 
       if (createError) {
         console.error(`Error creating ${bucketName} bucket:`, createError)
@@ -121,10 +125,16 @@ async function ensureBucketExists(bucketName: string) {
 // Helper function to create a storage bucket if it doesn't exist
 async function createBucketIfNotExists(bucketName: string) {
   try {
+    if (isOfflineMode()) {
+      console.log(`Skipping ${bucketName} bucket creation in offline mode`)
+      return { success: true }
+    }
+
     const adminClient = createAdminClient()
 
     // Check if the bucket exists
-    const { data: buckets, error: listError } = await adminClient.storage.listBuckets()
+    const { data: buckets, error: listError } = await adminClient.storage
+      .listBuckets()
 
     if (listError) {
       console.error(`Error listing buckets:`, listError)
@@ -135,9 +145,12 @@ async function createBucketIfNotExists(bucketName: string) {
 
     if (!bucketExists) {
       // Create the bucket
-      const { error: createError } = await adminClient.storage.createBucket(bucketName, {
-        public: true,
-      })
+      const { error: createError } = await adminClient.storage.createBucket(
+        bucketName,
+        {
+          public: true,
+        }
+      )
 
       if (createError) {
         console.error(`Error creating ${bucketName} bucket:`, createError)
@@ -156,67 +169,52 @@ async function createBucketIfNotExists(bucketName: string) {
   }
 }
 
-// Update the updateProfile function to validate userId before database operations
-export async function updateProfile({
-  firstName,
-  middleName,
-  lastName,
-  phoneNumber,
-  address,
-  city,
-  state,
-  zipCode,
-  profilePictureUrl,
-  bvn,
-  dateOfBirth,
-  // ID verification fields
-  idType,
-  idNumber,
-  idDocumentUrl,
-  // Employment information fields
-  employmentStatus,
-  employerName,
-  employerAddress,
-  workPhone,
-  jobTitle,
-  monthlyIncome,
-  employmentStartDate,
-  employmentEndDate,
-  // Withdrawal account fields
-  bankName,
-  accountNumber,
-  accountName,
-}: {
-  firstName: string
-  middleName?: string
-  lastName: string
-  phoneNumber: string
-  address: string
-  city: string
-  state: string
-  zipCode?: string
-  profilePictureUrl?: string | null
-  bvn?: string
-  dateOfBirth?: string
-  // ID verification fields
-  idType?: string
-  idNumber?: string
-  idDocumentUrl?: string | null
-  // Employment information fields
-  employmentStatus?: string
-  employerName?: string
-  employerAddress?: string
-  workPhone?: string
-  jobTitle?: string
-  monthlyIncome?: number
-  employmentStartDate?: string
-  employmentEndDate?: string
-  // Withdrawal account fields
-  bankName?: string
-  accountNumber?: string
-  accountName?: string
-}) {
+// Add all possible fields to the type
+type UpdateProfileInput = {
+  firstName?: string;
+  middleName?: string;
+  lastName?: string;
+  phoneNumber?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  profilePictureUrl?: string | null;
+  bvn?: string;
+  dateOfBirth?: string;
+  idType?: string;
+  idNumber?: string;
+  idDocumentUrl?: string | null;
+  employmentStatus?: string;
+  employerName?: string;
+  employerAddress?: string;
+  workPhone?: string;
+  jobTitle?: string;
+  monthlyIncome?: number;
+  employmentStartDate?: string;
+  employmentEndDate?: string;
+  bankName?: string;
+  accountNumber?: string;
+  accountName?: string;
+  schoolName?: string;
+  degree?: string;
+  fieldOfStudy?: string;
+  graduationYear?: number;
+  maritalStatus?: string;
+  numberOfDependants?: number | null;
+  lendingLicenseUrl?: string | null;
+  loanAmountOffered?: number;
+  interestRate?: number;
+  paybackPeriodWeeks?: number;
+};
+
+export async function updateProfile(input: UpdateProfileInput) {
   try {
+    if (isOfflineMode()) {
+      console.log("Skipping profile update in offline mode")
+      // Return a mock success response, adjust as needed based on expected behavior
+      return { success: true, data: {} };
+    }
     const supabase = createServerClient()
     const adminClient = createAdminClient()
 
@@ -253,152 +251,123 @@ export async function updateProfile({
       }
     }
 
-    // If we still don't have a user ID, return an error
-    if (!userId || userId === "undefined") {
-      console.error("No authenticated user found for profile update or invalid user ID:", userId)
-      return { error: "Authentication failed. Please try logging in again." }
-    }
-
-    // First, try to get the current profile to check which fields exist
-    const { data: currentProfile, error: profileError } = await adminClient
-      .from("profiles")
-      .select("*")
-      .eq("id", userId)
-      .single()
-
-    if (profileError) {
-      console.error("Error fetching current profile:", profileError)
-      return { error: "Failed to fetch current profile" }
-    }
-
-    // Split the update into two parts: basic fields and extended fields
-    // Basic fields are guaranteed to exist in the schema
-    const basicUpdateObject = {
-      first_name: firstName,
-      middle_name: middleName || null,
-      last_name: lastName,
-      phone_number: phoneNumber,
-      address: address,
-      city: city,
-      state: state,
-      zip_code: zipCode || null,
-      profile_picture_url: profilePictureUrl || null,
-      updated_at: new Date().toISOString(),
-    }
-
-    // Update basic fields first
-    const { error: basicUpdateError } = await adminClient.from("profiles").update(basicUpdateObject).eq("id", userId)
-
-    if (basicUpdateError) {
-      console.error("Error updating basic profile fields:", basicUpdateError)
-      return { error: basicUpdateError.message }
-    }
-
-    // Now try to update the extended fields if they exist in the current profile
-    // We'll do this in separate updates to isolate any schema issues
-
-    // Update BVN and date of birth if they exist in the schema
-    if (bvn || dateOfBirth) {
-      const bvnDateObject: any = {}
-      if (bvn) bvnDateObject.bvn = bvn
-      if (dateOfBirth) bvnDateObject.date_of_birth = dateOfBirth
-
+    // Method 3: Try to get user from custom auth token if other methods failed
+    if (!userId) {
       try {
-        const { error: bvnDateError } = await adminClient.from("profiles").update(bvnDateObject).eq("id", userId)
-        if (bvnDateError) console.warn("Could not update BVN or date of birth fields:", bvnDateError)
-      } catch (err: any) {
-        console.warn("Could not update BVN or date of birth fields (catch):", err)
-        // Continue with other updates
-      }
-    }
+        const cookieStoreResolved = await cookies()
+        const customAuthToken = cookieStoreResolved.get("custom-auth-token")?.value
+        if (customAuthToken) {
+          const { data, error } = await adminClient
+            .from("auth_users")
+            .select("id")
+            .eq("access_token", customAuthToken)
+            .single()
 
-    // Update ID verification fields if they exist in the schema
-    if (idType || idNumber || idDocumentUrl) {
-      const idVerificationObject: any = {}
-      if (idType) idVerificationObject.id_type = idType
-      if (idNumber) idVerificationObject.id_number = idNumber
-      if (idDocumentUrl) idVerificationObject.id_document_url = idDocumentUrl
-
-      try {
-        const { error: idVerificationError } = await adminClient.from("profiles").update(idVerificationObject).eq("id", userId)
-        if (idVerificationError) console.warn("Could not update ID verification fields:", idVerificationError)
-      } catch (err: any) {
-        console.warn("Could not update ID verification fields (catch):", err)
-        // Continue with other updates
-      }
-    }
-
-    // Update employment fields if they exist in the schema
-    if (
-      employmentStatus ||
-      employerName ||
-      employerAddress ||
-      workPhone ||
-      jobTitle ||
-      monthlyIncome !== undefined ||
-      employmentStartDate ||
-      employmentEndDate
-    ) {
-      // Try updating each employment field individually to isolate schema issues
-      const updateEmploymentField = async (fieldName: string, value: any) => {
-        try {
-          const updateObj: any = {}
-          updateObj[fieldName] = value
-          const { error: employmentError } = await adminClient.from("profiles").update(updateObj).eq("id", userId)
-          if (employmentError) console.warn(`Could not update ${fieldName} field:`, employmentError)
-        } catch (err: any) {
-          console.warn(`Could not update ${fieldName} field (catch):`, err)
-          // Continue with other fields
+          if (!error && data) {
+            userId = data.id
+            console.log("Using user ID from custom auth token for profile update:", userId)
+          }
         }
-      }
-
-      if (employmentStatus) await updateEmploymentField("employment_status", employmentStatus)
-      if (employerName) await updateEmploymentField("employer_name", employerName)
-      if (employerAddress) await updateEmploymentField("employer_address", employerAddress)
-      if (workPhone) await updateEmploymentField("work_phone", workPhone)
-      if (jobTitle) await updateEmploymentField("job_title", jobTitle)
-      if (monthlyIncome !== undefined) await updateEmploymentField("monthly_income", monthlyIncome)
-      if (employmentStartDate) await updateEmploymentField("employment_start_date", employmentStartDate)
-      if (employmentEndDate) await updateEmploymentField("employment_end_date", employmentEndDate)
-    }
-
-    // Update withdrawal account fields
-    if (bankName || accountNumber || accountName) {
-      const withdrawalAccountObject: any = {}
-      if (bankName) withdrawalAccountObject.bank_name = bankName
-      if (accountNumber) withdrawalAccountObject.account_number = accountNumber
-      if (accountName) withdrawalAccountObject.account_name = accountName
-
-      try {
-        const { error: withdrawalError } = await adminClient.from("profiles").update(withdrawalAccountObject).eq("id", userId)
-        if (withdrawalError) console.warn("Could not update withdrawal account fields:", withdrawalError)
-      } catch (err: any) {
-        console.warn("Could not update withdrawal account fields (catch):", err)
-        // Continue with other updates
+      } catch (customAuthError) {
+        console.error("Error checking custom auth token for profile update:", customAuthError)
+        // Continue to next method
       }
     }
+
+    if (!userId) {
+      console.error("User ID not found after multiple attempts.");
+      return { success: false, error: "Authentication failed." };
+    }
+
+    // Build update object
+    const updateData: any = {};
+    if (input.firstName !== undefined) updateData.first_name = input.firstName;
+    if (input.middleName !== undefined) updateData.middle_name = input.middleName;
+    if (input.lastName !== undefined) updateData.last_name = input.lastName;
+    if (input.phoneNumber !== undefined) updateData.phone_number = input.phoneNumber;
+    if (input.address !== undefined) updateData.address = input.address;
+    if (input.city !== undefined) updateData.city = input.city;
+    if (input.state !== undefined) updateData.state = input.state;
+    if (input.zipCode !== undefined) updateData.zip_code = input.zipCode;
+    if (input.profilePictureUrl !== undefined) updateData.profile_picture_url = input.profilePictureUrl;
+    if (input.bvn !== undefined) updateData.bvn = input.bvn;
+    if (input.dateOfBirth !== undefined) updateData.date_of_birth = input.dateOfBirth;
+    if (input.idType !== undefined) updateData.id_type = input.idType;
+    if (input.idNumber !== undefined) updateData.id_number = input.idNumber;
+    if (input.idDocumentUrl !== undefined) updateData.id_document_url = input.idDocumentUrl;
+    if (input.employmentStatus !== undefined) updateData.employment_status = input.employmentStatus;
+    if (input.employerName !== undefined) updateData.employer_name = input.employerName;
+    if (input.employerAddress !== undefined) updateData.employer_address = input.employerAddress;
+    if (input.workPhone !== undefined) updateData.work_phone = input.workPhone;
+    if (input.jobTitle !== undefined) updateData.job_title = input.jobTitle;
+    if (input.monthlyIncome !== undefined) updateData.monthly_income = input.monthlyIncome;
+    if (input.employmentStartDate !== undefined) updateData.employment_start_date = input.employmentStartDate;
+    if (input.employmentEndDate !== undefined) updateData.employment_end_date = input.employmentEndDate;
+    if (input.bankName !== undefined) updateData.bank_name = input.bankName;
+    if (input.accountNumber !== undefined) updateData.account_number = input.accountNumber;
+    if (input.accountName !== undefined) updateData.account_name = input.accountName;
+    if (input.schoolName !== undefined) updateData.school_name = input.schoolName;
+    if (input.degree !== undefined) updateData.degree = input.degree;
+    if (input.fieldOfStudy !== undefined) updateData.field_of_study = input.fieldOfStudy;
+    if (input.graduationYear !== undefined) updateData.graduation_year = input.graduationYear;
+    // New fields
+    if (input.maritalStatus !== undefined) updateData.marital_status = input.maritalStatus;
+    if (input.numberOfDependants !== undefined) updateData.number_of_dependants = input.numberOfDependants;
+    if (input.lendingLicenseUrl !== undefined) updateData.lending_license_url = input.lendingLicenseUrl;
+    if (input.loanAmountOffered !== undefined) updateData.loan_amount_offered = input.loanAmountOffered;
+    if (input.interestRate !== undefined) updateData.interest_rate = input.interestRate;
+    if (input.paybackPeriodWeeks !== undefined) updateData.payback_period_weeks = input.paybackPeriodWeeks;
+
+    if (Object.keys(updateData).length === 0) {
+        return { success: false, error: "No fields to update." };
+    }
+
+    const { data, error } = await adminClient
+      .from("profiles")
+      .update(updateData)
+      .eq("id", userId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error updating profile:", error);
+      return { success: false, error: error.message };
+    }
+
+    console.log("Profile updated successfully:", data);
 
     // Create activity notification for profile update
-    try {
-      if (userId) {
-        await createProfileActivityNotification({ userId: userId as string, type: "updated", details: "Your profile information has been updated successfully" })
-      }
-    } catch (notificationError: any) {
-      console.error("Error creating profile update notification:", notificationError)
-      // Non-blocking - continue even if notification fails
+    // Check if relevant fields were updated before creating notification
+    // This is a basic check, you might want more granular checks
+    const relevantFieldsUpdated = [input.firstName, input.lastName, input.phoneNumber, input.address, input.city, input.state, input.zipCode].some(field => field !== undefined);
+    if (relevantFieldsUpdated) {
+       // Note: Currently only creating a generic profile update notification.
+       // Might need more specific notifications based on which fields are updated.
+       await createProfileActivityNotification({
+        userId,
+        type: "updated",
+        details: "Your profile has been updated.",
+       });
     }
 
-    revalidatePath("/profile")
-    return { success: true }
+    revalidatePath("/profile"); // Revalidate profile page on successful update
+
+    return { success: true, data: data };
   } catch (error: any) {
-    console.error("Unexpected error updating profile:", error)
-    return { error: `An unexpected error occurred. ${error.message}` }
+    console.error("Unexpected error in updateProfile:", error);
+    return { success: false, error: "An unexpected error occurred: " + error.message };
   }
 }
 
 // Update the bio function to use 140 character limit
 export async function updateBio(userId: string, bio: string) {
   try {
+    if (isOfflineMode()) {
+      console.log("Skipping bio update in offline mode")
+      // Return a mock success response
+      return { success: true }
+    }
+
     if (!userId) {
       return { error: "User ID is required" }
     }
@@ -449,6 +418,11 @@ export async function updateBio(userId: string, bio: string) {
 // Add a function to upload ID document
 export async function uploadIdDocument(file: File) {
   try {
+    if (isOfflineMode()) {
+      console.log("Skipping ID document upload in offline mode")
+      // Return a mock success response with a placeholder URL
+      return { success: true, url: "/placeholder-id.svg" }
+    }
     const supabase = createServerClient()
     const adminClient = createAdminClient()
 
@@ -536,8 +510,13 @@ export async function uploadIdDocument(file: File) {
 // Update the uploadBannerImage function with enhanced authentication and bucket check
 export async function uploadBannerImage(file: File) {
   try {
+    if (isOfflineMode()) {
+      console.log("Skipping banner image upload in offline mode")
+      // Return a mock success response with a placeholder URL
+      return { success: true, url: "/placeholder-banner.svg" }
+    }
     const cookieStore = cookies()
-    const supabase = createServerClient(cookieStore)
+    const supabase = createServerClient()
     const adminClient = createAdminClient()
 
     // Get current user ID with enhanced method
@@ -624,6 +603,11 @@ export async function uploadBannerImage(file: File) {
 // Update the selectBannerImage function with enhanced authentication
 export async function selectBannerImage(bannerUrl: string) {
   try {
+    if (isOfflineMode()) {
+      console.log("Skipping banner image selection in offline mode")
+      // Return a mock success response
+      return { success: true }
+    }
     const adminClient = createAdminClient()
 
     // Get current user ID with enhanced method
@@ -676,6 +660,11 @@ export async function selectBannerImage(bannerUrl: string) {
 // Update the uploadProfilePicture function with bucket check
 export async function uploadProfilePicture(file: File) {
   try {
+    if (isOfflineMode()) {
+      console.log("Skipping profile picture upload in offline mode")
+      // Return a mock success response with a placeholder URL
+      return { success: true, url: "/placeholder-avatar.svg" }
+    }
     const supabase = createServerClient()
     const adminClient = createAdminClient()
 
@@ -819,6 +808,11 @@ export async function updateSocialMedia(
   }
 ) {
   try {
+    if (isOfflineMode()) {
+      console.log("Skipping social media update in offline mode")
+      // Return a mock success response
+      return { success: true }
+    }
     // Use the admin client for direct database operations within server actions
     const adminClient = createAdminClient();
 
@@ -842,5 +836,41 @@ export async function updateSocialMedia(
   } catch (error: any) {
     console.error("Unexpected error updating social media:", error)
     return { success: false, error: "An unexpected error occurred." }
+  }
+}
+
+export async function uploadLendingLicenseServer(file: File) {
+  try {
+    if (isOfflineMode()) {
+      console.log("Skipping lending license upload in offline mode");
+      return { success: true, url: "/placeholder.svg" };
+    }
+    const adminClient = createAdminClient();
+    // Optionally ensure the bucket exists (if you want):
+    // await ensureBucketExists("lending-licenses");
+    const fileExt = file.name.split(".").pop();
+    const fileName = `lending-license-${Date.now()}.${fileExt}`;
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = new Uint8Array(arrayBuffer);
+    const { error: uploadError } = await adminClient.storage
+      .from("lending-licenses")
+      .upload(fileName, buffer, {
+        contentType: file.type,
+        upsert: true,
+      });
+    if (uploadError) {
+      console.error("Error uploading lending license:", uploadError);
+      return { error: `Failed to upload lending license: ${uploadError.message}` };
+    }
+    const { data: publicUrlData } = adminClient.storage
+      .from("lending-licenses")
+      .getPublicUrl(fileName);
+    if (!publicUrlData || !publicUrlData.publicUrl) {
+      return { error: "Failed to get public URL for the lending license image" };
+    }
+    return { success: true, url: publicUrlData.publicUrl };
+  } catch (error: any) {
+    console.error("Unexpected error uploading lending license:", error);
+    return { error: `An unexpected error occurred. Please try again. ${error instanceof Error ? error.message : String(error)}` };
   }
 }

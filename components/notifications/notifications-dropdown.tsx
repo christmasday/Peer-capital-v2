@@ -17,6 +17,7 @@ import { NotificationBadge } from "@/components/notifications/notification-badge
 import { ScrollArea } from "@/components/ui/scroll-area"
 import type { Notification } from "@/lib/actions/notifications"
 import { useToast } from "@/hooks/use-toast"
+import { useSupabaseClient } from "@/components/supabase/SupabaseProvider"
 
 interface NotificationsDropdownProps {
   open?: boolean
@@ -31,6 +32,7 @@ export function NotificationsDropdown({ open, onOpenChange, onNotificationRead }
   const [markingAllAsRead, setMarkingAllAsRead] = useState(false)
   const [isOpen, setIsOpen] = useState(open || false)
   const { toast } = useToast()
+  const { supabase, session } = useSupabaseClient()
 
   // Use controlled or uncontrolled state based on props
   const handleOpenChange = (newOpen: boolean) => {
@@ -60,6 +62,31 @@ export function NotificationsDropdown({ open, onOpenChange, onNotificationRead }
       fetchNotifications()
     }
   }, [open, isOpen])
+
+  useEffect(() => {
+    if (!supabase || !session?.user?.id) return
+    // Subscribe to realtime notifications for this user
+    const channel = supabase
+      .channel('user-notifications')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${session.user.id}`,
+        },
+        (payload) => {
+          setNotifications((prev) => [payload.new as Notification, ...prev])
+          setUnreadCount((prev) => prev + 1)
+          new Audio('/notification.mp3').play()
+        }
+      )
+      .subscribe()
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [supabase, session?.user?.id])
 
   const handleMarkAllAsRead = async () => {
     setMarkingAllAsRead(true)

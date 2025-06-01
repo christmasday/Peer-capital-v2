@@ -26,6 +26,8 @@ import { cn } from "@/lib/utils"
 // Import the PostItem component and getUserPosts function
 import { PostItem } from "@/components/profile/post-item"
 import { getUserPosts } from "@/lib/actions/posts"
+import { LoanRequestsList } from "@/components/loans/LoanRequestsList"
+import { getAllLoanRequests } from "@/lib/actions/loans"
 
 export const dynamic = "force-dynamic"
 
@@ -47,7 +49,7 @@ export default async function UserProfilePage({
   }
 
   const cookieStore = cookies()
-  const supabase = createServerClient(cookieStore)
+  const supabase = createServerClient()
   const adminClient = createAdminClient()
 
   // Get current user session to determine if viewing own profile
@@ -89,13 +91,22 @@ export default async function UserProfilePage({
   const bannerImageUrl = profile.banner_image_url || defaultBannerImage
 
   // Fetch user's posts
-  const { data: posts, error: postsError } = await getUserPosts(params.userId, 10)
+  const postsResult = await getUserPosts(params.userId, 10)
+  const posts = postsResult.posts || []
+  const postsError = postsResult.error
 
   if (postsError) {
     console.error("Error fetching posts:", postsError)
   }
 
   const user = session?.user
+
+  // Fetch all loan requests for the 'More' tab
+  let allLoanRequests: any[] = []
+  if (activeTab === "more") {
+    const allLoanReqResult = await getAllLoanRequests()
+    allLoanRequests = allLoanReqResult.loanRequests || []
+  }
 
   return (
     <div className="-mt-6">
@@ -213,7 +224,7 @@ export default async function UserProfilePage({
                   <div className="flex items-center gap-2 text-gray-700">
                     <Rss className="h-5 w-5 text-gray-500" />
                     {/* Updated to display accurate follower count */}
-                    <span>Followed by {followersCount?.count || 0} people</span>
+                    <span>Followed by {followersCount?.length || 0} people</span>
                   </div>
                   {profile.website && (
                     <div className="flex items-center gap-2 text-gray-700">
@@ -251,94 +262,118 @@ export default async function UserProfilePage({
 
           {/* Right content area (8/12) */}
           <div className="col-span-8">
-            {/* Create post card */}
-            <Card className="mb-4 shadow-sm">
-              <CardContent className="pt-4">
-                <div className="flex items-center gap-2 mb-4">
-                  <Avatar className="h-10 w-10">
-                    {profile.profile_picture_url ? (
-                      <AvatarImage src={profile.profile_picture_url || "/placeholder.svg"} alt={fullName} />
-                    ) : (
-                      <AvatarFallback className="bg-blue-100">
-                        <UserRound className="h-5 w-5 text-blue-500" />
-                      </AvatarFallback>
-                    )}
-                  </Avatar>
-                  <div className="flex-grow">
-                    <Textarea
-                      placeholder="What's on your mind?"
-                      className="resize-none border-gray-300 rounded-full h-10 pt-2"
-                    />
+            {/* More tab: show all loan requests */}
+            {activeTab === "more" ? (
+              <>
+                <h2 className="text-xl font-bold mb-4">All Loan Requests</h2>
+                <LoanRequestsList loanRequests={allLoanRequests} currentUserId={currentUserId} />
+              </>
+            ) : (
+              <>
+                {/* Create post card */}
+                <Card className="mb-4 shadow-sm">
+                  <CardContent className="pt-4">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Avatar className="h-10 w-10">
+                        {profile.profile_picture_url ? (
+                          <AvatarImage src={profile.profile_picture_url || "/placeholder.svg"} alt={fullName} />
+                        ) : (
+                          <AvatarFallback className="bg-blue-100">
+                            <UserRound className="h-5 w-5 text-blue-500" />
+                          </AvatarFallback>
+                        )}
+                      </Avatar>
+                      <div className="flex-grow">
+                        <Textarea
+                          placeholder="What's on your mind?"
+                          className="resize-none border-gray-300 rounded-full h-10 pt-2"
+                        />
+                      </div>
+                    </div>
+                    <Separator className="my-2" />
+                    <div className="flex justify-between pt-1">
+                      <Button variant="ghost" className="text-gray-700 hover:bg-gray-100 flex-1">
+                        <Video className="h-5 w-5 mr-2 text-red-500" />
+                        Live video
+                      </Button>
+                      <Button variant="ghost" className="text-gray-700 hover:bg-gray-100 flex-1">
+                        <Camera className="h-5 w-5 mr-2 text-green-500" />
+                        Photo/video
+                      </Button>
+                      <Button variant="ghost" className="text-gray-700 hover:bg-gray-100 flex-1">
+                        <Calendar className="h-5 w-5 mr-2 text-blue-500" />
+                        Life event
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Posts header */}
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-xl font-bold">Posts</h2>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" className="text-gray-700 flex items-center gap-1">
+                      <Sliders className="h-4 w-4" />
+                      Filters
+                    </Button>
+                    <Button variant="outline" className="text-gray-700 flex items-center gap-1">
+                      <Settings className="h-4 w-4" />
+                      Manage posts
+                    </Button>
                   </div>
                 </div>
-                <Separator className="my-2" />
-                <div className="flex justify-between pt-1">
-                  <Button variant="ghost" className="text-gray-700 hover:bg-gray-100 flex-1">
-                    <Video className="h-5 w-5 mr-2 text-red-500" />
-                    Live video
-                  </Button>
-                  <Button variant="ghost" className="text-gray-700 hover:bg-gray-100 flex-1">
-                    <Camera className="h-5 w-5 mr-2 text-green-500" />
-                    Photo/video
-                  </Button>
-                  <Button variant="ghost" className="text-gray-700 hover:bg-gray-100 flex-1">
-                    <Calendar className="h-5 w-5 mr-2 text-blue-500" />
-                    Life event
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
 
-            {/* Posts header */}
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">Posts</h2>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" className="text-gray-700 flex items-center gap-1">
-                  <Sliders className="h-4 w-4" />
-                  Filters
-                </Button>
-                <Button variant="outline" className="text-gray-700 flex items-center gap-1">
-                  <Settings className="h-4 w-4" />
-                  Manage posts
-                </Button>
-              </div>
-            </div>
-
-            {/* View toggle */}
-            <Card className="mb-4 shadow-sm">
-              <CardContent className="py-2">
-                <div className="flex items-center">
-                  <Button variant="ghost" className="text-blue-600 border-b-2 border-blue-600 rounded-none flex-1 py-2">
-                    <Rss className="h-4 w-4 mr-2" />
-                    List view
-                  </Button>
-                  <Button variant="ghost" className="text-gray-600 hover:bg-gray-100 rounded-none flex-1 py-2">
-                    <div className="grid grid-cols-2 gap-0.5 mr-2">
-                      <div className="w-1.5 h-1.5 bg-gray-600"></div>
-                      <div className="w-1.5 h-1.5 bg-gray-600"></div>
-                      <div className="w-1.5 h-1.5 bg-gray-600"></div>
-                      <div className="w-1.5 h-1.5 bg-gray-600"></div>
+                {/* View toggle */}
+                <Card className="mb-4 shadow-sm">
+                  <CardContent className="py-2">
+                    <div className="flex items-center">
+                      <Button variant="ghost" className="text-blue-600 border-b-2 border-blue-600 rounded-none flex-1 py-2">
+                        <Rss className="h-4 w-4 mr-2" />
+                        List view
+                      </Button>
+                      <Button variant="ghost" className="text-gray-600 hover:bg-gray-100 rounded-none flex-1 py-2">
+                        <div className="grid grid-cols-2 gap-0.5 mr-2">
+                          <div className="w-1.5 h-1.5 bg-gray-600"></div>
+                          <div className="w-1.5 h-1.5 bg-gray-600"></div>
+                          <div className="w-1.5 h-1.5 bg-gray-600"></div>
+                          <div className="w-1.5 h-1.5 bg-gray-600"></div>
+                        </div>
+                        Grid view
+                      </Button>
                     </div>
-                    Grid view
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+                  </CardContent>
+                </Card>
 
-            {/* Posts list */}
-            {posts && posts.length > 0 ? (
-              <div className="space-y-4">
-                {posts.map((post) => (
-                  <PostItem key={post.id} post={post} profile={profile} currentUserId={user?.id} />
-                ))}
-              </div>
-            ) : (
-              <Card className="shadow-sm">
-                <CardContent className="py-12 text-center">
-                  <p className="text-gray-500 mb-2">No posts yet</p>
-                  <p className="text-sm text-gray-400">Posts will appear here once created</p>
-                </CardContent>
-              </Card>
+                {/* Posts list */}
+                {posts && posts.length > 0 ? (
+                  <div className="space-y-4">
+                    {posts.map((post: any) => (
+                      <PostItem
+                        key={post.id}
+                        id={post.id}
+                        userId={post.user_id}
+                        userName={profile.first_name + ' ' + profile.last_name}
+                        userImage={profile.profile_picture_url}
+                        content={post.content}
+                        imageUrl={post.image_url}
+                        imageSizes={post.image_sizes}
+                        createdAt={post.created_at}
+                        likesCount={post.likes_count || 0}
+                        commentsCount={post.comments_count || 0}
+                        sharesCount={post.shares_count || 0}
+                        isOwner={user?.id === post.user_id}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <Card className="shadow-sm">
+                    <CardContent className="py-12 text-center">
+                      <p className="text-gray-500 mb-2">No posts yet</p>
+                      <p className="text-sm text-gray-400">Posts will appear here once created</p>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
             )}
           </div>
         </div>

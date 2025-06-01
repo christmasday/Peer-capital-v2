@@ -7,8 +7,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { ImageUpload } from "@/components/ui/image-upload"
-import { VideoIcon, ImageIcon, Activity } from "lucide-react"
+import { VideoIcon, Activity } from "lucide-react"
 import { createPost } from "@/lib/actions/posts"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
@@ -20,34 +19,16 @@ interface CreatePostCardProps {
   onPostCreated?: () => void
 }
 
-interface ImageSizes {
-  thumbnail?: string
-  medium?: string
-  full?: string
-  [key: string]: string | undefined
-}
-
 export function CreatePostCard({ userId, userName, userImage, onPostCreated }: CreatePostCardProps) {
   const [content, setContent] = useState("")
-  const [imageUrl, setImageUrl] = useState<string | null>(null)
-  const [imageSizes, setImageSizes] = useState<ImageSizes | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const { toast } = useToast()
   const router = useRouter()
 
-  const handleImageChange = (url: string | null, sizes?: ImageSizes | null) => {
-    setImageUrl(url)
-    if (sizes) {
-      setImageSizes(sizes)
-    } else {
-      setImageSizes(null)
-    }
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!content.trim() && !imageUrl) {
+    if (!content.trim()) {
       toast({
         title: "Empty post",
         description: "Please add some text or an image to your post.",
@@ -61,12 +42,6 @@ export function CreatePostCard({ userId, userName, userImage, onPostCreated }: C
     try {
       const formData = new FormData()
       formData.append("content", content)
-      if (imageUrl) {
-        formData.append("imageUrl", imageUrl)
-      }
-      if (imageSizes) {
-        formData.append("imageSizes", JSON.stringify(imageSizes))
-      }
 
       const result = await createPost(formData)
 
@@ -81,8 +56,6 @@ export function CreatePostCard({ userId, userName, userImage, onPostCreated }: C
 
       // Reset form
       setContent("")
-      setImageUrl(null)
-      setImageSizes(null)
 
       // Callback if provided
       if (onPostCreated) {
@@ -114,52 +87,16 @@ export function CreatePostCard({ userId, userName, userImage, onPostCreated }: C
             </Avatar>
             <Textarea
               placeholder={`What's on your mind, ${userName.split(" ")[0]}?`}
-              className="flex-1 resize-none"
+              className="flex-1 resize-none outline-none border-b-4 border-b-blue-600  focus-visible:border-b-green-600 focus-visible:outline-none focus-visible:ring-0"
               value={content}
               onChange={(e) => setContent(e.target.value)}
               disabled={isSubmitting}
             />
           </div>
 
-          {/* Image upload area */}
-          {(imageUrl || content.trim()) && (
-            <div className="mb-4">
-              <ImageUpload
-                value={imageUrl}
-                onChange={handleImageChange}
-                disabled={isSubmitting}
-                aspectRatio="video"
-                maxSize={10}
-              />
-            </div>
-          )}
-
-          <div className="flex items-center justify-between border-t pt-3">
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="text-gray-500"
-                onClick={() => document.getElementById("image-upload")?.click()}
-                disabled={isSubmitting}
-              >
-                <ImageIcon className="h-5 w-5 mr-2" />
-                Photo/video
-              </Button>
-              <Button type="button" variant="ghost" size="sm" className="text-gray-500" disabled={isSubmitting}>
-                <Activity className="h-5 w-5 mr-2" />
-                Life event
-              </Button>
-              <Button type="button" variant="ghost" size="sm" className="text-gray-500" disabled={isSubmitting}>
-                <VideoIcon className="h-5 w-5 mr-2" />
-                Live video
-              </Button>
-            </div>
-
-            {/* Post button - only show when there's content or an image */}
-            {(content.trim() || imageUrl) && (
-              <Button type="submit" disabled={isSubmitting || (!content.trim() && !imageUrl)}>
+          <div className="flex items-end justify-between border-t pt-3">
+            {content.trim() && (
+              <Button type="submit" disabled={isSubmitting || !content.trim()}>
                 {isSubmitting ? "Posting..." : "Post"}
               </Button>
             )}

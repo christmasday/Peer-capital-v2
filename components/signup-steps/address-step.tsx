@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { SignupFormData } from "@/components/signup-form"
+import { cn } from "@/lib/utils"
 
 interface AddressStepProps {
   formData: SignupFormData
@@ -122,7 +123,10 @@ export function AddressStep({ formData, updateFormData }: AddressStepProps) {
           Country of Residence <span className="text-red-500">*</span>
         </Label>
         <Select value={formData.country} onValueChange={handleCountryChange}>
-          <SelectTrigger id="country" className={errors.country ? "border-red-500" : ""}>
+          <SelectTrigger id="country"
+            className="w-full"
+            isError={!!errors.country}
+          >
             <SelectValue placeholder="Select your country" />
           </SelectTrigger>
           <SelectContent>
@@ -146,7 +150,8 @@ export function AddressStep({ formData, updateFormData }: AddressStepProps) {
           value={formData.address}
           onChange={handleChange}
           onBlur={handleBlur}
-          className={errors.address ? "border-red-500" : ""}
+          className="w-full"
+          isError={!!errors.address}
         />
         {errors.address && <p className="text-sm text-red-500">{errors.address}</p>}
       </div>
@@ -161,7 +166,8 @@ export function AddressStep({ formData, updateFormData }: AddressStepProps) {
           value={formData.city}
           onChange={handleChange}
           onBlur={handleBlur}
-          className={errors.city ? "border-red-500" : ""}
+          className="w-full"
+          isError={!!errors.city}
         />
         {errors.city && <p className="text-sm text-red-500">{errors.city}</p>}
       </div>
@@ -176,14 +182,15 @@ export function AddressStep({ formData, updateFormData }: AddressStepProps) {
           value={formData.state}
           onChange={handleChange}
           onBlur={handleBlur}
-          className={errors.state ? "border-red-500" : ""}
+          className="w-full"
+          isError={!!errors.state}
         />
         {errors.state && <p className="text-sm text-red-500">{errors.state}</p>}
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="zipCode">Zip/Postal Code</Label>
-        <Input id="zipCode" name="zipCode" value={formData.zipCode} onChange={handleChange} />
+        <Input id="zipCode" name="zipCode" value={formData.zipCode} onChange={handleChange} className="w-full" />
       </div>
     </div>
   )

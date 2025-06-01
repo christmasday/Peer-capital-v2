@@ -12,7 +12,7 @@ export default function LoginPage() {
             <Logo width={180} height={60} />
           </div>
 
-          <Card className="border-none shadow-lg">
+          <Card className="shadow-lg">
             <CardHeader className="space-y-1">
               <CardTitle className="text-2xl font-bold text-center md:text-left">Sign in to your account</CardTitle>
               <CardDescription className="text-center md:text-left">

@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js"
+import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "./database.types"
 
 // Circuit breaker pattern
@@ -28,19 +28,26 @@ export function forceOfflineMode(value: boolean) {
 }
 
 // Create a mock client for offline mode
-function createMockClient() {
+function createMockClient(): SupabaseClient<Database> {
   console.log("Creating mock Supabase admin client for offline mode")
 
   // Create a basic mock that won't throw errors
   return {
-    from: (table: string) => ({
-      select: () => ({
-        eq: () => ({
+    from: (_table: string) => ({
+      select: function () {
+        return {
+          eq: function () {
+            return {
+              single: async () => ({ data: null, error: null }),
+              maybeSingle: async () => ({ data: null, error: null }),
+              order: function () { return { data: [], error: null } },
+            }
+          },
+          order: function () { return { data: [], error: null } },
           single: async () => ({ data: null, error: null }),
-          limit: () => ({ data: [], error: null }),
-        }),
-        limit: () => ({ data: [], error: null }),
-      }),
+          maybeSingle: async () => ({ data: null, error: null }),
+        }
+      },
       insert: async () => ({ data: null, error: null }),
       update: async () => ({ data: null, error: null }),
       upsert: async () => ({ data: null, error: null }),
@@ -69,7 +76,7 @@ function createMockClient() {
         getPublicUrl: () => ({ data: { publicUrl: "/placeholder.svg" } }),
       }),
     },
-  }
+  } as unknown as SupabaseClient<Database>
 }
 
 // Create a Supabase admin client

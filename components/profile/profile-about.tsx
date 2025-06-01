@@ -6,6 +6,13 @@ import { Briefcase, GraduationCap, MapPin, Phone, Mail, Heart, Calendar, User, I
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { updateSocialMedia } from "@/lib/actions/profile"
+import { updateBio } from "@/lib/actions/profile"
+import { updateProfile, uploadIdDocument, uploadLendingLicenseServer } from "@/lib/actions/profile"
+import { getLoanHelperSettings, updateLoanHelperSettings } from "@/lib/actions/loan-helper-settings"
+import { Textarea } from "@/components/ui/textarea"
+import { createAdminClient } from "@/lib/supabase/admin"
+import imageCompression from 'browser-image-compression'
+import { SlateEditor } from "@/components/profile/useSlateEditor"
 
 interface ProfileAboutProps {
   profile: any
@@ -16,6 +23,30 @@ export function ProfileAbout({ profile, isCurrentUser = false }: ProfileAboutPro
   const router = useRouter()
   const [activeSection, setActiveSection] = useState("overview")
   const [isEditingContact, setIsEditingContact] = useState(false)
+  const [isEditingBio, setIsEditingBio] = useState(false)
+  const [isEditingLocation, setIsEditingLocation] = useState(false)
+  const [isEditingWorkOverview, setIsEditingWorkOverview] = useState(false)
+  const [isEditingPhone, setIsEditingPhone] = useState(false)
+  const [isEditingEmail, setIsEditingEmail] = useState(false)
+  const [isEditingRelationship, setIsEditingRelationship] = useState(false)
+  const [isEditingEducation, setIsEditingEducation] = useState(false)
+  const [isEditingMonthlyIncome, setIsEditingMonthlyIncome] = useState(false)
+  const [isEditingBank, setIsEditingBank] = useState(false)
+  const [phoneText, setPhoneText] = useState(profile.phone_number || "")
+  const [emailText, setEmailText] = useState(profile.email || "")
+  const [relationshipStatusText, setRelationshipStatusText] = useState(profile.relationship_status || "")
+  const [bioText, setBioText] = useState(profile.bio || "")
+  const [locationAddress, setLocationAddress] = useState(profile.address || "")
+  const [locationCity, setLocationCity] = useState(profile.city || "")
+  const [locationState, setLocationState] = useState(profile.state || "")
+  const [workOverviewJobTitle, setWorkOverviewJobTitle] = useState(profile.job_title || "")
+  const [workOverviewEmployerName, setWorkOverviewEmployerName] = useState(profile.employer_name || "")
+  const [workOverviewEmployerAddress, setWorkOverviewEmployerAddress] = useState(profile.employer_address || "")
+  const [workOverviewEmploymentStatus, setWorkOverviewEmploymentStatus] = useState(profile.employment_status || "")
+  const [schoolName, setSchoolName] = useState(profile.school_name || "")
+  const [degree, setDegree] = useState(profile.degree || "")
+  const [fieldOfStudy, setFieldOfStudy] = useState(profile.field_of_study || "")
+  const [graduationYear, setGraduationYear] = useState(profile.graduation_year || "")
   const [socialMediaData, setSocialMediaData] = useState({
     facebook_url: profile.facebook_url || "",
     linkedin_url: profile.linkedin_url || "",
@@ -23,6 +54,24 @@ export function ProfileAbout({ profile, isCurrentUser = false }: ProfileAboutPro
     website: profile.website || "",
   })
   const [isSavingContact, setIsSavingContact] = useState(false)
+  const [monthlyIncomeValue, setMonthlyIncomeValue] = useState<string>(
+    profile.monthly_income !== undefined && profile.monthly_income !== null ? String(profile.monthly_income) : ""
+  )
+  const [isSavingMonthlyIncome, setIsSavingMonthlyIncome] = useState(false)
+  const [monthlyIncomeError, setMonthlyIncomeError] = useState<string | null>(null)
+  const [bankName, setBankName] = useState(profile.bank_name || "")
+  const [accountNumber, setAccountNumber] = useState(profile.account_number || "")
+  const [accountName, setAccountName] = useState(profile.account_name || "")
+  const [isSavingBank, setIsSavingBank] = useState(false)
+  const [bankError, setBankError] = useState<string | null>(null)
+  const [isEditingLoanHelper, setIsEditingLoanHelper] = useState(false)
+  const [loanAmount, setLoanAmount] = useState("")
+  const [interestRate, setInterestRate] = useState("")
+  const [paybackPeriod, setPaybackPeriod] = useState("")
+  const [loanTerms, setLoanTerms] = useState("")
+  const [isSavingLoanHelper, setIsSavingLoanHelper] = useState(false)
+  const [loanHelperError, setLoanHelperError] = useState<string | null>(null)
+  const [loanHelperLoaded, setLoanHelperLoaded] = useState(false)
 
   const sections = [
     { id: "overview", name: "Overview", icon: Info },
@@ -30,6 +79,8 @@ export function ProfileAbout({ profile, isCurrentUser = false }: ProfileAboutPro
     { id: "places", name: "Places lived", icon: MapPin },
     { id: "contact", name: "Contact and basic info", icon: Phone },
     { id: "details", name: "Details about you", icon: User },
+    { id: "bank", name: "Bank Account details", icon: Briefcase },
+    { id: "loan-helper", name: "Loan helper settings", icon: Briefcase },
   ]
 
   useEffect(() => {
@@ -39,7 +90,46 @@ export function ProfileAbout({ profile, isCurrentUser = false }: ProfileAboutPro
       twitter_url: profile.twitter_url || "",
       website: profile.website || "",
     })
+    setBioText(profile.bio || "")
+    setLocationAddress(profile.address || "")
+    setLocationCity(profile.city || "")
+    setLocationState(profile.state || "")
+    setWorkOverviewJobTitle(profile.job_title || "")
+    setWorkOverviewEmployerName(profile.employer_name || "")
+    setWorkOverviewEmployerAddress(profile.employer_address || "")
+    setWorkOverviewEmploymentStatus(profile.employment_status || "")
+    setPhoneText(profile.phone_number || "")
+    setEmailText(profile.email || "")
+    setRelationshipStatusText(profile.relationship_status || "")
+    setSchoolName(profile.school_name || "")
+    setDegree(profile.degree || "")
+    setFieldOfStudy(profile.field_of_study || "")
+    setGraduationYear(profile.graduation_year || "")
+    setMonthlyIncomeValue(
+      profile.monthly_income !== undefined && profile.monthly_income !== null ? String(profile.monthly_income) : ""
+    )
+    setBankName(profile.bank_name || "")
+    setAccountNumber(profile.account_number || "")
+    setAccountName(profile.account_name || "")
+    setLoanHelperLoaded(false);
   }, [profile])
+
+  // Fetch loan helper settings when section is active and not loaded
+  useEffect(() => {
+    const fetchLoanHelper = async () => {
+      if (activeSection === "loan-helper" && !loanHelperLoaded && profile.id) {
+        const { data, error } = await getLoanHelperSettings(profile.id);
+        if (data) {
+          setLoanAmount(data.loan_amount?.toString() || "");
+          setInterestRate(data.interest_rate?.toString() || "");
+          setPaybackPeriod(data.repayment_time?.toString() || "");
+          setLoanTerms(data.terms_and_conditions || "");
+        }
+        setLoanHelperLoaded(true);
+      }
+    };
+    fetchLoanHelper();
+  }, [activeSection, loanHelperLoaded, profile.id]);
 
   const handleSocialMediaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSocialMediaData({
@@ -79,6 +169,788 @@ export function ProfileAbout({ profile, isCurrentUser = false }: ProfileAboutPro
     })
     setIsEditingContact(false)
   }
+
+  const handleSaveBio = async () => {
+    // Assuming profile.id is available and is the user ID
+    const userId = profile.id;
+    if (!userId) {
+      console.error("User ID not available for saving bio.");
+      // TODO: Show an error message to the user
+      return;
+    }
+
+    // Call the server action to update the bio
+    const result = await updateBio(userId, bioText);
+
+    if (result.success) {
+      console.log("Bio updated successfully!");
+      setIsEditingBio(false);
+      // Revalidation of path should handle UI update
+    } else {
+      console.error("Failed to update bio:", result.error);
+      // TODO: Show an error message to the user
+    }
+  }
+
+  const handleCancelEditBio = () => {
+    setBioText(profile.bio || ""); // Revert to original bio
+    setIsEditingBio(false);
+  }
+
+  const handleSaveLocation = async () => {
+    const userId = profile.id;
+    if (!userId) {
+      console.error("User ID not available for saving location.");
+      return;
+    }
+
+    // Call the server action to update location fields
+    const result = await updateProfile({
+      firstName: profile.first_name || "",
+      lastName: profile.last_name || "",
+      phoneNumber: profile.phone_number || "",
+      address: locationAddress,
+      city: locationCity,
+      state: locationState,
+      zipCode: profile.zip_code,
+      profilePictureUrl: profile.profile_picture_url,
+      bvn: profile.bvn,
+      dateOfBirth: profile.date_of_birth,
+      idType: profile.id_type,
+      idNumber: profile.id_number,
+      idDocumentUrl: profile.id_document_url,
+      employmentStatus: profile.employment_status,
+      employerName: profile.employer_name,
+      employerAddress: profile.employer_address,
+      workPhone: profile.work_phone,
+      jobTitle: profile.job_title,
+      monthlyIncome: profile.monthly_income,
+      employmentStartDate: profile.employment_start_date,
+      employmentEndDate: profile.employment_end_date,
+      bankName: profile.bank_name,
+      accountNumber: profile.account_number,
+      accountName: profile.account_name,
+    });
+
+    if (result.success) {
+      console.log("Location updated successfully!");
+      setIsEditingLocation(false);
+      // Revalidation should handle UI update
+    } else {
+      console.error("Failed to update location:", result.error);
+      // TODO: Show error message
+    }
+  };
+
+  const handleCancelEditLocation = () => {
+    // Revert location fields to original values if you add state for them later
+    setIsEditingLocation(false);
+    setLocationAddress(profile.address || "");
+    setLocationCity(profile.city || "");
+    setLocationState(profile.state || "");
+  };
+
+  const handleSaveWorkOverview = async () => {
+    const userId = profile.id;
+    if (!userId) {
+      console.error("User ID not available for saving work details.");
+      return;
+    }
+
+    const result = await updateProfile({
+      firstName: profile.first_name,
+      lastName: profile.last_name,
+      phoneNumber: profile.phone_number,
+      address: profile.address,
+      city: profile.city,
+      state: profile.state,
+      zipCode: profile.zip_code,
+      profilePictureUrl: profile.profile_picture_url,
+      bvn: profile.bvn,
+      dateOfBirth: profile.date_of_birth,
+      idType: profile.id_type,
+      idNumber: profile.id_number,
+      idDocumentUrl: profile.id_document_url,
+      bankName: profile.bank_name,
+      accountNumber: profile.account_number,
+      accountName: profile.account_name,
+      // Pass updated work data
+      employmentStatus: workOverviewEmploymentStatus,
+      employerName: workOverviewEmployerName,
+      employerAddress: workOverviewEmployerAddress,
+      jobTitle: workOverviewJobTitle,
+      // Include other required employment fields if they exist in updateProfile signature
+      workPhone: profile.work_phone,
+      monthlyIncome: profile.monthly_income,
+      employmentStartDate: profile.employment_start_date,
+      employmentEndDate: profile.employment_end_date,
+    });
+
+    if (result.success) {
+      console.log("Work details updated successfully!");
+      setIsEditingWorkOverview(false);
+      // Revalidation should handle UI update
+    } else {
+      console.error("Failed to update work details:", result.error);
+      // TODO: Show error message
+    }
+  };
+
+  const handleCancelEditWorkOverview = () => {
+    setWorkOverviewJobTitle(profile.job_title || "");
+    setWorkOverviewEmployerName(profile.employer_name || "");
+    setWorkOverviewEmployerAddress(profile.employer_address || "");
+    setWorkOverviewEmploymentStatus(profile.employment_status || "");
+    setIsEditingWorkOverview(false);
+  };
+
+  const handleSavePhone = async () => {
+    const userId = profile.id;
+    if (!userId) {
+      console.error("User ID not available for saving phone.");
+      return;
+    }
+    const result = await updateProfile({
+      firstName: profile.first_name || "",
+      lastName: profile.last_name || "",
+      phoneNumber: phoneText,
+      address: profile.address || "",
+      city: profile.city || "",
+      state: profile.state || "",
+      zipCode: profile.zip_code,
+      profilePictureUrl: profile.profile_picture_url,
+      bvn: profile.bvn,
+      dateOfBirth: profile.date_of_birth,
+      idType: profile.id_type,
+      idNumber: profile.id_number,
+      idDocumentUrl: profile.id_document_url,
+      employmentStatus: profile.employment_status,
+      employerName: profile.employer_name,
+      employerAddress: profile.employer_address,
+      workPhone: profile.work_phone,
+      jobTitle: profile.job_title,
+      monthlyIncome: profile.monthly_income,
+      employmentStartDate: profile.employment_start_date,
+      employmentEndDate: profile.employment_end_date,
+      bankName: profile.bank_name,
+      accountNumber: profile.account_number,
+      accountName: profile.account_name,
+    });
+
+    if (result.success) {
+      console.log("Phone number updated successfully!");
+      setIsEditingPhone(false);
+    } else {
+      console.error("Failed to update phone number:", result.error);
+      // TODO: Show error message
+    }
+  };
+
+  const handleCancelEditPhone = () => {
+    setPhoneText(profile.phone_number || "");
+    setIsEditingPhone(false);
+  };
+
+  const handleSaveEmail = async () => {
+    const userId = profile.id;
+    if (!userId) {
+      console.error("User ID not available for saving email.");
+      return;
+    }
+
+    // Email cannot be updated via updateProfile. It likely requires a separate auth/email update function.
+    console.warn("Email update is not yet implemented via inline editing due to backend limitations.");
+    // TODO: Implement actual update logic for email if possible (may require a new server action or using auth functions)
+
+    // For now, just exit editing mode.
+    setIsEditingEmail(false); // Exit editing mode even if not saved
+  };
+
+  const handleCancelEditEmail = () => {
+    setEmailText(profile.email || "");
+    setIsEditingEmail(false);
+  };
+
+  const handleSaveRelationship = async () => {
+    console.warn("Relationship status update is not yet implemented via inline editing due to backend limitations.");
+    setIsEditingRelationship(false);
+  };
+
+  const handleCancelEditRelationship = () => {
+    setRelationshipStatusText(profile.relationship_status || "");
+    setIsEditingRelationship(false);
+  };
+
+  const handleSaveEducation = async () => {
+    const userId = profile.id;
+    if (!userId) {
+      console.error("User ID not available for saving education.");
+      return;
+    }
+
+    // TODO: Backend update needed - updateProfile or a new action must accept education fields
+    // For now, this will not actually save to the backend.
+    console.warn("Education update is not yet implemented via inline editing due to backend limitations.");
+
+    // Assuming updateProfile will be modified to accept these fields:
+     const result = await updateProfile({
+       ...profile, // Include existing profile data
+       schoolName: schoolName,
+       degree: degree,
+       fieldOfStudy: fieldOfStudy,
+       graduationYear: parseInt(graduationYear, 10) || null, // Convert to number
+     });
+
+     if (result.success) {
+       console.log("Education updated successfully!");
+       setIsEditingEducation(false);
+       // Revalidation should handle UI update
+     } else {
+       console.error("Failed to update education:", result.error);
+    //   // TODO: Show error message
+     }
+  };
+
+  const handleCancelEditEducation = () => {
+    setSchoolName(profile.school_name || "");
+    setDegree(profile.degree || "");
+    setFieldOfStudy(profile.field_of_study || "");
+    setGraduationYear(profile.graduation_year || "");
+    setIsEditingEducation(false);
+  };
+
+  const handleSaveMonthlyIncome = async () => {
+    setIsSavingMonthlyIncome(true);
+    setMonthlyIncomeError(null);
+    try {
+      const result = await updateProfile({ monthlyIncome: Number(monthlyIncomeValue) });
+      if (result.success) {
+        setIsEditingMonthlyIncome(false);
+      } else {
+        setMonthlyIncomeError(result.error || "Failed to update monthly income");
+      }
+    } catch (err: any) {
+      setMonthlyIncomeError(err?.message || "Failed to update monthly income");
+    } finally {
+      setIsSavingMonthlyIncome(false);
+    }
+  };
+
+  const handleCancelMonthlyIncome = () => {
+    setMonthlyIncomeValue(
+      profile.monthly_income !== undefined && profile.monthly_income !== null ? String(profile.monthly_income) : ""
+    );
+    setIsEditingMonthlyIncome(false);
+    setMonthlyIncomeError(null);
+  };
+
+  const handleSaveBank = async () => {
+    setIsSavingBank(true);
+    setBankError(null);
+    try {
+      const result = await updateProfile({ bankName, accountNumber, accountName });
+      if (result.success) {
+        setIsEditingBank(false);
+      } else {
+        setBankError(result.error || "Failed to update bank details");
+      }
+    } catch (err: any) {
+      setBankError(err?.message || "Failed to update bank details");
+    } finally {
+      setIsSavingBank(false);
+    }
+  };
+
+  const handleCancelBank = () => {
+    setBankName(profile.bank_name || "");
+    setAccountNumber(profile.account_number || "");
+    setAccountName(profile.account_name || "");
+    setIsEditingBank(false);
+    setBankError(null);
+  };
+
+  const handleSaveLoanHelper = async () => {
+    setIsSavingLoanHelper(true);
+    setLoanHelperError(null);
+    try {
+      const result = await updateLoanHelperSettings(
+        profile.id,
+        Number(loanAmount),
+        Number(interestRate),
+        Number(paybackPeriod),
+        loanTerms
+      );
+      if (result.success) {
+        setIsEditingLoanHelper(false);
+      } else {
+        setLoanHelperError(result.error || "Failed to update loan helper details");
+      }
+    } catch (err: any) {
+      setLoanHelperError(err?.message || "Failed to update loan helper details");
+    } finally {
+      setIsSavingLoanHelper(false);
+    }
+  };
+
+  const handleCancelLoanHelper = () => {
+    setLoanHelperLoaded(false); // will refetch on next open
+    setIsEditingLoanHelper(false);
+    setLoanHelperError(null);
+  };
+
+  // Add these implementations at the top level of the component (not inside another function)
+  async function uploadLendingLicense(file: File): Promise<string> {
+    // Call the server action to upload the file
+    const result = await uploadLendingLicenseServer(file);
+    if (result.error) throw new Error(result.error);
+    if (!result.url) throw new Error("No URL returned from server action");
+    return result.url;
+  }
+
+  async function handleUpdate(fields: any) {
+    const result = await updateProfile(fields);
+    if (!result.success) {
+      throw new Error(result.error || "Failed to update profile");
+    }
+  }
+
+  // Place DetailsAboutYouSection implementation here so it is defined before use
+  const maritalOptions = [
+    { value: "single", label: "Single" },
+    { value: "married", label: "Married" },
+    { value: "divorced", label: "Divorced" },
+    { value: "widow", label: "Widow" },
+    { value: "widower", label: "Widower" },
+  ];
+
+  type DetailsAboutYouProfile = {
+    marital_status?: string;
+    number_of_dependants?: number | null;
+    lending_license_url?: string | null;
+    id_document_url?: string | null;
+    id_type?: string;
+    id_number?: string;
+    // Add camelCase keys for updateProfile compatibility
+    maritalStatus?: string;
+    numberOfDependants?: number | null;
+    lendingLicenseUrl?: string | null;
+    idDocumentUrl?: string | null;
+    idType?: string;
+    idNumber?: string;
+  };
+
+  type DetailsAboutYouProps = {
+    profile: DetailsAboutYouProfile;
+    onUpdate: (fields: Partial<DetailsAboutYouProfile>) => Promise<void>;
+    uploadLendingLicense: (file: File) => Promise<string>;
+  };
+
+  function DetailsAboutYouSection({ profile, onUpdate, uploadLendingLicense }: DetailsAboutYouProps) {
+    const [maritalStatus, setMaritalStatus] = useState(profile.marital_status || "");
+    const [dependants, setDependants] = useState(
+      profile.number_of_dependants !== undefined && profile.number_of_dependants !== null
+        ? String(profile.number_of_dependants)
+        : ""
+    );
+    const [licenseUrl, setLicenseUrl] = useState(profile.lending_license_url || "");
+    const [licenseFile, setLicenseFile] = useState<File | null>(null);
+    const [uploading, setUploading] = useState(false);
+    const [savingMarital, setSavingMarital] = useState(false);
+    const [savingLicense, setSavingLicense] = useState(false);
+    const [messageMarital, setMessageMarital] = useState<string | null>(null);
+    const [messageLicense, setMessageLicense] = useState<string | null>(null);
+    const [editMarital, setEditMarital] = useState(false);
+    const [editLicense, setEditLicense] = useState(false);
+    const [idDocUrl, setIdDocUrl] = useState(profile.id_document_url || "");
+    const [idDocFile, setIdDocFile] = useState<File | null>(null);
+    const [savingIdDoc, setSavingIdDoc] = useState(false);
+    const [editIdDoc, setEditIdDoc] = useState(false);
+    const [messageIdDoc, setMessageIdDoc] = useState<string | null>(null);
+    const [idType, setIdType] = useState(profile.idType || profile.id_type || "");
+    const [idNumber, setIdNumber] = useState(profile.idNumber || profile.id_number || "");
+    const ID_TYPE_OPTIONS = [
+      { value: "National ID", label: "National ID" },
+      { value: "Driver's License", label: "Driver's License" },
+      { value: "Passport", label: "Passport" },
+      { value: "Voter's Card", label: "Voter's Card" },
+      { value: "Other", label: "Other" },
+    ];
+    const [idDocFileError, setIdDocFileError] = useState<string | null>(null);
+    const MAX_ID_DOC_SIZE_MB = 5;
+    const [licenseFileError, setLicenseFileError] = useState<string | null>(null);
+
+    const isDirtyMarital =
+      maritalStatus !== (profile.marital_status || "") ||
+      (maritalStatus === "married" && dependants !== (profile.number_of_dependants !== undefined && profile.number_of_dependants !== null ? String(profile.number_of_dependants) : ""));
+    const isDirtyLicense = editLicense && licenseFile !== null;
+
+    const handleLicenseFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        if (file.size > MAX_ID_DOC_SIZE_MB * 1024 * 1024) {
+          setLicenseFileError(`File size exceeds ${MAX_ID_DOC_SIZE_MB}MB. Please upload a smaller file.`);
+          setLicenseFile(null);
+          setLicenseUrl("");
+          return;
+        }
+        setLicenseFileError(null);
+        if (file.type.startsWith('image/')) {
+          try {
+            const compressedFile = await imageCompression(file, {
+              maxSizeMB: 1, // Target max size in MB
+              maxWidthOrHeight: 1920, // Optional: resize large images
+              useWebWorker: true,
+            });
+            setLicenseFile(compressedFile);
+          } catch (err) {
+            setLicenseFileError('Image compression failed. Please try another image.');
+            setLicenseFile(null);
+            return;
+          }
+        } else {
+          setLicenseFile(file); // For PDFs, no compression
+        }
+        setLicenseUrl("");
+      }
+    };
+
+    const handleSaveMarital = async () => {
+      setSavingMarital(true);
+      setMessageMarital(null);
+      try {
+        const updateFields: any = {
+          maritalStatus: maritalStatus,
+        };
+        if (maritalStatus === "married") {
+          updateFields.numberOfDependants = dependants ? Number(dependants) : null;
+        } else {
+          updateFields.numberOfDependants = null;
+        }
+        await onUpdate(updateFields);
+        setMessageMarital("Saved!");
+        setEditMarital(false);
+      } catch (err: any) {
+        setMessageMarital(err?.message || "Save failed");
+      } finally {
+        setSavingMarital(false);
+      }
+    };
+    const handleCancelMarital = () => {
+      setMaritalStatus(profile.marital_status || "");
+      setDependants(
+        profile.number_of_dependants !== undefined && profile.number_of_dependants !== null
+          ? String(profile.number_of_dependants)
+          : ""
+      );
+      setEditMarital(false);
+      setMessageMarital(null);
+    };
+
+    const handleSaveLicense = async () => {
+      setSavingLicense(true);
+      setMessageLicense(null);
+      let url = licenseUrl;
+      try {
+        if (licenseFile) {
+          setUploading(true);
+          setMessageLicense("Uploading license...");
+          url = await uploadLendingLicense(licenseFile);
+          setLicenseUrl(url);
+          setUploading(false);
+        }
+        await onUpdate({ lendingLicenseUrl: url });
+        setMessageLicense("Saved!");
+        setLicenseFile(null);
+        setEditLicense(false);
+      } catch (err: any) {
+        setMessageLicense(err?.message || "Save failed");
+      } finally {
+        setSavingLicense(false);
+        setUploading(false);
+      }
+    };
+    const handleCancelLicense = () => {
+      setLicenseUrl(profile.lending_license_url || "");
+      setLicenseFile(null);
+      setEditLicense(false);
+      setMessageLicense(null);
+    };
+
+    const handleIdDocFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        if (file.size > MAX_ID_DOC_SIZE_MB * 1024 * 1024) {
+          setIdDocFileError(`File size exceeds ${MAX_ID_DOC_SIZE_MB}MB. Please upload a smaller file.`);
+          setIdDocFile(null);
+          setIdDocUrl("");
+          return;
+        }
+        setIdDocFileError(null);
+        if (file.type.startsWith('image/')) {
+          try {
+            const compressedFile = await imageCompression(file, {
+              maxSizeMB: 1, // Target max size in MB
+              maxWidthOrHeight: 1920, // Optional: resize large images
+              useWebWorker: true,
+            });
+            setIdDocFile(compressedFile);
+          } catch (err) {
+            setIdDocFileError('Image compression failed. Please try another image.');
+            setIdDocFile(null);
+            return;
+          }
+        } else {
+          setIdDocFile(file); // For PDFs, no compression
+        }
+        setIdDocUrl("");
+      }
+    };
+    const handleSaveIdDoc = async () => {
+      setSavingIdDoc(true);
+      setMessageIdDoc(null);
+      let url = idDocUrl;
+      try {
+        if (idDocFile) {
+          setMessageIdDoc("Uploading ID document...");
+          const result = await uploadIdDocument(idDocFile);
+          if (result.error) throw new Error(result.error);
+          url = result.url ?? "";
+          setIdDocUrl(url);
+        }
+        await onUpdate({ idDocumentUrl: url, idType, idNumber });
+        setMessageIdDoc("Saved!");
+        setIdDocFile(null);
+        setEditIdDoc(false);
+      } catch (err: any) {
+        setMessageIdDoc(err?.message || "Save failed");
+      } finally {
+        setSavingIdDoc(false);
+      }
+    };
+    const handleCancelIdDoc = () => {
+      setIdDocUrl(profile.id_document_url || "");
+      setIdDocFile(null);
+      setIdType(profile.idType || profile.id_type || "");
+      setIdNumber(profile.idNumber || profile.id_number || "");
+      setEditIdDoc(false);
+      setMessageIdDoc(null);
+    };
+
+    return (
+      <div className="space-y-6 w-full">
+        {/* Marital Status */}
+        <div>
+          <div className="flex items-center justify-between">
+            <label className="font-semibold">Marital Status</label>
+            {!editMarital && (
+              <button
+                className="text-blue-600 flex items-center gap-1 text-sm"
+                onClick={() => setEditMarital(true)}
+                type="button"
+              >
+                <Edit className="h-4 w-4"/>
+              </button>
+            )}
+          </div>
+          {!editMarital ? (
+            <div className="mt-1">
+              <span className="text-gray-800 capitalize">{profile.marital_status || "Not specified"}</span>
+              {profile.marital_status === "married" && (
+                <span className="ml-4 text-gray-600">Dependants: {profile.number_of_dependants ?? "-"}</span>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-2 mt-2">
+              <select
+                className="border-b-2 border-blue-600 focus:border-green-600 outline-none px-3 py-2 w-full"
+                value={maritalStatus}
+                onChange={e => setMaritalStatus(e.target.value)}
+                disabled={savingMarital}
+              >
+                <option value="">Select...</option>
+                {maritalOptions.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+              {maritalStatus === "married" && (
+                <input
+                  type="number"
+                  placeholder="Number of dependants (optional)"
+                  min={0}
+                  className="border-b-2 border-blue-600 focus:border-green-600 outline-none px-3 py-2 w-full"
+                  value={dependants}
+                  onChange={e => setDependants(e.target.value)}
+                  disabled={savingMarital}
+                />
+              )}
+              <div className="flex gap-2 mt-2 w-full">
+                <Button variant="outline" className="w-1/2" onClick={handleCancelMarital} type="button" disabled={savingMarital}>Cancel</Button>
+                <Button
+                  className="w-1/2"
+                  onClick={handleSaveMarital}
+                  disabled={savingMarital || !isDirtyMarital}
+                  type="button"
+                >
+                  {savingMarital ? "Saving..." : "Save"}
+                </Button>
+              </div>
+              {messageMarital && <div className="text-sm text-gray-500 mt-2">{messageMarital}</div>}
+            </div>
+          )}
+        </div>
+        {/* Lending License */}
+        <div>
+          <div className="flex items-center justify-between">
+            <label className="font-semibold block mb-2">Lending License</label>
+            {!editLicense && (
+              <button
+                className="text-blue-600 flex items-center gap-1 text-sm"
+                onClick={() => setEditLicense(true)}
+                type="button"
+              >
+                <Edit className="h-4 w-4"/>
+              </button>
+            )}
+          </div>
+          {!editLicense ? (
+            <div>
+              {profile.lending_license_url ? (
+                <img
+                  src={profile.lending_license_url}
+                  alt="Lending License"
+                  className="w-40 h-40 object-cover mb-2 rounded border"
+                />
+              ) : (
+                <span className="text-gray-800">No license uploaded</span>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {licenseUrl && (
+                <img
+                  src={licenseUrl}
+                  alt="Lending License Preview"
+                  className="w-40 h-40 object-cover mb-2 rounded border"
+                />
+              )}
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleLicenseFileChange}
+                disabled={uploading || savingLicense}
+                className="w-full"
+              />
+              {licenseFileError && <div className="text-sm text-red-500 mt-1">{licenseFileError}</div>}
+              <div className="flex gap-2 mt-2 w-full">
+                <Button variant="outline" className="w-1/2" onClick={handleCancelLicense} type="button" disabled={savingLicense}>Cancel</Button>
+                <Button
+                  className="w-1/2"
+                  onClick={handleSaveLicense}
+                  disabled={savingLicense || uploading || !isDirtyLicense}
+                  type="button"
+                >
+                  {savingLicense || uploading ? "Saving..." : "Save"}
+                </Button>
+              </div>
+              {messageLicense && <div className="text-sm text-gray-500 mt-2">{messageLicense}</div>}
+            </div>
+          )}
+        </div>
+        {/* Valid Means of Identification */}
+        <div>
+          <div className="flex items-center justify-between">
+            <label className="font-semibold block mb-2">Valid Means of Identification</label>
+            {!editIdDoc && (
+              <button
+                className="text-blue-600 flex items-center gap-1 text-sm"
+                onClick={() => setEditIdDoc(true)}
+                type="button"
+              >
+                <Edit className="h-4 w-4"/>
+              </button>
+            )}
+          </div>
+          {!editIdDoc ? (
+            <div>
+              {profile.id_document_url ? (
+                <img
+                  src={profile.id_document_url}
+                  alt="ID Document"
+                  className="w-40 h-40 object-cover mb-2 rounded border"
+                />
+              ) : (
+                <span className="text-gray-800">No ID document uploaded</span>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {idDocUrl && (
+                <img
+                  src={idDocUrl}
+                  alt="ID Document Preview"
+                  className="w-40 h-40 object-cover mb-2 rounded border"
+                />
+              )}
+              <select
+                className="border-b-2 border-blue-600 focus:border-green-600 outline-none px-3 py-2 w-full"
+                value={idType}
+                onChange={e => setIdType(e.target.value)}
+                disabled={savingIdDoc}
+              >
+                <option value="">Select ID Type...</option>
+                {ID_TYPE_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+              <input
+                type="text"
+                className="border-b-2 border-blue-600 focus:border-green-600 outline-none px-3 py-2 w-full"
+                placeholder="ID Card Number"
+                value={idNumber}
+                onChange={e => setIdNumber(e.target.value)}
+                disabled={savingIdDoc}
+              />
+              <input
+                type="file"
+                accept="image/*,application/pdf"
+                onChange={handleIdDocFileChange}
+                disabled={savingIdDoc}
+                className="w-full"
+              />
+              {idDocFileError && <div className="text-sm text-red-500 mt-1">{idDocFileError}</div>}
+              <div className="flex gap-2 mt-2 w-full">
+                <Button variant="outline" className="w-1/2" onClick={handleCancelIdDoc} type="button" disabled={savingIdDoc}>Cancel</Button>
+                <Button
+                  className="w-1/2"
+                  onClick={handleSaveIdDoc}
+                  disabled={savingIdDoc || (!idDocFile && !idDocUrl) || !idType || !idNumber}
+                  type="button"
+                >
+                  {savingIdDoc ? "Saving..." : "Save"}
+                </Button>
+              </div>
+              {messageIdDoc && <div className="text-sm text-gray-500 mt-2">{messageIdDoc}</div>}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  const NIGERIAN_STATES = [
+    "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno", "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu", "FCT", "Gombe", "Imo", "Jigawa", "Kaduna", "Kano", "Katsina", "Kebbi", "Kogi", "Kwara", "Lagos", "Nasarawa", "Niger", "Ogun", "Ondo", "Osun", "Oyo", "Plateau", "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara"
+  ];
+
+  const quillModules = {
+    toolbar: [
+      ['bold', 'italic', 'underline'],
+      [{ list: 'ordered' }, { list: 'bullet' }],
+      ['link'],
+    ],
+  };
+  const quillFormats = [
+    'bold', 'italic', 'underline', 'list', 'bullet', 'link',
+  ];
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -129,6 +1001,46 @@ export function ProfileAbout({ profile, isCurrentUser = false }: ProfileAboutPro
               </div>
               <div className="flex-grow">
                 <div className="flex justify-between items-start">
+                   {isEditingWorkOverview ? (
+                     <div className="space-y-2 w-full">
+                       <input
+                         type="text"
+                         value={workOverviewJobTitle}
+                         onChange={(e) => setWorkOverviewJobTitle(e.target.value)}
+                         placeholder="Job Title"
+                         className="border-b-3 border-solid !important border-b-blue-600 !important focus-visible:border-b-green-600 !important rounded-none px-3 py-2 w-full"
+                       />
+                       <input
+                         type="text"
+                         value={workOverviewEmployerName}
+                         onChange={(e) => setWorkOverviewEmployerName(e.target.value)}
+                         placeholder="Employer Name"
+                         className="border-b-3 border-solid !important border-b-blue-600 !important focus-visible:border-b-green-600 !important rounded-none px-3 py-2 w-full"
+                       />
+                        <input
+                         type="text"
+                         value={workOverviewEmployerAddress}
+                         onChange={(e) => setWorkOverviewEmployerAddress(e.target.value)}
+                         placeholder="Employer Address"
+                         className="border-b-3 border-solid !important border-b-blue-600 !important focus-visible:border-b-green-600 !important rounded-none px-3 py-2 w-full"
+                       />
+                        <select
+                         value={workOverviewEmploymentStatus}
+                         onChange={(e) => setWorkOverviewEmploymentStatus(e.target.value)}
+                         className="border-b-3 border-solid !important border-b-blue-600 !important focus-visible:border-b-green-600 !important rounded-none px-3 py-2 w-full"
+                        >
+                         <option value="">Select Employment Status</option>
+                         <option value="Employed">Employed</option>
+                         <option value="Self-Employed">Self-Employed</option>
+                         <option value="Unemployed">Unemployed</option>
+                         <option value="Student">Student</option>
+                       </select>
+                       <div className="flex justify-end gap-2 mt-2">
+                         <Button variant="outline" onClick={handleCancelEditWorkOverview}>Cancel</Button>
+                         <Button onClick={handleSaveWorkOverview} disabled={workOverviewJobTitle === (profile.job_title || "") && workOverviewEmployerName === (profile.employer_name || "") && workOverviewEmployerAddress === (profile.employer_address || "") && workOverviewEmploymentStatus === (profile.employment_status || "")}>Save</Button>
+                       </div>
+                     </div>
+                   ) : (
                   <div>
                     <h3 className="text-lg font-medium">
                       {profile.job_title && profile.employer_name
@@ -142,11 +1054,10 @@ export function ProfileAbout({ profile, isCurrentUser = false }: ProfileAboutPro
                     {profile.employer_address && <p className="text-gray-600">{profile.employer_address}</p>}
                     {profile.employment_status && <p className="text-gray-600">{profile.employment_status}</p>}
                   </div>
+                   )}
                   {isCurrentUser && (
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" asChild>
-                      <Link href="/profile/edit?tab=employment">
+                     <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setIsEditingWorkOverview(true)}>
                         <Edit className="h-4 w-4" />
-                      </Link>
                     </Button>
                   )}
                 </div>
@@ -160,17 +1071,46 @@ export function ProfileAbout({ profile, isCurrentUser = false }: ProfileAboutPro
               </div>
               <div className="flex-grow">
                 <div className="flex justify-between items-start">
+                   {isEditingLocation ? (
+                     <div className="space-y-2 w-full">
+                       <input
+                         type="text"
+                         value={locationAddress}
+                         onChange={(e) => setLocationAddress(e.target.value)}
+                         placeholder="Address"
+                         className="border-b-3 border-solid !important border-b-blue-600 !important focus-visible:border-b-green-600 !important rounded-none px-3 py-2 w-full"
+                       />
+                       <input
+                         type="text"
+                         value={locationCity}
+                         onChange={(e) => setLocationCity(e.target.value)}
+                         placeholder="City"
+                         className="border-b-3 border-solid !important border-b-blue-600 !important focus-visible:border-b-green-600 !important rounded-none px-3 py-2 w-full"
+                       />
+                       <select
+                         value={(locationState ?? '') + ''}
+                         onChange={(e) => setLocationState(e.target.value)}
+                         className="border-b-3 border-solid !important border-b-blue-600 !important focus-visible:border-b-green-600 !important rounded-none px-3 py-2 w-full"
+                       >
+                         <option value="">Select State</option>
+                         {NIGERIAN_STATES.map(state => <option key={state} value={state}>{state}</option>)}
+                       </select>
+                       <div className="flex justify-end gap-2 mt-2">
+                         <Button variant="outline" onClick={handleCancelEditLocation}>Cancel</Button>
+                         <Button onClick={handleSaveLocation} disabled={locationAddress === (profile.address || "") && locationCity === (profile.city || "") && locationState === (profile.state || "")}>Save</Button>
+                       </div>
+                     </div>
+                   ) : (
                   <div>
                     <h3 className="text-lg font-medium">
                       Lives in {profile.city || "Not specified"}, {profile.state || "Not specified"}
                     </h3>
                     <p className="text-gray-600">{profile.address}</p>
                   </div>
+                   )}
                   {isCurrentUser && (
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" asChild>
-                      <Link href="/profile/edit?tab=personal">
+                     <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setIsEditingLocation(true)}>
                         <Edit className="h-4 w-4" />
-                      </Link>
                     </Button>
                   )}
                 </div>
@@ -184,18 +1124,34 @@ export function ProfileAbout({ profile, isCurrentUser = false }: ProfileAboutPro
               </div>
               <div className="flex-grow">
                 <div className="flex justify-between items-start">
+                   {isEditingPhone ? (
+                     <div className="space-y-2 w-full">
+                       <input
+                         type="text"
+                         value={phoneText}
+                         onChange={(e) => setPhoneText(e.target.value)}
+                         placeholder="Phone Number"
+                         className="border-b-3 border-solid !important border-b-blue-600 !important focus-visible:border-b-green-600 !important rounded-none px-3 py-2 w-full"
+                       />
+                       <div className="flex justify-end gap-2 mt-2">
+                         <Button variant="outline" onClick={handleCancelEditPhone}>Cancel</Button>
+                         <Button onClick={handleSavePhone} disabled={phoneText === (profile.phone_number || "")}>Save</Button>
+                       </div>
+                     </div>
+                   ) : (
+                     <div className="flex justify-between items-start w-full">
                   <div>
                     <h3 className="text-lg font-medium">{profile.phone_number || "No phone number added"}</h3>
                     <p className="text-gray-600">Mobile</p>
                   </div>
                   {isCurrentUser && (
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" asChild>
-                      <Link href="/profile/edit?tab=personal">
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setIsEditingPhone(true)}>
                         <Edit className="h-4 w-4" />
-                      </Link>
                     </Button>
                   )}
                 </div>
+                    )}
+                  </div>
               </div>
             </div>
 
@@ -206,39 +1162,29 @@ export function ProfileAbout({ profile, isCurrentUser = false }: ProfileAboutPro
               </div>
               <div className="flex-grow">
                 <div className="flex justify-between items-start">
+                   {isEditingEmail ? (
+                     <div className="space-y-2 w-full">
+                       <input
+                         type="email"
+                         value={emailText}
+                         onChange={(e) => setEmailText(e.target.value)}
+                         placeholder="Email Address"
+                         className="border-b-3 border-solid !important border-b-blue-600 !important focus-visible:border-b-green-600 !important rounded-none px-3 py-2 w-full"
+                       />
+                       <div className="flex justify-end gap-2 mt-2">
+                         <Button variant="outline" onClick={handleCancelEditEmail}>Cancel</Button>
+                         <Button onClick={handleSaveEmail} disabled={emailText === (profile.email || "")}>Save</Button>
+                       </div>
+                     </div>
+                   ) : (
+                     <div className="flex justify-between items-start w-full">
                   <div>
                     <h3 className="text-lg font-medium">{profile.email || "No email added"}</h3>
                     <p className="text-gray-600">Email</p>
                   </div>
-                  {isCurrentUser && (
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" asChild>
-                      <Link href="/profile/edit?tab=personal">
-                        <Edit className="h-4 w-4" />
-                      </Link>
-                    </Button>
-                  )}
                 </div>
-              </div>
-            </div>
-
-            {/* Relationship Status */}
-            <div className="flex items-start gap-4">
-              <div className="mt-1">
-                <Heart className="h-10 w-10 p-2 bg-gray-100 text-gray-500 rounded-full" />
-              </div>
-              <div className="flex-grow">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h3 className="text-lg font-medium">{profile.relationship_status || "Single"}</h3>
+                     )}
                   </div>
-                  {isCurrentUser && (
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" asChild>
-                      <Link href="/profile/edit?tab=personal">
-                        <Edit className="h-4 w-4" />
-                      </Link>
-                    </Button>
-                  )}
-                </div>
               </div>
             </div>
           </div>
@@ -253,6 +1199,46 @@ export function ProfileAbout({ profile, isCurrentUser = false }: ProfileAboutPro
               </div>
               <div className="flex-grow">
                 <div className="flex justify-between items-start">
+                   {isEditingWorkOverview ? (
+                     <div className="space-y-2 w-full">
+                       <input
+                         type="text"
+                         value={workOverviewJobTitle}
+                         onChange={(e) => setWorkOverviewJobTitle(e.target.value)}
+                         placeholder="Job Title"
+                         className="border-b-3 border-solid !important border-b-blue-600 !important focus-visible:border-b-green-600 !important rounded-none px-3 py-2 w-full"
+                       />
+                       <input
+                         type="text"
+                         value={workOverviewEmployerName}
+                         onChange={(e) => setWorkOverviewEmployerName(e.target.value)}
+                         placeholder="Employer Name"
+                         className="border-b-3 border-solid !important border-b-blue-600 !important focus-visible:border-b-green-600 !important rounded-none px-3 py-2 w-full"
+                       />
+                        <input
+                         type="text"
+                         value={workOverviewEmployerAddress}
+                         onChange={(e) => setWorkOverviewEmployerAddress(e.target.value)}
+                         placeholder="Employer Address"
+                         className="border-b-3 border-solid !important border-b-blue-600 !important focus-visible:border-b-green-600 !important rounded-none px-3 py-2 w-full"
+                       />
+                        <select
+                         value={workOverviewEmploymentStatus}
+                         onChange={(e) => setWorkOverviewEmploymentStatus(e.target.value)}
+                         className="border-b-3 border-solid !important border-b-blue-600 !important focus-visible:border-b-green-600 !important rounded-none px-3 py-2 w-full"
+                        >
+                         <option value="">Select Employment Status</option>
+                         <option value="Employed">Employed</option>
+                         <option value="Self-Employed">Self-Employed</option>
+                         <option value="Unemployed">Unemployed</option>
+                         <option value="Student">Student</option>
+                       </select>
+                       <div className="flex justify-end gap-2 mt-2">
+                         <Button variant="outline" onClick={handleCancelEditWorkOverview}>Cancel</Button>
+                         <Button onClick={handleSaveWorkOverview} disabled={workOverviewJobTitle === (profile.job_title || "") && workOverviewEmployerName === (profile.employer_name || "") && workOverviewEmployerAddress === (profile.employer_address || "") && workOverviewEmploymentStatus === (profile.employment_status || "")}>Save</Button>
+                       </div>
+                     </div>
+                   ) : (
                   <div>
                     <h3 className="text-lg font-medium">
                       {profile.job_title && profile.employer_name
@@ -261,22 +1247,15 @@ export function ProfileAbout({ profile, isCurrentUser = false }: ProfileAboutPro
                           ? profile.job_title
                           : profile.employer_name
                             ? `Works at ${profile.employer_name}`
-                            : "No work information added"}
+                               : "Work"}
                     </h3>
                     {profile.employer_address && <p className="text-gray-600">{profile.employer_address}</p>}
                     {profile.employment_status && <p className="text-gray-600">{profile.employment_status}</p>}
-                    {profile.employment_start_date && (
-                      <p className="text-gray-600">
-                        Since {new Date(profile.employment_start_date).getFullYear()}
-                        {profile.employment_end_date && ` to ${new Date(profile.employment_end_date).getFullYear()}`}
-                      </p>
-                    )}
                   </div>
+                   )}
                   {isCurrentUser && (
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" asChild>
-                      <Link href="/profile/edit?tab=employment">
+                     <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setIsEditingWorkOverview(true)}>
                         <Edit className="h-4 w-4" />
-                      </Link>
                     </Button>
                   )}
                 </div>
@@ -284,15 +1263,101 @@ export function ProfileAbout({ profile, isCurrentUser = false }: ProfileAboutPro
             </div>
 
             <h2 className="text-xl font-medium mt-8">Education</h2>
-            <div className="flex items-center gap-4 text-gray-500">
-              <GraduationCap className="h-5 w-5" />
-              <span>No education information added</span>
+             <div className="flex items-start gap-4">
+               <div className="mt-1">
+                 <GraduationCap className="h-10 w-10 p-2 bg-gray-100 text-gray-500 rounded-full" />
+               </div>
+               <div className="flex-grow">
+                 <div className="flex justify-between items-start">
+                   {isEditingEducation ? (
+                     <div className="space-y-2 w-full">
+                       <input
+                         type="text"
+                         value={schoolName}
+                         onChange={(e) => setSchoolName(e.target.value)}
+                         placeholder="School Name"
+                         className="border-b-3 border-solid !important border-b-blue-600 !important focus-visible:border-b-green-600 !important rounded-none px-3 py-2 w-full"
+                       />
+                       <input
+                         type="text"
+                         value={degree}
+                         onChange={(e) => setDegree(e.target.value)}
+                         placeholder="Degree"
+                         className="border-b-3 border-solid !important border-b-blue-600 !important focus-visible:border-b-green-600 !important rounded-none px-3 py-2 w-full"
+                       />
+                       <input
+                         type="text"
+                         value={fieldOfStudy}
+                         onChange={(e) => setFieldOfStudy(e.target.value)}
+                         placeholder="Field of Study"
+                         className="border-b-3 border-solid !important border-b-blue-600 !important focus-visible:border-b-green-600 !important rounded-none px-3 py-2 w-full"
+                       />
+                       <input
+                         type="number"
+                         value={graduationYear}
+                         onChange={(e) => setGraduationYear(e.target.value)}
+                         placeholder="Graduation Year"
+                         className="border-b-3 border-solid !important border-b-blue-600 !important focus-visible:border-b-green-600 !important rounded-none px-3 py-2 w-full"
+                       />
+                       <div className="flex justify-end gap-2 mt-2">
+                         <Button variant="outline" onClick={handleCancelEditEducation}>Cancel</Button>
+                         <Button onClick={handleSaveEducation} disabled={schoolName === (profile.school_name || "") && degree === (profile.degree || "") && fieldOfStudy === (profile.field_of_study || "") && graduationYear === (profile.graduation_year || "")}>Save</Button>
+                       </div>
+                     </div>
+                   ) : (
+                     <div>
+                       <h3 className="text-lg font-medium">
+                         {profile.degree && profile.field_of_study
+                           ? `${profile.degree} in ${profile.field_of_study}`
+                           : profile.degree
+                             ? profile.degree
+                             : profile.field_of_study
+                               ? profile.field_of_study
+                               : "No education information added"}
+                       </h3>
+                       {profile.school_name && <p className="text-gray-600">{profile.school_name}</p>}
+                       {profile.graduation_year && <p className="text-gray-600">Graduated in {profile.graduation_year}</p>}
+                     </div>
+                   )}
               {isCurrentUser && (
-                <Button variant="outline" size="sm">
-                  <Edit className="h-4 w-4 mr-2" /> Add education
+                     <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setIsEditingEducation(true)}>
+                       <Edit className="h-4 w-4" />
                 </Button>
               )}
+                 </div>
+               </div>
             </div>
+
+            {isCurrentUser && (
+              <div className="mt-2 text-gray-700 font-medium">
+                Monthly Income: {isEditingMonthlyIncome ? (
+                  <>
+                    <input
+                      type="number"
+                      min={0}
+                      className="border-b-2 border-blue-600 focus:border-green-600 outline-none px-3 py-2 w-full"
+                      value={monthlyIncomeValue}
+                      onChange={e => setMonthlyIncomeValue(e.target.value)}
+                      disabled={isSavingMonthlyIncome}
+                    />
+                    <div className="flex gap-2 mt-2 w-full">
+                      <Button variant="outline" className="w-1/2" onClick={handleCancelMonthlyIncome} type="button" disabled={isSavingMonthlyIncome}>Cancel</Button>
+                      <Button className="w-1/2" onClick={handleSaveMonthlyIncome} disabled={isSavingMonthlyIncome || Number(monthlyIncomeValue) === profile.monthly_income} type="button">
+                        {isSavingMonthlyIncome ? "Saving..." : "Save"}
+                      </Button>
+                    </div>
+                    {monthlyIncomeError && <div className="text-sm text-red-500 mt-2">{monthlyIncomeError}</div>}
+                  </>
+                ) : (
+                  <>
+                    ₦{Number(profile.monthly_income).toLocaleString()}
+                    <Button variant="ghost" size="sm" className="ml-2 h-8 w-8 p-0" onClick={() => setIsEditingMonthlyIncome(true)}>
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -305,32 +1370,50 @@ export function ProfileAbout({ profile, isCurrentUser = false }: ProfileAboutPro
               </div>
               <div className="flex-grow">
                 <div className="flex justify-between items-start">
+                   {isEditingLocation ? (
+                     <div className="space-y-2 w-full">
+                       <input
+                         type="text"
+                         value={locationAddress}
+                         onChange={(e) => setLocationAddress(e.target.value)}
+                         placeholder="Address"
+                         className="border-b-3 border-solid !important border-b-blue-600 !important focus-visible:border-b-green-600 !important rounded-none px-3 py-2 w-full"
+                       />
+                       <input
+                         type="text"
+                         value={locationCity}
+                         onChange={(e) => setLocationCity(e.target.value)}
+                         placeholder="City"
+                         className="border-b-3 border-solid !important border-b-blue-600 !important focus-visible:border-b-green-600 !important rounded-none px-3 py-2 w-full"
+                       />
+                       <select
+                         value={(locationState ?? '') + ''}
+                         onChange={(e) => setLocationState(e.target.value)}
+                         className="border-b-3 border-solid !important border-b-blue-600 !important focus-visible:border-b-green-600 !important rounded-none px-3 py-2 w-full"
+                       >
+                         <option value="">Select State</option>
+                         {NIGERIAN_STATES.map(state => <option key={state} value={state}>{state}</option>)}
+                       </select>
+                       <div className="flex justify-end gap-2 mt-2">
+                         <Button variant="outline" onClick={handleCancelEditLocation}>Cancel</Button>
+                         <Button onClick={handleSaveLocation} disabled={locationAddress === (profile.address || "") && locationCity === (profile.city || "") && locationState === (profile.state || "")}>Save</Button>
+                       </div>
+                     </div>
+                   ) : (
                   <div>
                     <h3 className="text-lg font-medium">
                       Lives in {profile.city || "Not specified"}, {profile.state || "Not specified"}
                     </h3>
                     <p className="text-gray-600">{profile.address}</p>
-                    {profile.country && <p className="text-gray-600">{profile.country}</p>}
                   </div>
+                   )}
                   {isCurrentUser && (
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" asChild>
-                      <Link href="/profile/edit?tab=personal">
+                     <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setIsEditingLocation(true)}>
                         <Edit className="h-4 w-4" />
-                      </Link>
                     </Button>
                   )}
                 </div>
               </div>
-            </div>
-
-            <h2 className="text-xl font-medium mt-8">Hometown</h2>
-            <div className="flex items-center gap-4">
-              {isCurrentUser && (
-                <Button variant="outline">
-                  <Edit className="h-4 w-4 mr-2" /> Add hometown
-                </Button>
-              )}
-              {!isCurrentUser && <p className="text-gray-600">No hometown added</p>}
             </div>
           </div>
         )}
@@ -452,23 +1535,165 @@ export function ProfileAbout({ profile, isCurrentUser = false }: ProfileAboutPro
             <h2 className="text-xl font-medium">About You</h2>
             <div className="flex items-start gap-4">
               <div className="flex-grow">
+                 {isEditingBio ? (
+                   <div className="space-y-4">
+                     <Textarea
+                       placeholder="Tell us about yourself..."
+                       value={bioText}
+                       onChange={(e) => setBioText(e.target.value)}
+                       rows={4}
+                     />
+                     <div className="flex justify-end gap-2">
+                       <Button variant="outline" onClick={handleCancelEditBio}>Cancel</Button>
+                       <Button onClick={handleSaveBio} disabled={bioText === (profile.bio || "")}>Save</Button>
+                     </div>
+                   </div>
+                 ) : (
+                   <div className="flex justify-between items-start">
                 <p className="text-gray-700">{profile.bio || "No details to show"}</p>
-                {isCurrentUser && !profile.bio && (
-                  <Button variant="outline" className="mt-4">
-                    <Edit className="h-4 w-4 mr-2" /> Add bio
+                     {isCurrentUser && (
+                       <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setIsEditingBio(true)}>
+                         <Edit className="h-4 w-4" />
                   </Button>
+                     )}
+                   </div>
                 )}
               </div>
             </div>
 
-            <h2 className="text-xl font-medium mt-8">Name Pronunciation</h2>
-            <div className="flex items-center gap-4 text-gray-500">
-              <span>No name pronunciation added</span>
-              {isCurrentUser && (
-                <Button variant="outline" size="sm">
-                  <Edit className="h-4 w-4 mr-2" /> Add pronunciation
-                </Button>
-              )}
+            <DetailsAboutYouSection
+              profile={profile}
+              onUpdate={handleUpdate}
+              uploadLendingLicense={uploadLendingLicense}
+              />
+          </div>
+        )}
+
+        {activeSection === "bank" && (
+          <div className="space-y-6">
+            <h2 className="text-xl font-medium">Bank Account Details</h2>
+            <div className="flex items-start gap-4">
+              <div className="flex-grow">
+                {isEditingBank ? (
+                  <div className="space-y-2 w-full">
+                    <input
+                      type="text"
+                      value={bankName}
+                      onChange={e => setBankName(e.target.value)}
+                      placeholder="Bank Name"
+                      className="border-b-2 border-blue-600 focus:border-green-600 outline-none px-3 py-2 w-full"
+                    />
+                    <input
+                      type="text"
+                      value={accountNumber}
+                      onChange={e => setAccountNumber(e.target.value)}
+                      placeholder="Account Number"
+                      className="border-b-2 border-blue-600 focus:border-green-600 outline-none px-3 py-2 w-full"
+                    />
+                    <input
+                      type="text"
+                      value={accountName}
+                      onChange={e => setAccountName(e.target.value)}
+                      placeholder="Account Name"
+                      className="border-b-2 border-blue-600 focus:border-green-600 outline-none px-3 py-2 w-full"
+                    />
+                    <div className="flex gap-2 mt-2 w-full">
+                      <Button variant="outline" className="w-1/2" onClick={handleCancelBank} type="button" disabled={isSavingBank}>Cancel</Button>
+                      <Button className="w-1/2" onClick={handleSaveBank} disabled={isSavingBank || (bankName === (profile.bank_name || "") && accountNumber === (profile.account_number || "") && accountName === (profile.account_name || ""))} type="button">
+                        {isSavingBank ? "Saving..." : "Save"}
+                      </Button>
+                    </div>
+                    {bankError && <div className="text-sm text-red-500 mt-2">{bankError}</div>}
+                  </div>
+                ) : (
+                  <div className="flex justify-between items-start w-full">
+                    <div>
+                      <h3 className="text-lg font-medium">{profile.bank_name || "No bank name added"}</h3>
+                      <p className="text-gray-600">Account Number: {profile.account_number || "-"}</p>
+                      <p className="text-gray-600">Account Name: {profile.account_name || "-"}</p>
+                    </div>
+                    {isCurrentUser && (
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setIsEditingBank(true)}>
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeSection === "loan-helper" && (
+          <div className="space-y-8">
+            <h2 className="text-xl font-medium">Loan Helper Settings</h2>
+            <div className="flex items-start gap-4">
+              <div className="flex-grow">
+                {isEditingLoanHelper ? (
+                  <div className="space-y-6 w-full">
+                    <input
+                      type="number"
+                      value={loanAmount}
+                      onChange={e => setLoanAmount(e.target.value)}
+                      placeholder="Loan Amount Offered"
+                      className="border-b-2 border-blue-600 focus:border-green-600 outline-none px-3 py-2 w-full"
+                    />
+                    <input
+                      type="number"
+                      value={interestRate}
+                      onChange={e => setInterestRate(e.target.value)}
+                      placeholder="Interest Rate (%)"
+                      className="border-b-2 border-blue-600 focus:border-green-600 outline-none px-3 py-2 w-full"
+                    />
+                    <input
+                      type="number"
+                      value={paybackPeriod}
+                      onChange={e => setPaybackPeriod(e.target.value)}
+                      placeholder="Payback Period (weeks)"
+                      className="border-b-2 border-blue-600 focus:border-green-600 outline-none px-3 py-2 w-full"
+                    />
+                    <div className="border-b-2 border-blue-600 focus:border-green-600 outline-none py-4">
+                      <label className="font-semibold mb-2 block">Loan Terms and Conditions</label>
+                      <div className="min-h-[180px]">
+                        <SlateEditor value={loanTerms} onChange={setLoanTerms} />
+                      </div>
+                    </div>
+                    <div className="flex gap-2 mt-2 w-full">
+                      <Button variant="outline" className="w-1/2" onClick={handleCancelLoanHelper} type="button" disabled={isSavingLoanHelper}>Cancel</Button>
+                      <Button className="w-1/2" onClick={handleSaveLoanHelper} disabled={isSavingLoanHelper} type="button">
+                        {isSavingLoanHelper ? "Saving..." : "Save"}
+                      </Button>
+                    </div>
+                    {loanHelperError && <div className="text-sm text-red-500 mt-2">{loanHelperError}</div>}
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-6 w-full">
+                    <div>
+                      <h3 className="text-lg font-medium mb-1">Loan Amount Offered:</h3>
+                      <p className="text-gray-600">₦{loanAmount ? Number(loanAmount).toLocaleString() : '-'}</p>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-medium mb-1">Interest Rate:</h3>
+                      <p className="text-gray-600">{interestRate || '-'}%</p>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-medium mb-1">Payback Period:</h3>
+                      <p className="text-gray-600">{paybackPeriod || '-'} weeks</p>
+                    </div>
+                    <div>
+                      <span className="text-lg font-medium block mb-1">Loan Terms and Conditions:</span>
+                      <div className="text-gray-700 mt-1 prose max-w-none min-h-[120px]">
+                        <SlateEditor value={loanTerms} readOnly />
+                      </div>
+                    </div>
+                    {isCurrentUser && (
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0 self-end" onClick={() => setIsEditingLoanHelper(true)}>
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}

@@ -37,6 +37,11 @@ import { ProfileAbout } from "@/components/profile/profile-about"
 import { ProfilePostsWrapper } from "@/components/profile/profile-posts-wrapper"
 import { ConnectionsList } from "@/components/profile/connections-list"
 import { getFollowersCount, getFollowingCount } from "@/lib/actions/connections"
+import { updateProfile } from "@/lib/actions/profile"
+import { LoanRequestsList } from "@/components/loans/LoanRequestsList"
+import { getAllLoanRequests } from "@/lib/actions/loans"
+import { getVirtualAccount } from "@/lib/actions/paystack"
+import { CreateVirtualAccountButton } from '@/components/profile/CreateVirtualAccountButton'
 
 export const dynamic = "force-dynamic"
 export const revalidate = 0
@@ -103,6 +108,20 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
   // Get active tab from search params or default to "posts"
   const activeTab = searchParams?.tab || "posts"
 
+  // Fetch all loan requests for the 'More' tab
+  let allLoanRequests: any[] = []
+  if (activeTab === "more") {
+    const allLoanReqResult = await getAllLoanRequests()
+    allLoanRequests = allLoanReqResult.loanRequests || []
+  }
+
+  // Fetch virtual account for about tab
+  let virtualAccount: any = null
+  if (activeTab === "about") {
+    const vaResult = await getVirtualAccount(user.id)
+    virtualAccount = vaResult.virtualAccount || null
+  }
+
   return (
     <MainLayout userName={fullName} userImage={profile.profile_picture_url}>
       {/* Add the auth state maintainer */}
@@ -146,9 +165,6 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
 
           {/* Action Buttons - positioned at farthest right */}
           <div className="absolute -bottom-16 right-0 md:right-4 flex gap-2">
-            <Button className="bg-blue-600 hover:bg-blue-700">
-              <span className="mr-1">+</span> Add to story
-            </Button>
             <Button asChild variant="outline" className="bg-gray-200 border-gray-300 hover:bg-gray-300 text-black">
               <Link href="/profile/edit">
                 <Edit className="mr-2 h-4 w-4" />
@@ -235,6 +251,11 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
           />
         ) : activeTab === "about" ? (
           <ProfileAbout profile={profile} isCurrentUser={true} />
+        ) : activeTab === "more" ? (
+          <div className="lg:col-span-12">
+            <h2 className="text-xl font-bold mb-4">All Loan Requests</h2>
+            <LoanRequestsList loanRequests={allLoanRequests} currentUserId={user.id} showAdminActions />
+          </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6" id="overview">
             {/* Left Sidebar - About section (4/12) */}
@@ -258,7 +279,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
                     </div>
                     <div className="flex items-center gap-2 text-gray-700">
                       <Rss className="h-5 w-5 text-gray-500" />
-                      <span>Followed by {followersCount?.length || 0} people</span>
+                      <span>Followed by {followersCount || 0} people</span>
                     </div>
                     {profile.website && (
                       <div className="flex items-center gap-2 text-gray-700">
@@ -274,71 +295,10 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
                     <Link href="/profile/edit">Edit details</Link>
                   </Button>
                 </CardContent>
-                {profile.profile_picture_url && (
-                  <div className="px-6 pb-4">
-                    <div className="grid grid-cols-3 gap-1 mt-2 w-full">
-                      <div className="aspect-square bg-gray-200 rounded overflow-hidden">
-                        <img
-                          src={profile.profile_picture_url || "/placeholder.svg"}
-                          alt="Profile thumbnail"
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
               </Card>
 
-              {/* Keep the existing About card for additional info */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">About</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-start gap-2">
-                    <Mail className="h-5 w-5 text-muted-foreground mt-0.5" />
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Email</p>
-                      <p>{profile.email || "Not provided"}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-2">
-                    <Phone className="h-5 w-5 text-muted-foreground mt-0.5" />
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Phone</p>
-                      <p>{profile.phone_number || "Not provided"}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-2">
-                    <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Address</p>
-                      <p>
-                        {[profile.address, profile.city, profile.state, profile.country].filter(Boolean).join(", ") ||
-                          "Not provided"}
-                      </p>
-                    </div>
-                  </div>
-
-                  {profile.employment_status && (
-                    <div className="flex items-start gap-2">
-                      <Briefcase className="h-5 w-5 text-muted-foreground mt-0.5" />
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Employment</p>
-                        <p>
-                          {profile.employment_status}
-                          {profile.employer_name && ` at ${profile.employer_name}`}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Loan Helper Settings Card - Keep if it exists */}
-              {loanHelperSettings && (
+              {/* Loan Helper Settings Card - Only show in about tab */}
+              {activeTab === "about" && loanHelperSettings && (
                 <Card>
                   <CardHeader>
                     <div className="flex justify-between items-center">
@@ -370,6 +330,27 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
                   </CardContent>
                 </Card>
               )}
+              {/* Virtual Account Card */}
+              {activeTab === "about" && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Virtual Account</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {virtualAccount ? (
+                      <div className="space-y-2">
+                        <div className="font-semibold">Account Number: <span className="font-mono">{virtualAccount.account_number}</span></div>
+                        <div>Account Name: {virtualAccount.account_name}</div>
+                        <div>Bank: {virtualAccount.bank_name}</div>
+                        <div>Currency: {virtualAccount.currency}</div>
+                        <div>Status: {virtualAccount.assigned ? <Badge className="bg-green-500">Active</Badge> : <Badge className="bg-gray-400">Inactive</Badge>}</div>
+                      </div>
+                    ) : (
+                      <CreateVirtualAccountButton />
+                    )}
+                  </CardContent>
+                </Card>
+              )}
             </div>
 
             {/* Main Content - Posts section (8/12) */}
@@ -387,4 +368,35 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
       </div>
     </MainLayout>
   )
+}
+
+async function uploadLendingLicense(file: File): Promise<string> {
+  const adminClient = createAdminClient();
+  const fileExt = file.name.split(".").pop();
+  const fileName = `lending-license-${Date.now()}.${fileExt}`;
+  const buffer = await file.arrayBuffer();
+
+  const { error } = await adminClient.storage
+    .from("lending-licenses")
+    .upload(fileName, new Uint8Array(buffer), {
+      contentType: file.type,
+      upsert: true,
+    });
+
+  if (error) throw new Error(error.message);
+
+  const { data } = adminClient.storage
+    .from("lending-licenses")
+    .getPublicUrl(fileName);
+
+  if (!data?.publicUrl) throw new Error("Failed to get public URL");
+
+  return data.publicUrl;
+}
+
+async function handleUpdate(fields: any) {
+  const result = await updateProfile(fields);
+  if (!result.success) {
+    throw new Error(result.error || "Failed to update profile");
+  }
 }

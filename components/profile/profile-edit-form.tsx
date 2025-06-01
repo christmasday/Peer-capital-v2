@@ -244,7 +244,7 @@ export function ProfileEditForm({ profile, initialTab = "personal" }: ProfileEdi
         toast({
           title: "Profile Updated",
           description: "Your profile has been updated successfully!",
-          variant: "success",
+          variant: "default",
         })
 
         // Redirect back to profile page after 2 seconds
@@ -411,7 +411,7 @@ export function ProfileEditForm({ profile, initialTab = "personal" }: ProfileEdi
                             placeholder="First Name"
                             value={firstName}
                             onChange={(e) => setFirstName(e.target.value)}
-                            className="border-gray-300 focus:border-blue-500"
+                            className=""
                             required
                           />
                         </div>
@@ -425,7 +425,7 @@ export function ProfileEditForm({ profile, initialTab = "personal" }: ProfileEdi
                             placeholder="Last Name"
                             value={lastName}
                             onChange={(e) => setLastName(e.target.value)}
-                            className="border-gray-300 focus:border-blue-500"
+                            className=""
                             required
                           />
                         </div>
@@ -440,7 +440,7 @@ export function ProfileEditForm({ profile, initialTab = "personal" }: ProfileEdi
                           placeholder="Middle Name"
                           value={middleName}
                           onChange={(e) => setMiddleName(e.target.value)}
-                          className="border-gray-300 focus:border-blue-500"
+                          className=""
                         />
                       </div>
 
@@ -455,7 +455,7 @@ export function ProfileEditForm({ profile, initialTab = "personal" }: ProfileEdi
                             placeholder="Phone Number"
                             value={phoneNumber}
                             onChange={(e) => setPhoneNumber(e.target.value)}
-                            className="pl-10 border-gray-300 focus:border-blue-500"
+                            className="pl-10"
                             required
                           />
                         </div>
@@ -473,7 +473,7 @@ export function ProfileEditForm({ profile, initialTab = "personal" }: ProfileEdi
                             placeholder="Enter your BVN"
                             value={bvn}
                             onChange={(e) => setBvn(e.target.value)}
-                            className="pl-10 border-gray-300 focus:border-blue-500"
+                            className="pl-10"
                           />
                         </div>
                         <p className="text-xs text-gray-500">
@@ -493,7 +493,7 @@ export function ProfileEditForm({ profile, initialTab = "personal" }: ProfileEdi
                             type="date"
                             value={dateOfBirth}
                             onChange={(e) => setDateOfBirth(e.target.value)}
-                            className="pl-10 border-gray-300 focus:border-blue-500"
+                            className="pl-10"
                           />
                         </div>
                       </div>
@@ -517,7 +517,7 @@ export function ProfileEditForm({ profile, initialTab = "personal" }: ProfileEdi
                         placeholder="Street Address"
                         value={address}
                         onChange={(e) => setAddress(e.target.value)}
-                        className="border-gray-300 focus:border-blue-500"
+                        className=""
                         required
                       />
                     </div>
@@ -532,7 +532,7 @@ export function ProfileEditForm({ profile, initialTab = "personal" }: ProfileEdi
                           placeholder="City"
                           value={city}
                           onChange={(e) => setCity(e.target.value)}
-                          className="border-gray-300 focus:border-blue-500"
+                          className=""
                           required
                         />
                       </div>
@@ -546,7 +546,7 @@ export function ProfileEditForm({ profile, initialTab = "personal" }: ProfileEdi
                           placeholder="State"
                           value={state}
                           onChange={(e) => setState(e.target.value)}
-                          className="border-gray-300 focus:border-blue-500"
+                          className=""
                           required
                         />
                       </div>
@@ -560,7 +560,7 @@ export function ProfileEditForm({ profile, initialTab = "personal" }: ProfileEdi
                           placeholder="Zip/Postal Code"
                           value={zipCode}
                           onChange={(e) => setZipCode(e.target.value)}
-                          className="border-gray-300 focus:border-blue-500"
+                          className=""
                         />
                       </div>
                     </div>
@@ -587,7 +587,7 @@ export function ProfileEditForm({ profile, initialTab = "personal" }: ProfileEdi
                           ID Type <span className="text-red-500">*</span>
                         </Label>
                         <Select onValueChange={setIdType} defaultValue={idType}>
-                          <SelectTrigger className="border-gray-300 focus:border-blue-500">
+                          <SelectTrigger className="">
                             <SelectValue placeholder="Select ID type" />
                           </SelectTrigger>
                           <SelectContent>
@@ -610,7 +610,7 @@ export function ProfileEditForm({ profile, initialTab = "personal" }: ProfileEdi
                             placeholder="Enter your ID number"
                             value={idNumber}
                             onChange={(e) => setIdNumber(e.target.value)}
-                            className="pl-10 border-gray-300 focus:border-blue-500"
+                            className="pl-10"
                           />
                         </div>
                       </div>
@@ -706,7 +706,7 @@ export function ProfileEditForm({ profile, initialTab = "personal" }: ProfileEdi
                         Employment Status <span className="text-red-500">*</span>
                       </Label>
                       <Select onValueChange={setEmploymentStatus} defaultValue={employmentStatus}>
-                        <SelectTrigger className="border-gray-300 focus:border-blue-500">
+                        <SelectTrigger className="">
                           <SelectValue placeholder="Select employment status" />
                         </SelectTrigger>
                         <SelectContent>
@@ -738,7 +738,7 @@ export function ProfileEditForm({ profile, initialTab = "personal" }: ProfileEdi
                             }
                             value={employerName}
                             onChange={(e) => setEmployerName(e.target.value)}
-                            className="border-gray-300 focus:border-blue-500"
+                            className=""
                           />
                         </div>
 
@@ -756,7 +756,7 @@ export function ProfileEditForm({ profile, initialTab = "personal" }: ProfileEdi
                             }
                             value={jobTitle}
                             onChange={(e) => setJobTitle(e.target.value)}
-                            className="border-gray-300 focus:border-blue-500"
+                            className=""
                           />
                         </div>
 
@@ -773,7 +773,7 @@ export function ProfileEditForm({ profile, initialTab = "personal" }: ProfileEdi
                             }
                             value={employerAddress}
                             onChange={(e) => setEmployerAddress(e.target.value)}
-                            className="border-gray-300 focus:border-blue-500"
+                            className=""
                           />
                         </div>
 
@@ -788,7 +788,7 @@ export function ProfileEditForm({ profile, initialTab = "personal" }: ProfileEdi
                               placeholder="Enter work phone number"
                               value={workPhone}
                               onChange={(e) => setWorkPhone(e.target.value)}
-                              className="pl-10 border-gray-300 focus:border-blue-500"
+                              className="pl-10"
                             />
                           </div>
                         </div>
@@ -805,7 +805,7 @@ export function ProfileEditForm({ profile, initialTab = "personal" }: ProfileEdi
                                 type="date"
                                 value={employmentStartDate}
                                 onChange={(e) => setEmploymentStartDate(e.target.value)}
-                                className="pl-10 border-gray-300 focus:border-blue-500"
+                                className="pl-10"
                               />
                             </div>
                           </div>
@@ -821,7 +821,7 @@ export function ProfileEditForm({ profile, initialTab = "personal" }: ProfileEdi
                                 type="date"
                                 value={employmentEndDate}
                                 onChange={(e) => setEmploymentEndDate(e.target.value)}
-                                className="pl-10 border-gray-300 focus:border-blue-500"
+                                className="pl-10"
                               />
                             </div>
                           </div>
@@ -843,7 +843,7 @@ export function ProfileEditForm({ profile, initialTab = "personal" }: ProfileEdi
                           placeholder="Enter your monthly income"
                           value={monthlyIncome === undefined ? "" : monthlyIncome.toString()}
                           onChange={(e) => setMonthlyIncome(e.target.value === "" ? undefined : Number(e.target.value))}
-                          className="pl-8 border-gray-300 focus:border-blue-500"
+                          className="pl-8"
                         />
                       </div>
                       <p className="text-xs text-gray-500 mt-1">
@@ -884,7 +884,8 @@ export function ProfileEditForm({ profile, initialTab = "personal" }: ProfileEdi
                         placeholder="Enter your bank name"
                         value={bankName}
                         onChange={(e) => setBankName(e.target.value)}
-                        className="border-gray-300 focus:border-blue-500"
+                        className=""
+                        required
                       />
                     </div>
 
@@ -897,7 +898,8 @@ export function ProfileEditForm({ profile, initialTab = "personal" }: ProfileEdi
                         placeholder="Enter your account number"
                         value={accountNumber}
                         onChange={(e) => setAccountNumber(e.target.value)}
-                        className="border-gray-300 focus:border-blue-500"
+                        className=""
+                        required
                       />
                     </div>
 
@@ -910,7 +912,8 @@ export function ProfileEditForm({ profile, initialTab = "personal" }: ProfileEdi
                         placeholder="Enter your account name"
                         value={accountName}
                         onChange={(e) => setAccountName(e.target.value)}
-                        className="border-gray-300 focus:border-blue-500"
+                        className=""
+                        required
                       />
                     </div>
                   </div>
