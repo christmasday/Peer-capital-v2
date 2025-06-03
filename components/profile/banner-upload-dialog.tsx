@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Loader2, Upload, ImageIcon, Camera, AlertCircle, RefreshCw } from "lucide-react"
 import { uploadBannerImage, selectBannerImage } from "@/lib/actions/profile"
 import Cookies from "js-cookie"
+import imageCompression from 'browser-image-compression'
 
 // Predefined banner images
 const BANNER_IMAGES = [
@@ -28,6 +29,27 @@ interface BannerUploadDialogProps {
   userId: string
   currentBannerUrl?: string | null
   children?: React.ReactNode
+}
+
+// Utility to convert any image file to JPEG using a canvas
+async function convertToJpeg(file: File): Promise<File> {
+  return new Promise((resolve, reject) => {
+    const img = new window.Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx?.drawImage(img, 0, 0);
+      canvas.toBlob((blob) => {
+        if (!blob) return reject(new Error('Failed to convert image to JPEG'));
+        const jpegFile = new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' });
+        resolve(jpegFile);
+      }, 'image/jpeg', 0.85);
+    };
+    img.onerror = reject;
+    img.src = URL.createObjectURL(file);
+  });
 }
 
 export function BannerUploadDialog({ userId, currentBannerUrl, children }: BannerUploadDialogProps) {
@@ -67,25 +89,28 @@ export function BannerUploadDialog({ userId, currentBannerUrl, children }: Banne
     return true
   }
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null
     setError(null)
 
     if (file) {
-      // Validate file type
-      const validTypes = ["image/jpeg", "image/png", "image/gif"]
-      if (!validTypes.includes(file.type)) {
-        setError("Please select a valid image file (JPEG, PNG, or GIF)")
+      // Validate file type (allow any image, but always convert to JPEG)
+      if (!file.type.startsWith('image/')) {
+        setError('Please select a valid image file')
         return
       }
 
       // Validate file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
-        setError("Image size should be less than 5MB")
+        setError('Image size should be less than 5MB')
         return
       }
 
-      setBannerImage(file)
+      // Compress image
+      const compressed = await imageCompression(file, { maxSizeMB: 2, maxWidthOrHeight: 1920 })
+      // Convert to JPEG
+      const jpegFile = await convertToJpeg(compressed)
+      setBannerImage(jpegFile)
 
       // Create preview URL
       const reader = new FileReader()
@@ -95,7 +120,7 @@ export function BannerUploadDialog({ userId, currentBannerUrl, children }: Banne
       reader.onerror = () => {
         setError("Failed to read the image file. Please try again.")
       }
-      reader.readAsDataURL(file)
+      reader.readAsDataURL(jpegFile)
     }
   }
 

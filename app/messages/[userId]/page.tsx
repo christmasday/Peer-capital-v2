@@ -88,7 +88,7 @@ export default async function ConversationPage({ params }: { params: { userId: s
           <div className="flex-1 overflow-hidden">
             <MessageList otherUserId={userId} currentUserId={currentUserId} />
           </div>
-          <MessageInput recipientId={userId} onMessageSent={() => {}} />
+          <MessageInput recipientId={userId} />
         </CardContent>
       </Card>
     </div>

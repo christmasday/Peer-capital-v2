@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import type { SignupFormData } from "@/components/signup-form"
@@ -22,6 +22,37 @@ export function PersonalInfoStep({ formData, updateFormData }: PersonalInfoStepP
     bvn: "",
     dateOfBirth: "",
   })
+
+  // Add state for country and banks
+  const [country, setCountry] = useState(formData.country || "Nigeria");
+  const [countries, setCountries] = useState<{name: string, iso_code: string}[]>([]);
+  const [bankCode, setBankCode] = useState(formData.bankCode || "");
+  const [banks, setBanks] = useState<{name: string, code: string}[]>([]);
+  const [isLoadingBanks, setIsLoadingBanks] = useState(false);
+  const [isLoadingCountries, setIsLoadingCountries] = useState(false);
+
+  // Fetch countries on mount
+  useEffect(() => {
+    setIsLoadingCountries(true);
+    fetch("https://api.paystack.co/country", { headers: { Authorization: `Bearer ${process.env.NEXT_PUBLIC_PAYSTACK_KEY}` } })
+      .then(res => res.json())
+      .then(data => {
+        setCountries(data.data || []);
+        setIsLoadingCountries(false);
+      });
+  }, []);
+
+  // Fetch banks when country changes
+  useEffect(() => {
+    if (!country) return;
+    setIsLoadingBanks(true);
+    fetch(`https://api.paystack.co/bank?country=${encodeURIComponent(country)}`, { headers: { Authorization: `Bearer ${process.env.NEXT_PUBLIC_PAYSTACK_KEY}` } })
+      .then(res => res.json())
+      .then(data => {
+        setBanks(data.data || []);
+        setIsLoadingBanks(false);
+      });
+  }, [country]);
 
   const validateField = (name: string, value: string) => {
     let error = ""
@@ -217,6 +248,20 @@ export function PersonalInfoStep({ formData, updateFormData }: PersonalInfoStepP
           isError={!!errors.dateOfBirth}
         />
         {errors.dateOfBirth && <p className="text-sm text-red-500">{errors.dateOfBirth}</p>}
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="country">Country</Label>
+        <select id="country" name="country" value={country} onChange={e => { setCountry(e.target.value); updateFormData({ country: e.target.value }); }} className="w-full border-b-2 border-blue-600 focus:border-green-600 outline-none px-3 py-2">
+          {isLoadingCountries ? <option>Loading...</option> : countries.map(c => <option key={c.iso_code} value={c.name}>{c.name}</option>)}
+        </select>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="bank">Bank Name</Label>
+        <select id="bank" name="bank" value={bankCode} onChange={e => { setBankCode(e.target.value); updateFormData({ bankCode: e.target.value }); }} className="w-full border-b-2 border-blue-600 focus:border-green-600 outline-none px-3 py-2">
+          {isLoadingBanks ? <option>Loading...</option> : banks.map(b => <option key={b.code} value={b.code}>{b.name}</option>)}
+        </select>
       </div>
     </div>
   )

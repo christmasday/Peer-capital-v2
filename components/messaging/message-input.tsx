@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast"
 
 interface MessageInputProps {
   recipientId: string
-  onMessageSent: () => void
+  onMessageSent?: () => void
 }
 
 export function MessageInput({ recipientId, onMessageSent }: MessageInputProps) {
@@ -41,7 +41,7 @@ export function MessageInput({ recipientId, onMessageSent }: MessageInputProps) 
       }
 
       setMessage("")
-      onMessageSent()
+      if (onMessageSent) onMessageSent()
     } catch (error) {
       toast({
         title: "Error",

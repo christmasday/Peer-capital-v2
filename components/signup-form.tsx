@@ -30,6 +30,7 @@ export type SignupFormData = {
   state: string
   zipCode: string
   country: string
+  bankCode: string
   password: string
   confirmPassword: string
   profilePicture: File | null
@@ -53,6 +54,7 @@ export function SignupForm() {
     state: "",
     zipCode: "",
     country: "Nigeria", // Default to Nigeria
+    bankCode: "",
     password: "",
     confirmPassword: "",
     profilePicture: null,
@@ -464,6 +466,7 @@ export function SignupForm() {
             state: formData.state,
             zipCode: formData.zipCode,
             country: formData.country,
+            bankCode: formData.bankCode,
             profilePictureUrl: pictureUrl,
             referralCode: formData.referralCode,
           })

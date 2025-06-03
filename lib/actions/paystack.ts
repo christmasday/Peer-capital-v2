@@ -217,3 +217,40 @@ export async function getVirtualAccount(userId?: string) {
     return { error: "An unexpected error occurred. Please try again." }
   }
 }
+
+// Validate account with Paystack (account number, bank code, bvn)
+export async function validateAccountWithPaystack({ account_number, bank_code, bvn }: { account_number: string, bank_code: string, bvn: string }) {
+  try {
+    const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
+    if (!PAYSTACK_SECRET_KEY) {
+      return { success: false, error: "Paystack secret key not configured" };
+    }
+    const response = await fetch("https://api.paystack.co/bank/resolve", {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+        "Content-Type": "application/json",
+      },
+      // Pass params as query string
+      // Paystack expects: account_number, bank_code, bvn
+    });
+    // Actually, Paystack's validate account endpoint is:
+    // https://api.paystack.co/bank/validate?account_number=...&bank_code=...&bvn=...
+    const url = `https://api.paystack.co/bank/validate?account_number=${encodeURIComponent(account_number)}&bank_code=${encodeURIComponent(bank_code)}&bvn=${encodeURIComponent(bvn)}`;
+    const validateRes = await fetch(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+        "Content-Type": "application/json",
+      },
+    });
+    const data = await validateRes.json();
+    if (data.status) {
+      return { success: true, data: data.data };
+    } else {
+      return { success: false, error: data.message || "Validation failed" };
+    }
+  } catch (err: any) {
+    return { success: false, error: err?.message || "Validation failed" };
+  }
+}

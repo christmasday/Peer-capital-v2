@@ -34,20 +34,46 @@ export async function findLenders({ loanAmount, loanDuration }: LenderSearchPara
     const cookieStore = cookies()
     const supabase = createServerClient(cookieStore)
 
-    // Build query based on provided parameters
-    let query = supabase.from("loan_helper_settings").select(`id, user_id, loan_amount, interest_rate, repayment_time`)
+    // Get the current user's ID
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const currentUserId = session?.user?.id;
+    if (!currentUserId) {
+      return { lenders: [], error: "You must be logged in to search for lenders." };
+    }
+
+    // Get the list of user IDs the current user is following
+    const { data: followingConnections, error: followingError } = await supabase
+      .from("user_connections")
+      .select("following_id")
+      .eq("follower_id", currentUserId)
+      .eq("status", "active");
+    if (followingError) {
+      console.error("Error fetching following connections:", followingError);
+      return { lenders: [], error: "Failed to get your following list." };
+    }
+    const followingIds = (followingConnections || []).map((conn) => conn.following_id);
+    if (!followingIds.length) {
+      return { lenders: [], error: "You are not following any users who are lenders." };
+    }
+
+    // Build query based on provided parameters, and filter to only those user_ids
+    let query = supabase
+      .from("loan_helper_settings")
+      .select(`id, user_id, loan_amount, interest_rate, repayment_time`)
+      .in("user_id", followingIds);
 
     // Add filters based on provided parameters
     if (loanAmount !== undefined && loanAmount > 0) {
-      query = query.gte("loan_amount", loanAmount)
+      query = query.gte("loan_amount", loanAmount);
     }
-
     if (loanDuration !== undefined && loanDuration > 0) {
-      query = query.gte("repayment_time", loanDuration)
+      query = query.gte("repayment_time", loanDuration);
     }
 
     // Execute query
-    const { data: lenderSettings, error } = await query
+    const { data: lenderSettings, error } = await query;
 
     if (error) {
       console.error("Error finding lenders:", error)

@@ -2,26 +2,31 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Briefcase, GraduationCap, MapPin, Phone, Mail, Heart, Calendar, User, Info, Edit } from "lucide-react"
+import { Briefcase, GraduationCap, MapPin, Phone, Mail, Heart, Calendar, User, Info, Edit, Wallet } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { updateSocialMedia } from "@/lib/actions/profile"
 import { updateBio } from "@/lib/actions/profile"
 import { updateProfile, uploadIdDocument, uploadLendingLicenseServer } from "@/lib/actions/profile"
 import { getLoanHelperSettings, updateLoanHelperSettings } from "@/lib/actions/loan-helper-settings"
+import { getVirtualAccount, createVirtualAccount } from "@/lib/actions/paystack"
 import { Textarea } from "@/components/ui/textarea"
 import { createAdminClient } from "@/lib/supabase/admin"
 import imageCompression from 'browser-image-compression'
 import { SlateEditor } from "@/components/profile/useSlateEditor"
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 
 interface ProfileAboutProps {
   profile: any
   isCurrentUser?: boolean
+  virtualAccount?: any
+  initialSection?: string
 }
 
-export function ProfileAbout({ profile, isCurrentUser = false }: ProfileAboutProps) {
+export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: initialVirtualAccount, initialSection }: ProfileAboutProps) {
   const router = useRouter()
-  const [activeSection, setActiveSection] = useState("overview")
+  const [activeSection, setActiveSection] = useState(initialSection || "overview")
   const [isEditingContact, setIsEditingContact] = useState(false)
   const [isEditingBio, setIsEditingBio] = useState(false)
   const [isEditingLocation, setIsEditingLocation] = useState(false)
@@ -72,6 +77,33 @@ export function ProfileAbout({ profile, isCurrentUser = false }: ProfileAboutPro
   const [isSavingLoanHelper, setIsSavingLoanHelper] = useState(false)
   const [loanHelperError, setLoanHelperError] = useState<string | null>(null)
   const [loanHelperLoaded, setLoanHelperLoaded] = useState(false)
+  const [virtualAccount, setVirtualAccount] = useState<any>(initialVirtualAccount || null)
+  const [isLoadingVA, setIsLoadingVA] = useState(false)
+  const [vaError, setVaError] = useState<string | null>(null)
+  const [isCreatingVA, setIsCreatingVA] = useState(false)
+  // Add state for BVN editing and verification
+  const [isEditingBvn, setIsEditingBvn] = useState(false);
+  const [bvnText, setBvnText] = useState(profile.bvn || "");
+  const [isSavingBvn, setIsSavingBvn] = useState(false);
+  const [bvnError, setBvnError] = useState<string | null>(null);
+  const [isVerifyingBvn, setIsVerifyingBvn] = useState(false);
+  const [bvnVerified, setBvnVerified] = useState<boolean | null>(profile.bvn_verified ?? null);
+  const [bvnVerificationMsg, setBvnVerificationMsg] = useState<string | null>(null);
+  // Add state for country and banks
+  const [country, setCountry] = useState(profile.country || "Nigeria");
+  const [countries, setCountries] = useState<{name: string, iso_code: string}[]>([]);
+  const [bankCode, setBankCode] = useState(profile.bank_code || "");
+  const [banks, setBanks] = useState<{name: string, code: string}[]>([]);
+  const [isLoadingBanks, setIsLoadingBanks] = useState(false);
+  const [isLoadingCountries, setIsLoadingCountries] = useState(false);
+  // Add state for account type
+  const [accountType, setAccountType] = useState(profile.account_type || "personal");
+  const [isEditingFullName, setIsEditingFullName] = useState(false);
+  const [firstNameText, setFirstNameText] = useState(profile.first_name || "");
+  const [middleNameText, setMiddleNameText] = useState(profile.middle_name || "");
+  const [lastNameText, setLastNameText] = useState(profile.last_name || "");
+  const [isSavingFullName, setIsSavingFullName] = useState(false);
+  const [fullNameError, setFullNameError] = useState<string | null>(null);
 
   const sections = [
     { id: "overview", name: "Overview", icon: Info },
@@ -81,6 +113,7 @@ export function ProfileAbout({ profile, isCurrentUser = false }: ProfileAboutPro
     { id: "details", name: "Details about you", icon: User },
     { id: "bank", name: "Bank Account details", icon: Briefcase },
     { id: "loan-helper", name: "Loan helper settings", icon: Briefcase },
+    ...(isCurrentUser ? [{ id: "virtual-account", name: "Virtual account", icon: Wallet }] : []),
   ]
 
   useEffect(() => {
@@ -130,6 +163,50 @@ export function ProfileAbout({ profile, isCurrentUser = false }: ProfileAboutPro
     };
     fetchLoanHelper();
   }, [activeSection, loanHelperLoaded, profile.id]);
+
+  // Fetch virtual account on mount (only for current user)
+  useEffect(() => {
+    if (isCurrentUser && profile.id) {
+      setIsLoadingVA(true)
+      getVirtualAccount(profile.id).then((res) => {
+        setVirtualAccount(res.virtualAccount || null)
+        setVaError(res.error || null)
+        setIsLoadingVA(false)
+      })
+    }
+  }, [isCurrentUser, profile.id])
+
+  // Fetch countries on mount
+  useEffect(() => {
+    setIsLoadingCountries(true);
+    fetch("https://api.paystack.co/country", { headers: { Authorization: `Bearer ${process.env.NEXT_PUBLIC_PAYSTACK_KEY}` } })
+      .then(res => res.json())
+      .then(data => {
+        setCountries(data.data || []);
+        setIsLoadingCountries(false);
+      });
+  }, []);
+
+  // Fetch banks when country changes
+  useEffect(() => {
+    if (!country) return;
+    setIsLoadingBanks(true);
+    fetch(`https://api.paystack.co/bank?country=${encodeURIComponent(country)}`, { headers: { Authorization: `Bearer ${process.env.NEXT_PUBLIC_PAYSTACK_KEY}` } })
+      .then(res => res.json())
+      .then(data => {
+        setBanks(data.data || []);
+        setIsLoadingBanks(false);
+      });
+  }, [country]);
+
+  useEffect(() => {
+    // If initialSection is 'about', default to 'overview'
+    if (initialSection === 'about') {
+      setActiveSection('overview');
+    } else if (initialSection) {
+      setActiveSection(initialSection);
+    }
+  }, [initialSection]);
 
   const handleSocialMediaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSocialMediaData({
@@ -448,7 +525,14 @@ export function ProfileAbout({ profile, isCurrentUser = false }: ProfileAboutPro
     setIsSavingBank(true);
     setBankError(null);
     try {
-      const result = await updateProfile({ bankName, accountNumber, accountName });
+      const result = await updateProfile({
+        bankName,
+        accountNumber,
+        accountName,
+        country,
+        bankCode,
+        accountType, // persist account type
+      });
       if (result.success) {
         setIsEditingBank(false);
       } else {
@@ -498,6 +582,18 @@ export function ProfileAbout({ profile, isCurrentUser = false }: ProfileAboutPro
     setLoanHelperError(null);
   };
 
+  const handleCreateVirtualAccount = async () => {
+    setIsCreatingVA(true)
+    setVaError(null)
+    const res = await createVirtualAccount()
+    if (res.virtualAccount) {
+      setVirtualAccount(res.virtualAccount)
+    } else if (res.error) {
+      setVaError(res.error)
+    }
+    setIsCreatingVA(false)
+  }
+
   // Add these implementations at the top level of the component (not inside another function)
   async function uploadLendingLicense(file: File): Promise<string> {
     // Call the server action to upload the file
@@ -537,6 +633,8 @@ export function ProfileAbout({ profile, isCurrentUser = false }: ProfileAboutPro
     idDocumentUrl?: string | null;
     idType?: string;
     idNumber?: string;
+    idExpirationDate?: string | null; // new
+    idDateIssued?: string | null; // new
   };
 
   type DetailsAboutYouProps = {
@@ -568,6 +666,8 @@ export function ProfileAbout({ profile, isCurrentUser = false }: ProfileAboutPro
     const [messageIdDoc, setMessageIdDoc] = useState<string | null>(null);
     const [idType, setIdType] = useState(profile.idType || profile.id_type || "");
     const [idNumber, setIdNumber] = useState(profile.idNumber || profile.id_number || "");
+    const [idExpirationDate, setIdExpirationDate] = useState(profile.idExpirationDate || "");
+    const [idDateIssued, setIdDateIssued] = useState(profile.idDateIssued || "");
     const ID_TYPE_OPTIONS = [
       { value: "National ID", label: "National ID" },
       { value: "Driver's License", label: "Driver's License" },
@@ -717,7 +817,7 @@ export function ProfileAbout({ profile, isCurrentUser = false }: ProfileAboutPro
           url = result.url ?? "";
           setIdDocUrl(url);
         }
-        await onUpdate({ idDocumentUrl: url, idType, idNumber });
+        await onUpdate({ idDocumentUrl: url, idType, idNumber, idExpirationDate, idDateIssued });
         setMessageIdDoc("Saved!");
         setIdDocFile(null);
         setEditIdDoc(false);
@@ -881,6 +981,11 @@ export function ProfileAbout({ profile, isCurrentUser = false }: ProfileAboutPro
               ) : (
                 <span className="text-gray-800">No ID document uploaded</span>
               )}
+              {/* Show ID expiration and date issued */}
+              <div className="mt-2 text-gray-700 text-sm">
+                <div>ID Expiration Date: {profile.idExpirationDate ? new Date(profile.idExpirationDate).toLocaleDateString() : '-'}</div>
+                <div>ID Date Issued: {profile.idDateIssued ? new Date(profile.idDateIssued).toLocaleDateString() : '-'}</div>
+              </div>
             </div>
           ) : (
             <div className="space-y-2">
@@ -908,6 +1013,23 @@ export function ProfileAbout({ profile, isCurrentUser = false }: ProfileAboutPro
                 placeholder="ID Card Number"
                 value={idNumber}
                 onChange={e => setIdNumber(e.target.value)}
+                disabled={savingIdDoc}
+              />
+              {/* New fields for expiration and date issued */}
+              <input
+                type="date"
+                className="border-b-2 border-blue-600 focus:border-green-600 outline-none px-3 py-2 w-full"
+                placeholder="Expiration Date"
+                value={idExpirationDate}
+                onChange={e => setIdExpirationDate(e.target.value)}
+                disabled={savingIdDoc}
+              />
+              <input
+                type="date"
+                className="border-b-2 border-blue-600 focus:border-green-600 outline-none px-3 py-2 w-full"
+                placeholder="Date Issued"
+                value={idDateIssued}
+                onChange={e => setIdDateIssued(e.target.value)}
                 disabled={savingIdDoc}
               />
               <input
@@ -951,6 +1073,95 @@ export function ProfileAbout({ profile, isCurrentUser = false }: ProfileAboutPro
   const quillFormats = [
     'bold', 'italic', 'underline', 'list', 'bullet', 'link',
   ];
+
+  // Add BVN verification handler
+  async function handleVerifyBvn() {
+    setIsVerifyingBvn(true);
+    setBvnVerificationMsg(null);
+    setBvnError(null);
+    try {
+      const res = await fetch("/api/paystack/validate-account", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          account_number: profile.account_number,
+          bank_code: profile.bank_code,
+          bvn: bvnText,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setBvnVerified(true);
+        setBvnVerificationMsg("BVN verified successfully!");
+      } else {
+        setBvnVerified(false);
+        setBvnVerificationMsg(data.error || "Verification failed");
+      }
+    } catch (err: any) {
+      setBvnVerified(false);
+      setBvnVerificationMsg("Verification failed. Please try again.");
+    } finally {
+      setIsVerifyingBvn(false);
+    }
+  }
+
+  async function handleSaveBvn() {
+    setIsSavingBvn(true);
+    setBvnError(null);
+    try {
+      const result = await updateProfile({ bvn: bvnText });
+      if (result.success) {
+        setIsEditingBvn(false);
+      } else {
+        setBvnError(result.error || "Failed to update BVN");
+      }
+    } catch (err: any) {
+      setBvnError(err?.message || "Failed to update BVN");
+    } finally {
+      setIsSavingBvn(false);
+    }
+  }
+
+  function handleCancelBvn() {
+    setBvnText(profile.bvn || "");
+    setIsEditingBvn(false);
+    setBvnError(null);
+  }
+
+  // Compute if bank details are dirty
+  const isBankDirty = (
+    bankName !== (profile.bank_name || "") ||
+    accountNumber !== (profile.account_number || "") ||
+    accountName !== (profile.account_name || "") ||
+    country !== (profile.country || "Nigeria") ||
+    bankCode !== (profile.bank_code || "") ||
+    accountType !== (profile.account_type || "personal")
+  );
+
+  const handleSaveFullName = async () => {
+    setIsSavingFullName(true);
+    setFullNameError(null);
+    try {
+      const result = await updateProfile({ firstName: firstNameText, middleName: middleNameText, lastName: lastNameText });
+      if (result.success) {
+        setIsEditingFullName(false);
+      } else {
+        setFullNameError(result.error || "Failed to update name");
+      }
+    } catch (err: any) {
+      setFullNameError(err?.message || "Failed to update name");
+    } finally {
+      setIsSavingFullName(false);
+    }
+  };
+
+  const handleCancelEditFullName = () => {
+    setFirstNameText(profile.first_name || "");
+    setMiddleNameText(profile.middle_name || "");
+    setLastNameText(profile.last_name || "");
+    setIsEditingFullName(false);
+    setFullNameError(null);
+  };
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -1420,111 +1631,211 @@ export function ProfileAbout({ profile, isCurrentUser = false }: ProfileAboutPro
 
         {activeSection === "contact" && (
           <div className="space-y-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-medium">Contact and Basic Info</h2>
-              {isCurrentUser && !isEditingContact && (
-                <Button variant="ghost" size="sm" onClick={() => setIsEditingContact(true)}>
-                  <Edit className="h-4 w-4 mr-2" /> Edit
-                </Button>
-              )}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700">Full Name</label>
+              <div className="flex items-center gap-2 mt-1 justify-between">
+                {isEditingFullName ? (
+                  <div className="flex flex-col gap-2 w-full">
+                    <input
+                      type="text"
+                      value={firstNameText}
+                      onChange={e => setFirstNameText(e.target.value)}
+                      placeholder="First Name"
+                      className="border-b-2 border-blue-600 focus:border-green-600 outline-none px-3 py-2 w-full"
+                      disabled={isSavingFullName}
+                    />
+                    <input
+                      type="text"
+                      value={middleNameText}
+                      onChange={e => setMiddleNameText(e.target.value)}
+                      placeholder="Middle Name"
+                      className="border-b-2 border-blue-600 focus:border-green-600 outline-none px-3 py-2 w-full"
+                      disabled={isSavingFullName}
+                    />
+                    <input
+                      type="text"
+                      value={lastNameText}
+                      onChange={e => setLastNameText(e.target.value)}
+                      placeholder="Last Name"
+                      className="border-b-2 border-blue-600 focus:border-green-600 outline-none px-3 py-2 w-full"
+                      disabled={isSavingFullName}
+                    />
+                    <div className="flex gap-2 mt-2 w-full">
+                      <Button variant="outline" className="w-1/2" onClick={handleCancelEditFullName} type="button" disabled={isSavingFullName}>Cancel</Button>
+                      <Button className="w-1/2" onClick={handleSaveFullName} disabled={isSavingFullName || (firstNameText === (profile.first_name || "") && middleNameText === (profile.middle_name || "") && lastNameText === (profile.last_name || ""))} type="button">
+                        {isSavingFullName ? "Saving..." : "Save"}
+                      </Button>
+                    </div>
+                    {fullNameError && <div className="text-sm text-red-500 mt-2">{fullNameError}</div>}
+                  </div>
+                ) : (
+                  <>
+                    <span className="text-lg font-semibold">{profile.first_name} {profile.middle_name} {profile.last_name}</span>
+                    {isCurrentUser && (
+                      <Button size="sm" variant="ghost" className="ml-auto" onClick={() => { setIsEditingFullName(true); setIsEditingPhone(false); setIsEditingEmail(false); setIsEditingContact(false); }}><Edit className="h-4 w-4" /></Button>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
-
-            {isEditingContact ? (
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="facebook_url" className="block text-sm font-medium text-gray-700">Facebook Profile URL</label>
+            {/* Phone */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700">Phone Number</label>
+              <div className="flex items-center gap-2 mt-1 justify-between">
+                {isEditingPhone ? (
+                  <div className="flex flex-col gap-2 w-full">
+                    <input
+                      type="text"
+                      value={phoneText}
+                      onChange={e => setPhoneText(e.target.value)}
+                      placeholder="Phone Number"
+                      className="border-b-2 border-blue-600 focus:border-green-600 outline-none px-3 py-2 w-full"
+                      disabled={isSavingContact}
+                    />
+                    <div className="flex gap-2 mt-2 w-full">
+                      <Button variant="outline" className="w-1/2" onClick={handleCancelEditPhone} type="button" disabled={isSavingContact}>Cancel</Button>
+                      <Button className="w-1/2" onClick={handleSavePhone} disabled={isSavingContact || phoneText === (profile.phone_number || "")} type="button">
+                        {isSavingContact ? "Saving..." : "Save"}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <span>{profile.phone_number || "No phone number added"}</span>
+                    {isCurrentUser && (
+                      <Button size="sm" variant="ghost" className="ml-auto" onClick={() => { setIsEditingPhone(true); setIsEditingFullName(false); setIsEditingEmail(false); setIsEditingContact(false); }}><Edit className="h-4 w-4" /></Button>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+            {/* Email */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700">Email</label>
+              <div className="flex items-center gap-2 mt-1 justify-between">
+                {isEditingEmail ? (
+                  <div className="flex flex-col gap-2 w-full">
+                    <input
+                      type="email"
+                      value={emailText}
+                      onChange={e => setEmailText(e.target.value)}
+                      placeholder="Email Address"
+                      className="border-b-2 border-blue-600 focus:border-green-600 outline-none px-3 py-2 w-full"
+                      disabled={isSavingContact}
+                    />
+                    <div className="flex gap-2 mt-2 w-full">
+                      <Button variant="outline" className="w-1/2" onClick={handleCancelEditEmail} type="button" disabled={isSavingContact}>Cancel</Button>
+                      <Button className="w-1/2" onClick={handleSaveEmail} disabled={isSavingContact || emailText === (profile.email || "")} type="button">
+                        {isSavingContact ? "Saving..." : "Save"}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <span>{profile.email || "No email added"}</span>
+                    {isCurrentUser && (
+                      <Button size="sm" variant="ghost" className="ml-auto" onClick={() => { setIsEditingEmail(true); setIsEditingFullName(false); setIsEditingPhone(false); setIsEditingContact(false); }}><Edit className="h-4 w-4" /></Button>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+            {/* Social Media and Website */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700">Facebook Profile URL</label>
+              <div className="flex items-center gap-2 mt-1 justify-between">
+                {isEditingContact ? (
                   <input
                     type="url"
                     id="facebook_url"
                     name="facebook_url"
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                     value={socialMediaData.facebook_url}
                     onChange={handleSocialMediaChange}
                   />
-                </div>
-                <div>
-                  <label htmlFor="linkedin_url" className="block text-sm font-medium text-gray-700">LinkedIn Profile URL</label>
+                ) : (
+                  <>
+                    <span>{profile.facebook_url || "-"}</span>
+                    {isCurrentUser && (
+                      <Button size="sm" variant="ghost" className="ml-auto" onClick={() => { setIsEditingContact(true); setIsEditingFullName(false); setIsEditingPhone(false); setIsEditingEmail(false); }}><Edit className="h-4 w-4" /></Button>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700">LinkedIn Profile URL</label>
+              <div className="flex items-center gap-2 mt-1 justify-between">
+                {isEditingContact ? (
                   <input
                     type="url"
                     id="linkedin_url"
                     name="linkedin_url"
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                     value={socialMediaData.linkedin_url}
                     onChange={handleSocialMediaChange}
                   />
-                </div>
-                <div>
-                  <label htmlFor="twitter_url" className="block text-sm font-medium text-gray-700">Twitter Profile URL</label>
+                ) : (
+                  <>
+                    <span>{profile.linkedin_url || "-"}</span>
+                    {isCurrentUser && (
+                      <Button size="sm" variant="ghost" className="ml-auto" onClick={() => { setIsEditingContact(true); setIsEditingFullName(false); setIsEditingPhone(false); setIsEditingEmail(false); }}><Edit className="h-4 w-4" /></Button>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700">Twitter Profile URL</label>
+              <div className="flex items-center gap-2 mt-1 justify-between">
+                {isEditingContact ? (
                   <input
                     type="url"
                     id="twitter_url"
                     name="twitter_url"
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                     value={socialMediaData.twitter_url}
                     onChange={handleSocialMediaChange}
                   />
-                </div>
-                <div>
-                  <label htmlFor="website" className="block text-sm font-medium text-gray-700">Website URL</label>
+                ) : (
+                  <>
+                    <span>{profile.twitter_url || "-"}</span>
+                    {isCurrentUser && (
+                      <Button size="sm" variant="ghost" className="ml-auto" onClick={() => { setIsEditingContact(true); setIsEditingFullName(false); setIsEditingPhone(false); setIsEditingEmail(false); }}><Edit className="h-4 w-4" /></Button>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700">Website URL</label>
+              <div className="flex items-center gap-2 mt-1 justify-between">
+                {isEditingContact ? (
                   <input
                     type="url"
                     id="website"
                     name="website"
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                     value={socialMediaData.website}
                     onChange={handleSocialMediaChange}
                   />
-                </div>
-
-                <div className="flex justify-end space-x-2">
-                  <Button variant="outline" onClick={handleCancelEditContact} disabled={isSavingContact}>Cancel</Button>
-                  <Button onClick={handleSaveContact} disabled={isSavingContact}>
-                    {isSavingContact ? "Saving..." : "Save Changes"}
-                  </Button>
-                </div>
+                ) : (
+                  <>
+                    <span>{profile.website || "-"}</span>
+                    {isCurrentUser && (
+                      <Button size="sm" variant="ghost" className="ml-auto" onClick={() => { setIsEditingContact(true); setIsEditingFullName(false); setIsEditingPhone(false); setIsEditingEmail(false); }}><Edit className="h-4 w-4" /></Button>
+                    )}
+                  </>
+                )}
               </div>
-            ) : (
-              <div className="space-y-4">
-                {profile.phone_number && (
-                  <div className="flex items-center gap-3">
-                    <Phone className="h-5 w-5 text-gray-500" />
-                    <span>{profile.phone_number}</span>
-                  </div>
-                )}
-                {profile.email && (
-                  <div className="flex items-center gap-3">
-                    <Mail className="h-5 w-5 text-gray-500" />
-                    <span>{profile.email}</span>
-                  </div>
-                )}
-                {profile.facebook_url && (
-                  <div className="flex items-center gap-3">
-                    <Info className="h-5 w-5 text-gray-500" />
-                    <Link href={profile.facebook_url} target="_blank" className="text-blue-600 hover:underline">{profile.facebook_url}</Link>
-                  </div>
-                )}
-                {profile.linkedin_url && (
-                  <div className="flex items-center gap-3">
-                    <Info className="h-5 w-5 text-gray-500" />
-                    <Link href={profile.linkedin_url} target="_blank" className="text-blue-600 hover:underline">{profile.linkedin_url}</Link>
-                  </div>
-                )}
-                {profile.twitter_url && (
-                  <div className="flex items-center gap-3">
-                    <Info className="h-5 w-5 text-gray-500" />
-                    <Link href={profile.twitter_url} target="_blank" className="text-blue-600 hover:underline">{profile.twitter_url}</Link>
-                  </div>
-                )}
-                {profile.website && (
-                  <div className="flex items-center gap-3">
-                    <Info className="h-5 w-5 text-gray-500" />
-                    <Link href={profile.website} target="_blank" className="text-blue-600 hover:underline">{profile.website}</Link>
-                  </div>
-                )}
-
-                {!profile.phone_number && !profile.email && !profile.facebook_url && !profile.linkedin_url && !profile.twitter_url && !profile.website && (
-                  <div className="text-gray-500">No contact information available.</div>
-                )}
+            </div>
+            {/* Save/Cancel for social media fields */}
+            {isEditingContact && (
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={handleCancelEditContact} disabled={isSavingContact}>Cancel</Button>
+                <Button onClick={handleSaveContact} disabled={isSavingContact}>
+                  {isSavingContact ? "Saving..." : "Save Changes"}
+                </Button>
               </div>
             )}
           </div>
@@ -1576,13 +1887,22 @@ export function ProfileAbout({ profile, isCurrentUser = false }: ProfileAboutPro
               <div className="flex-grow">
                 {isEditingBank ? (
                   <div className="space-y-2 w-full">
-                    <input
-                      type="text"
-                      value={bankName}
-                      onChange={e => setBankName(e.target.value)}
-                      placeholder="Bank Name"
-                      className="border-b-2 border-blue-600 focus:border-green-600 outline-none px-3 py-2 w-full"
-                    />
+                    {/* Country Dropdown */}
+                    <label className="font-semibold">Country</label>
+                    <select value={country} onChange={e => setCountry(e.target.value)} className="border-b-2 border-blue-600 focus:border-green-600 outline-none px-3 py-2 w-full">
+                      {isLoadingCountries ? <option>Loading...</option> : countries.map(c => <option key={c.iso_code} value={c.name}>{c.name}</option>)}
+                    </select>
+                    {/* Bank Dropdown */}
+                    <label className="font-semibold">Bank Name</label>
+                    <select value={bankCode} onChange={e => setBankCode(e.target.value)} className="border-b-2 border-blue-600 focus:border-green-600 outline-none px-3 py-2 w-full">
+                      {isLoadingBanks ? <option>Loading...</option> : banks.map(b => <option key={b.code} value={b.code}>{b.name}</option>)}
+                    </select>
+                    {/* Account Type Dropdown */}
+                    <label className="font-semibold">Account Type</label>
+                    <select value={accountType} onChange={e => setAccountType(e.target.value)} className="border-b-2 border-blue-600 focus:border-green-600 outline-none px-3 py-2 w-full">
+                      <option value="personal">Personal</option>
+                      <option value="business">Business</option>
+                    </select>
                     <input
                       type="text"
                       value={accountNumber}
@@ -1597,9 +1917,43 @@ export function ProfileAbout({ profile, isCurrentUser = false }: ProfileAboutPro
                       placeholder="Account Name"
                       className="border-b-2 border-blue-600 focus:border-green-600 outline-none px-3 py-2 w-full"
                     />
+                    {/* BVN Inline Edit */}
+                    <div className="flex items-center gap-2 mt-2">
+                      <label className="font-semibold">BVN:</label>
+                      {isEditingBvn ? (
+                        <>
+                          <input
+                            type="text"
+                            value={bvnText}
+                            onChange={e => setBvnText(e.target.value.replace(/[^0-9]/g, "").slice(0, 11))}
+                            placeholder="Enter your BVN"
+                            className="border-b-2 border-blue-600 focus:border-green-600 outline-none px-3 py-2 w-40"
+                            maxLength={11}
+                          />
+                          <Button size="sm" onClick={handleSaveBvn} disabled={isSavingBvn || bvnText === (profile.bvn || "")}>{isSavingBvn ? "Saving..." : "Save"}</Button>
+                          <Button size="sm" variant="outline" onClick={handleCancelBvn} disabled={isSavingBvn}>Cancel</Button>
+                        </>
+                      ) : (
+                        <>
+                          <span className="font-mono border-b-2 border-blue-200 px-3 py-2 bg-gray-50 rounded text-gray-800">{profile.bvn ? `******${profile.bvn.slice(-4)}` : "-"}</span>
+                          {isCurrentUser && (
+                            <Button size="sm" variant="ghost" onClick={() => setIsEditingBvn(true)}><Edit className="h-4 w-4" /></Button>
+                          )}
+                        </>
+                      )}
+                      {/* BVN Verification */}
+                      {isCurrentUser && !isEditingBvn && profile.bvn && (
+                        <Button size="sm" variant="secondary" onClick={handleVerifyBvn} disabled={isVerifyingBvn} className="ml-2">
+                          {isVerifyingBvn ? "Verifying..." : bvnVerified ? "Verified" : "Verify"}
+                        </Button>
+                      )}
+                      {bvnVerificationMsg && <span className={`ml-2 text-sm ${bvnVerified ? "text-green-600" : "text-red-600"}`}>{bvnVerificationMsg}</span>}
+                    </div>
+                    {bvnError && <div className="text-sm text-red-500 mt-1">{bvnError}</div>}
+                    {/* End BVN Inline Edit */}
                     <div className="flex gap-2 mt-2 w-full">
                       <Button variant="outline" className="w-1/2" onClick={handleCancelBank} type="button" disabled={isSavingBank}>Cancel</Button>
-                      <Button className="w-1/2" onClick={handleSaveBank} disabled={isSavingBank || (bankName === (profile.bank_name || "") && accountNumber === (profile.account_number || "") && accountName === (profile.account_name || ""))} type="button">
+                      <Button className="w-1/2" onClick={handleSaveBank} disabled={isSavingBank || !isBankDirty} type="button">
                         {isSavingBank ? "Saving..." : "Save"}
                       </Button>
                     </div>
@@ -1611,6 +1965,19 @@ export function ProfileAbout({ profile, isCurrentUser = false }: ProfileAboutPro
                       <h3 className="text-lg font-medium">{profile.bank_name || "No bank name added"}</h3>
                       <p className="text-gray-600">Account Number: {profile.account_number || "-"}</p>
                       <p className="text-gray-600">Account Name: {profile.account_name || "-"}</p>
+                      <p className="text-gray-600">Account Type: {profile.account_type ? profile.account_type.charAt(0).toUpperCase() + profile.account_type.slice(1) : "Personal"}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-gray-600">BVN: <span className="font-mono">{profile.bvn ? `******${profile.bvn.slice(-4)}` : "-"}</span></span>
+                        {isCurrentUser && (
+                          <Button size="sm" variant="ghost" onClick={() => setIsEditingBvn(true)}><Edit className="h-4 w-4" /></Button>
+                        )}
+                        {isCurrentUser && profile.bvn && (
+                          <Button size="sm" variant="secondary" onClick={handleVerifyBvn} disabled={isVerifyingBvn} className="ml-2">
+                            {isVerifyingBvn ? "Verifying..." : bvnVerified ? "Verified" : "Verify"}
+                          </Button>
+                        )}
+                        {bvnVerificationMsg && <span className={`ml-2 text-sm ${bvnVerified ? "text-green-600" : "text-red-600"}`}>{bvnVerificationMsg}</span>}
+                      </div>
                     </div>
                     {isCurrentUser && (
                       <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setIsEditingBank(true)}>
@@ -1668,10 +2035,16 @@ export function ProfileAbout({ profile, isCurrentUser = false }: ProfileAboutPro
                   </div>
                 ) : (
                   <div className="flex flex-col gap-6 w-full">
-                    <div>
+                    {/* Move edit button to top right of section */}
+                    <div className="flex justify-between items-center mb-2">
                       <h3 className="text-lg font-medium mb-1">Loan Amount Offered:</h3>
-                      <p className="text-gray-600">₦{loanAmount ? Number(loanAmount).toLocaleString() : '-'}</p>
+                      {isCurrentUser && (
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setIsEditingLoanHelper(true)}>
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
+                    <p className="text-gray-600">₦{loanAmount ? Number(loanAmount).toLocaleString() : '-'}</p>
                     <div>
                       <h3 className="text-lg font-medium mb-1">Interest Rate:</h3>
                       <p className="text-gray-600">{interestRate || '-'}%</p>
@@ -1686,16 +2059,40 @@ export function ProfileAbout({ profile, isCurrentUser = false }: ProfileAboutPro
                         <SlateEditor value={loanTerms} readOnly />
                       </div>
                     </div>
-                    {isCurrentUser && (
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0 self-end" onClick={() => setIsEditingLoanHelper(true)}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                    )}
                   </div>
                 )}
               </div>
             </div>
           </div>
+        )}
+
+        {/* Virtual Account Section - Only show if selected and isCurrentUser */}
+        {activeSection === "virtual-account" && isCurrentUser && (
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle className="text-lg">Virtual Account</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isLoadingVA ? (
+                <div className="text-gray-500">Loading virtual account...</div>
+              ) : virtualAccount ? (
+                <div className="space-y-2">
+                  <div className="font-semibold">Account Number: <span className="font-mono">{virtualAccount.account_number}</span></div>
+                  <div>Account Name: {virtualAccount.account_name}</div>
+                  <div>Bank: {virtualAccount.bank_name}</div>
+                  <div>Currency: {virtualAccount.currency}</div>
+                  <div>Status: {virtualAccount.assigned ? <span className="inline-block bg-green-500 text-white px-2 py-1 rounded">Active</span> : <span className="inline-block bg-gray-400 text-white px-2 py-1 rounded">Inactive</span>}</div>
+                </div>
+              ) : (
+                <div>
+                  <Button onClick={handleCreateVirtualAccount} disabled={isCreatingVA}>
+                    {isCreatingVA ? "Creating..." : "Create Virtual Account"}
+                  </Button>
+                  {vaError && <div className="text-red-500 mt-2">{vaError}</div>}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         )}
       </div>
     </div>

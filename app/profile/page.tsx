@@ -152,7 +152,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
             <div className="relative">
               <Avatar className="h-32 w-32 border-4 border-white shadow-lg">
                 {profile.profile_picture_url ? (
-                  <AvatarImage src={profile.profile_picture_url || "/placeholder.svg"} alt={fullName} />
+                  <AvatarImage src={`${profile.profile_picture_url}?t=${profile.updated_at ? new Date(profile.updated_at).getTime() : Date.now()}`} alt={fullName} />
                 ) : (
                   <AvatarFallback className="text-4xl bg-blue-100">
                     <User className="h-16 w-16 text-blue-500" />
@@ -161,19 +161,6 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
               </Avatar>
               <AvatarUploadDialog userId={user.id} currentAvatarUrl={profile.profile_picture_url} userName={fullName} />
             </div>
-          </div>
-
-          {/* Action Buttons - positioned at farthest right */}
-          <div className="absolute -bottom-16 right-0 md:right-4 flex gap-2">
-            <Button asChild variant="outline" className="bg-gray-200 border-gray-300 hover:bg-gray-300 text-black">
-              <Link href="/profile/edit">
-                <Edit className="mr-2 h-4 w-4" />
-                Edit profile
-              </Link>
-            </Button>
-            <Button variant="outline" size="icon" className="bg-gray-200 border-gray-300 hover:bg-gray-300 text-black">
-              <MoreHorizontal className="h-5 w-5" />
-            </Button>
           </div>
         </div>
       </div>
@@ -189,11 +176,15 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
               <div className="flex flex-wrap items-center gap-2 mt-1 text-gray-600">
                 {profile.job_title && (
                   <span className="flex items-center">
-                    <Briefcase className="h-4 w-4 mr-1" />
                     {profile.job_title}
                   </span>
                 )}
                 {profile.employer_name && <span>at {profile.employer_name}</span>}
+              </div>
+              <div className="flex items-center gap-2 mt-1 text-gray-600">
+                <span className="flex items-center">
+                  Followed by {followersCount} {followersCount === 1 ? "person" : "people"}
+                </span>
               </div>
             </div>
 
@@ -216,12 +207,12 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
 
         {/* Facebook-style tabs */}
         <div className="border-b border-gray-300 mb-6">
-          <div className="flex space-x-1 overflow-x-auto">
+          <div className="flex space-x-1 overflow-x-auto justify-center">
             {[
               { name: "Posts", href: "/profile", active: activeTab === "posts" },
               { name: "About", href: "/profile?tab=about", active: activeTab === "about" },
               { name: "Friends", href: "/profile/?tab=friends", active: activeTab === "friends" },
-              { name: "More", href: "/profile?tab=more", active: activeTab === "more" },
+              { name: "Loan Requests", href: "/profile?tab=more", active: activeTab === "more" },
             ].map((tab) => (
               <Link
                 key={tab.name}
@@ -250,7 +241,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
             initialFollowingCount={followingCount}
           />
         ) : activeTab === "about" ? (
-          <ProfileAbout profile={profile} isCurrentUser={true} />
+          <ProfileAbout profile={profile} isCurrentUser={true} virtualAccount={virtualAccount} initialSection="about" />
         ) : activeTab === "more" ? (
           <div className="lg:col-span-12">
             <h2 className="text-xl font-bold mb-4">All Loan Requests</h2>
@@ -330,27 +321,6 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
                   </CardContent>
                 </Card>
               )}
-              {/* Virtual Account Card */}
-              {activeTab === "about" && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Virtual Account</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {virtualAccount ? (
-                      <div className="space-y-2">
-                        <div className="font-semibold">Account Number: <span className="font-mono">{virtualAccount.account_number}</span></div>
-                        <div>Account Name: {virtualAccount.account_name}</div>
-                        <div>Bank: {virtualAccount.bank_name}</div>
-                        <div>Currency: {virtualAccount.currency}</div>
-                        <div>Status: {virtualAccount.assigned ? <Badge className="bg-green-500">Active</Badge> : <Badge className="bg-gray-400">Inactive</Badge>}</div>
-                      </div>
-                    ) : (
-                      <CreateVirtualAccountButton />
-                    )}
-                  </CardContent>
-                </Card>
-              )}
             </div>
 
             {/* Main Content - Posts section (8/12) */}
@@ -368,35 +338,4 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
       </div>
     </MainLayout>
   )
-}
-
-async function uploadLendingLicense(file: File): Promise<string> {
-  const adminClient = createAdminClient();
-  const fileExt = file.name.split(".").pop();
-  const fileName = `lending-license-${Date.now()}.${fileExt}`;
-  const buffer = await file.arrayBuffer();
-
-  const { error } = await adminClient.storage
-    .from("lending-licenses")
-    .upload(fileName, new Uint8Array(buffer), {
-      contentType: file.type,
-      upsert: true,
-    });
-
-  if (error) throw new Error(error.message);
-
-  const { data } = adminClient.storage
-    .from("lending-licenses")
-    .getPublicUrl(fileName);
-
-  if (!data?.publicUrl) throw new Error("Failed to get public URL");
-
-  return data.publicUrl;
-}
-
-async function handleUpdate(fields: any) {
-  const result = await updateProfile(fields);
-  if (!result.success) {
-    throw new Error(result.error || "Failed to update profile");
-  }
 }

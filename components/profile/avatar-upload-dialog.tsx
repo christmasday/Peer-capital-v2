@@ -11,12 +11,34 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import { Loader2, Camera, AlertCircle, User } from "lucide-react"
 import { uploadProfilePicture } from "@/lib/actions/profile"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import imageCompression from 'browser-image-compression'
 
 interface AvatarUploadDialogProps {
   userId: string
   currentAvatarUrl?: string | null
   userName?: string
   children?: React.ReactNode
+}
+
+// Utility to convert any image file to JPEG using a canvas
+async function convertToJpeg(file: File): Promise<File> {
+  return new Promise((resolve, reject) => {
+    const img = new window.Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx?.drawImage(img, 0, 0);
+      canvas.toBlob((blob) => {
+        if (!blob) return reject(new Error('Failed to convert image to JPEG'));
+        const jpegFile = new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' });
+        resolve(jpegFile);
+      }, 'image/jpeg', 0.85);
+    };
+    img.onerror = reject;
+    img.src = URL.createObjectURL(file);
+  });
 }
 
 export function AvatarUploadDialog({ userId, currentAvatarUrl, userName, children }: AvatarUploadDialogProps) {
@@ -53,33 +75,29 @@ export function AvatarUploadDialog({ userId, currentAvatarUrl, userName, childre
     setError(null)
 
     if (file) {
-      // Validate file type
-      const validTypes = ["image/jpeg", "image/png", "image/gif"]
-      if (!validTypes.includes(file.type)) {
-        setError("Please select a valid image file (JPEG, PNG, or GIF)")
+      // Validate file type (allow any image, but always convert to JPEG)
+      if (!file.type.startsWith('image/')) {
+        setError('Please select a valid image file')
         return
       }
 
       // Validate file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
-        setError("Image size should be less than 5MB")
+        setError('Image size should be less than 5MB')
         return
       }
 
-      // Create preview URL
+      // Compress image
+      const compressed = await imageCompression(file, { maxSizeMB: 1, maxWidthOrHeight: 512 })
+      // Convert to JPEG
+      const jpegFile = await convertToJpeg(compressed)
+      setAvatarImage(jpegFile)
+
+      // Set preview URL
       const reader = new FileReader()
-      reader.onload = async () => {
-        setPreviewUrl(reader.result as string)
-        // After setting preview, validate dimensions
-        const dimensionsValid = await validateImageDimensions(file)
-        if (dimensionsValid) {
-          setAvatarImage(file)
-        }
-      }
-      reader.onerror = () => {
-        setError("Failed to read the image file. Please try again.")
-      }
-      reader.readAsDataURL(file)
+      reader.onload = () => setPreviewUrl(reader.result as string)
+      reader.onerror = () => setError("Failed to read the image file. Please try again.")
+      reader.readAsDataURL(jpegFile)
     }
   }
 

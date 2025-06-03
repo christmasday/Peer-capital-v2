@@ -206,6 +206,11 @@ type UpdateProfileInput = {
   loanAmountOffered?: number;
   interestRate?: number;
   paybackPeriodWeeks?: number;
+  country?: string;
+  bankCode?: string;
+  accountType?: string;
+  idExpirationDate?: string;
+  idDateIssued?: string;
 };
 
 export async function updateProfile(input: UpdateProfileInput) {
@@ -317,6 +322,11 @@ export async function updateProfile(input: UpdateProfileInput) {
     if (input.loanAmountOffered !== undefined) updateData.loan_amount_offered = input.loanAmountOffered;
     if (input.interestRate !== undefined) updateData.interest_rate = input.interestRate;
     if (input.paybackPeriodWeeks !== undefined) updateData.payback_period_weeks = input.paybackPeriodWeeks;
+    if (input.country !== undefined) updateData.country = input.country;
+    if (input.bankCode !== undefined) updateData.bank_code = input.bankCode;
+    if (input.accountType !== undefined) updateData.account_type = input.accountType;
+    if (input.idExpirationDate !== undefined) updateData.id_expiration_date = input.idExpirationDate;
+    if (input.idDateIssued !== undefined) updateData.id_date_issued = input.idDateIssued;
 
     if (Object.keys(updateData).length === 0) {
         return { success: false, error: "No fields to update." };
@@ -507,6 +517,18 @@ export async function uploadIdDocument(file: File) {
   }
 }
 
+// Helper to extract the storage path from a Supabase public URL
+function extractStoragePath(url: string, bucket: string): string | null {
+  try {
+    const u = new URL(url)
+    // Example: /storage/v1/object/public/profiles/avatar_xxx.jpg
+    const match = u.pathname.match(new RegExp(`/storage/v1/object/public/${bucket}/(.+)`))
+    return match && match[1] ? match[1] : null
+  } catch {
+    return null
+  }
+}
+
 // Update the uploadBannerImage function with enhanced authentication and bucket check
 export async function uploadBannerImage(file: File) {
   try {
@@ -593,6 +615,32 @@ export async function uploadBannerImage(file: File) {
     revalidatePath("/profile")
     revalidatePath(`/profile/${userId}`)
 
+    // Fetch the current banner image URL before uploading
+    let oldBannerUrl: string | null = null
+    try {
+      const { data: profileData } = await adminClient
+        .from("profiles")
+        .select("banner_image_url")
+        .eq("id", userId)
+        .single()
+      if (profileData && profileData.banner_image_url) {
+        oldBannerUrl = profileData.banner_image_url
+      }
+    } catch (e) {
+      // Ignore fetch error, just don't delete
+    }
+
+    // Delete the old banner image if it exists and is not a placeholder
+    if (oldBannerUrl && !oldBannerUrl.includes("placeholder")) {
+      const oldPath = extractStoragePath(oldBannerUrl, "profile-images")
+      if (oldPath) {
+        try {
+          await adminClient.storage.from("profile-images").remove([oldPath])
+        } catch (e) {
+          console.error("Failed to delete old banner image:", e)
+        }
+      }
+    }
     return { success: true, url: publicUrlData.publicUrl }
   } catch (error) {
     console.error("Error in uploadBannerImage:", error)
@@ -724,6 +772,21 @@ export async function uploadProfilePicture(file: File) {
       }
     }
 
+    // Fetch the current profile picture URL before uploading
+    let oldProfilePictureUrl: string | null = null
+    try {
+      const { data: profileData } = await adminClient
+        .from("profiles")
+        .select("profile_picture_url")
+        .eq("id", userId)
+        .single()
+      if (profileData && profileData.profile_picture_url) {
+        oldProfilePictureUrl = profileData.profile_picture_url
+      }
+    } catch (e) {
+      // Ignore fetch error, just don't delete
+    }
+
     // Generate a unique file name with sanitization
     const fileExt = file.name.split(".").pop()?.toLowerCase() || "jpg"
     // Create a clean filename with user ID and timestamp
@@ -768,6 +831,17 @@ export async function uploadProfilePicture(file: File) {
           .update({ profile_picture_url: publicUrl, updated_at: new Date().toISOString() })
           .eq("id", userId)
 
+        // Delete the old profile image if it exists and is not a placeholder
+        if (oldProfilePictureUrl && !oldProfilePictureUrl.includes("placeholder")) {
+          const oldPath = extractStoragePath(oldProfilePictureUrl, "profiles")
+          if (oldPath) {
+            try {
+              await adminClient.storage.from("profiles").remove([oldPath])
+            } catch (e) {
+              console.error("Failed to delete old profile image:", e)
+            }
+          }
+        }
         return { success: true, url: publicUrl }
       }
 
@@ -788,9 +862,31 @@ export async function uploadProfilePicture(file: File) {
     if (updateError) {
       console.error("Error updating profile with new avatar URL:", updateError)
       // Return success anyway as the image was uploaded successfully
+      // Delete the old profile image if it exists and is not a placeholder
+      if (oldProfilePictureUrl && !oldProfilePictureUrl.includes("placeholder")) {
+        const oldPath = extractStoragePath(oldProfilePictureUrl, "profiles")
+        if (oldPath) {
+          try {
+            await adminClient.storage.from("profiles").remove([oldPath])
+          } catch (e) {
+            console.error("Failed to delete old profile image:", e)
+          }
+        }
+      }
       return { success: true, url: publicUrl, warning: "Image uploaded but profile not updated" }
     }
 
+    // Delete the old profile image if it exists and is not a placeholder
+    if (oldProfilePictureUrl && !oldProfilePictureUrl.includes("placeholder")) {
+      const oldPath = extractStoragePath(oldProfilePictureUrl, "profiles")
+      if (oldPath) {
+        try {
+          await adminClient.storage.from("profiles").remove([oldPath])
+        } catch (e) {
+          console.error("Failed to delete old profile image:", e)
+        }
+      }
+    }
     return { success: true, url: publicUrl }
   } catch (error) {
     console.error("Unexpected error uploading profile picture:", error)

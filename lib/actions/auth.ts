@@ -119,6 +119,7 @@ async function createAuthUser(userData: {
   state: string
   zipCode?: string
   country: string
+  bankCode?: string
   profilePictureUrl?: string | null
 }) {
   try {
@@ -142,6 +143,7 @@ async function createAuthUser(userData: {
       state: userData.state,
       zip_code: userData.zipCode,
       country: userData.country,
+      bank_code: userData.bankCode || null,
       profile_picture_url: userData.profilePictureUrl,
     }
 
@@ -895,6 +897,7 @@ async function createUserProfile(
     state: string
     zipCode?: string
     country: string
+    bankCode?: string
     profilePictureUrl?: string | null
     referred_by: string
     referral_code: string
@@ -955,6 +958,7 @@ async function createUserProfile(
       state: userData.state || "",
       zip_code: userData.zipCode || null,
       country: userData.country || "Nigeria", // Default to Nigeria if not provided
+      bank_code: userData.bankCode || null,
       profile_picture_url: userData.profilePictureUrl || null,
       referred_by: userData.referred_by,
       referral_code: userData.referral_code,
@@ -1028,6 +1032,7 @@ export async function signUp(userData: {
   state: string
   zipCode?: string
   country: string
+  bankCode?: string
   profilePictureUrl?: string | null
   referralCode: string
 }) {
@@ -1666,7 +1671,11 @@ export async function getUserProfile() {
     // Return whatever data we have, even if some parts are missing
     return {
       user: { id: userId, email: "user@example.com" },
-      profile: profile,
+      profile: {
+        ...profile,
+        idExpirationDate: profile.id_expiration_date,
+        idDateIssued: profile.id_date_issued,
+      },
       account: accountData || { balance: 120000, loan_balance: 50000 },
     }
   } catch (error) {
