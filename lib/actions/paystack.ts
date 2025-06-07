@@ -98,6 +98,7 @@ export async function createVirtualAccount() {
 
     // Make API call to Paystack
     const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY
+    console.log("Paystack Secret Key present:", !!PAYSTACK_SECRET_KEY)
     if (!PAYSTACK_SECRET_KEY) {
       console.error("Paystack secret key not found")
       return { error: "Payment provider configuration error" }
@@ -114,104 +115,197 @@ export async function createVirtualAccount() {
       country: "NG",
       bvn: profile.bvn || "",
     }
-
+    console.log("Paystack payload:", payload)
     console.log(`Using preferred bank: ${process.env.PAYSTACK_PREFERRED_BANK || "providus-bank"}`)
 
-    console.log("Sending request to Paystack with payload:", {
-      ...payload,
-      // Don't log sensitive fields
-      email: payload.email ? "****@****.com" : "undefined",
-      bvn: payload.bvn ? "********" : "undefined",
-    })
+    try {
+      // Make the API call
+      const response = await fetch("https://api.paystack.co/dedicated_account/assign", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      })
+      console.log("Paystack response status:", response.status)
+      const responseText = await response.text()
+      console.log("Paystack response text:", responseText)
+      let responseData
+      try {
+        responseData = JSON.parse(responseText)
+      } catch (parseErr) {
+        console.error("Error parsing Paystack response as JSON:", parseErr)
+        responseData = { raw: responseText }
+      }
 
-    // Make the API call
-    const response = await fetch("https://api.paystack.co/dedicated_account/assign", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    })
+      if (!responseData.status) {
+        console.error("Paystack API error:", responseData.message)
+        return { error: responseData.message || "Failed to create virtual account", raw: responseData }
+      }
 
-    const responseData: PaystackResponse = await response.json()
+      if (!responseData.data) {
+        // No account details yet, show in-progress message
+        return {
+          success: false,
+          message: responseData.message || "Virtual account creation in progress. Please check back later.",
+          paystackResponse: responseData,
+          inProgress: true,
+        }
+      }
 
-    if (!responseData.status) {
-      console.error("Paystack API error:", responseData.message)
-      return { error: responseData.message || "Failed to create virtual account" }
+      // Store the virtual account in the database
+      if (responseData.data) {
+        const virtualAccountData = {
+          user_id: userId,
+          account_number: responseData.data.account_number,
+          account_name: responseData.data.account_name,
+          bank_name: responseData.data.bank.name,
+          bank_code: responseData.data.bank.slug,
+          currency: responseData.data.currency,
+          assigned: responseData.data.assigned,
+          paystack_id: responseData.data.id.toString(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }
+
+        const { error: insertError } = await adminClient.from("virtual_accounts").insert(virtualAccountData)
+
+        if (insertError) {
+          console.error("Error storing virtual account:", insertError)
+          return { error: "Failed to store virtual account details", raw: responseData }
+        }
+
+        // Return success
+        revalidatePath("/profile")
+        return {
+          success: true,
+          message: "Virtual account created successfully",
+          virtualAccount: virtualAccountData,
+          paystackResponse: responseData,
+        }
+      }
+
+      return { error: "No data returned from payment provider", raw: responseData }
+    } catch (fetchErr) {
+      console.error("Error during Paystack fetch:", fetchErr)
+      return { error: "Error during Paystack fetch", fetchErr: fetchErr instanceof Error ? fetchErr.message : fetchErr }
     }
-
-    // Store the virtual account in the database
-    if (responseData.data) {
-      const virtualAccountData = {
-        user_id: userId,
-        account_number: responseData.data.account_number,
-        account_name: responseData.data.account_name,
-        bank_name: responseData.data.bank.name,
-        bank_code: responseData.data.bank.slug,
-        currency: responseData.data.currency,
-        assigned: responseData.data.assigned,
-        paystack_id: responseData.data.id.toString(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }
-
-      const { error: insertError } = await adminClient.from("virtual_accounts").insert(virtualAccountData)
-
-      if (insertError) {
-        console.error("Error storing virtual account:", insertError)
-        return { error: "Failed to store virtual account details" }
-      }
-
-      // Return success
-      revalidatePath("/profile")
-      return {
-        success: true,
-        message: "Virtual account created successfully",
-        virtualAccount: virtualAccountData,
-      }
-    }
-
-    return { error: "No data returned from payment provider" }
   } catch (error) {
     console.error("Error creating virtual account:", error)
     return { error: `An unexpected error occurred: ${error instanceof Error ? error.message : "Unknown error"}` }
   }
 }
 
-export async function getVirtualAccount(userId?: string) {
+export async function getVirtualAccount(emailOrUserId?: string) {
   try {
     const adminClient = createAdminClient()
 
-    // If userId is not provided, get the current user
-    if (!userId) {
-      userId = await getCurrentUserId()
-
+    let email = emailOrUserId;
+    // If not provided, get the current user's email
+    if (!emailOrUserId) {
+      const userId = await getCurrentUserId()
       if (!userId) {
         console.error("Authentication failed: No user ID found")
         return { error: "You must be logged in to view virtual account details" }
       }
+      // Fetch email from profile
+      const { data: profile, error: profileError } = await adminClient
+        .from("profiles")
+        .select("email")
+        .eq("id", userId)
+        .single()
+      if (profileError || !profile?.email) {
+        console.error("Could not fetch user email for virtual account", profileError)
+        return { error: "Could not determine your email address" }
+      }
+      email = profile.email
+    } else if (emailOrUserId && emailOrUserId.includes("@")) {
+      // Already an email
+      email = emailOrUserId
+    } else {
+      // If a user id is provided, fetch the email
+      const { data: profile, error: profileError } = await adminClient
+        .from("profiles")
+        .select("email")
+        .eq("id", emailOrUserId)
+        .single()
+      if (profileError || !profile?.email) {
+        console.error("Could not fetch user email for virtual account", profileError)
+        return { error: "Could not determine your email address" }
+      }
+      email = profile.email
     }
 
-    console.log("Fetching virtual account for user:", userId)
+    if (!email || typeof email !== "string") {
+      console.error("Email is required and must be a string for Paystack virtual account fetch.");
+      return { error: "Could not determine your email address" };
+    }
 
-    // Get the virtual account
+    // 1. Check the local database for the virtual account
     const { data: virtualAccount, error } = await adminClient
       .from("virtual_accounts")
       .select("*")
-      .eq("user_id", userId)
+      .eq("email", email)
       .single()
 
-    if (error) {
-      if (error.code === "PGRST116") {
-        // No virtual account found
-        return { success: false, message: "No virtual account found" }
-      }
+    if (virtualAccount) {
+      return { success: true, virtualAccount };
+    }
+    if (error && error.code !== "PGRST116") {
+      // Only log/return if it's not a "not found" error
       console.error("Error fetching virtual account:", error)
       return { error: "Failed to fetch virtual account details" }
     }
 
-    return { success: true, virtualAccount }
+    // 2. If not found, fetch from Paystack API
+    const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
+    if (!PAYSTACK_SECRET_KEY) {
+      return { error: "Paystack secret key not configured" };
+    }
+    const url = `https://api.paystack.co/customer/${encodeURIComponent(email)}`;
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+        "Content-Type": "application/json",
+      },
+    });
+    const responseData = await response.json();
+    if (response.ok && responseData.status && responseData.data) {
+      const customer = responseData.data;
+      if (customer.dedicated_account) {
+        // Upsert the dedicated account into the virtual_accounts table
+        const va = customer.dedicated_account;
+        // Look up user_id by email
+        const { data: userProfile } = await adminClient
+          .from("profiles")
+          .select("id")
+          .eq("email", email)
+          .single();
+        const user_id = userProfile?.id || null;
+        const virtualAccountData = {
+          email: email,
+          user_id: user_id,
+          account_number: va.account_number,
+          account_name: va.account_name,
+          bank_name: va.bank_name || va.bank?.name,
+          bank_code: va.bank_code || va.bank?.id?.toString(),
+          currency: va.currency,
+          assigned: va.assigned ?? true,
+          paystack_id: va.id?.toString(),
+          created_at: va.created_at || new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        await adminClient
+          .from("virtual_accounts")
+          .upsert([virtualAccountData], { onConflict: "email" });
+        return { success: true, virtualAccount: virtualAccountData, paystackCustomer: customer };
+      }
+    }
+
+    // If still not found, return not found
+    return { success: false, message: "No virtual account found" }
   } catch (error) {
     console.error("Error fetching virtual account:", error)
     return { error: "An unexpected error occurred. Please try again." }
@@ -252,5 +346,68 @@ export async function validateAccountWithPaystack({ account_number, bank_code, b
     }
   } catch (err: any) {
     return { success: false, error: err?.message || "Validation failed" };
+  }
+}
+
+// Validate customer identification with Paystack
+export async function validateCustomerIdentification({
+  country,
+  type,
+  account_number,
+  bvn,
+  bank_code,
+  first_name,
+  last_name,
+  email,
+}: {
+  country: string;
+  type: string;
+  account_number: string;
+  bvn: string;
+  bank_code: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+}) {
+  try {
+    const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
+    if (!PAYSTACK_SECRET_KEY) {
+      return { success: false, error: "Paystack secret key not configured" };
+    }
+    // Use email as the customer_code in the URL
+    const url = `https://api.paystack.co/customer/${encodeURIComponent(email)}/identification`;
+    const payload = {
+      country,
+      type,
+      account_number,
+      bvn,
+      bank_code,
+      first_name,
+      last_name,
+    };
+    console.log("Paystack customer identification payload:", payload);
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+    const responseText = await response.text();
+    console.log("Paystack customer identification response:", responseText);
+    let responseData;
+    try {
+      responseData = JSON.parse(responseText);
+    } catch (err) {
+      responseData = { raw: responseText };
+    }
+    if (response.ok && responseData.status) {
+      return { success: true, data: responseData.data, message: responseData.message };
+    } else {
+      return { success: false, error: responseData.message || "Identification failed", raw: responseData };
+    }
+  } catch (err: any) {
+    return { success: false, error: err?.message || "Identification failed" };
   }
 }

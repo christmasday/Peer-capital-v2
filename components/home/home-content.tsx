@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input"
 import { HelperCard } from "@/components/helpers/helper-card"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { findLenders, type LenderResult } from "@/lib/actions/find-lenders"
 import { useToast } from "@/hooks/use-toast"
 
 interface HomeContentProps {
@@ -19,7 +18,7 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
   const [loanAmount, setLoanAmount] = useState<string>("")
   const [loanDuration, setLoanDuration] = useState<string>("")
   const [isSearching, setIsSearching] = useState(false)
-  const [searchResults, setSearchResults] = useState<LenderResult[] | null>(null)
+  const [searchResults, setSearchResults] = useState<any[] | null>(null)
   const [searchError, setSearchError] = useState<string | null>(null)
   const [hasSearched, setHasSearched] = useState(false)
 
@@ -48,11 +47,14 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
         return
       }
 
-      // Call the server action to find lenders
-      const { lenders, error } = await findLenders({
-        loanAmount: amount && amount > 0 ? amount : undefined,
-        loanDuration: duration && duration > 0 ? duration : undefined,
+      // Call the API route to find lenders
+      const res = await fetch("/api/find-lenders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ loanAmount: amount && amount > 0 ? amount : undefined, loanDuration: duration && duration > 0 ? duration : undefined }),
+        credentials: "include"
       })
+      const { lenders, error } = await res.json()
 
       if (error) {
         setSearchError(error)
@@ -61,7 +63,7 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
           description: error,
           variant: "destructive",
         })
-        setSearchResults([]) // Set empty array to indicate search was performed but no results
+        setSearchResults([])
       } else if (lenders.length === 0) {
         setSearchError("No lenders found matching your criteria. Try adjusting your search.")
         setSearchResults([])
@@ -133,28 +135,21 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
                 <div className="flex justify-between items-center">
                   <Link href="/account/fund" className="flex flex-col items-center">
                     <div className="bg-white p-2 rounded-lg mb-2">
-                      <Plus className="h-4 w-4 text-blue-700" />
+                      <Plus className="h-12 w-12 text-blue-700" />
                     </div>
                     <span className="text-xs">Fund</span>
                   </Link>
 
                   <Link href="/account/withdraw" className="flex flex-col items-center">
                     <div className="bg-white p-2 rounded-lg mb-2">
-                      <ArrowDown className="h-4 w-4 text-blue-700" />
+                      <ArrowRightLeft className="h-12 w-12 text-blue-700" />
                     </div>
-                    <span className="text-xs">Withdraw</span>
+                    <span className="text-xs">Transfer</span>
                   </Link>
 
                   <div className="flex flex-col items-center">
                     <div className="bg-white p-2 rounded-lg mb-2">
-                      <ArrowRightLeft className="h-4 w-4 text-blue-700" />
-                    </div>
-                    <span className="text-xs">Transfer</span>
-                  </div>
-
-                  <div className="flex flex-col items-center">
-                    <div className="bg-white p-2 rounded-lg mb-2">
-                      <TrendingUp className="h-4 w-4 text-blue-700" />
+                      <TrendingUp className="h-12 w-12 text-blue-700" />
                     </div>
                     <span className="text-xs">Loans</span>
                   </div>
@@ -231,7 +226,7 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
         <div className="mb-8">
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-5">
             <h2 className="text-xl font-bold text-gray-900 mb-4 md:mb-0">
-              {hasSearched ? "Search Results" : "Top Helpers"}
+              {hasSearched ? "Search Results" : "Loan Offers from People You Follow"}
             </h2>
             {hasSearched && (
               <Button variant="outline" onClick={handleResetSearch} className="text-sm py-2 h-auto">
@@ -286,11 +281,15 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
                   id={helper.id}
                   name={helper.name}
                   interestRate={helper.interest_rate.toString()}
-                  maxLoan={formatCurrency(helper.max_loan_amount)}
+                  maxLoan={formatCurrency(helper.loanAmount)}
                   loanIssued={helper.loans_issued.toString()}
                   amountIssued={formatCurrency(helper.amount_issued)}
                   profileImage={helper.profile_image_url || "/vibrant-street-market.png"}
-                  rating={helper.rating || 4.5 - index * 0.2} // Use provided rating or fallback
+                  rating={helper.rating || 4.5 - index * 0.2}
+                  loanAmount={helper.loanAmount}
+                  repaymentTime={helper.repayment_time}
+                  repaymentUnit={helper.repayment_unit}
+                  currentUser={userProfile}
                 />
               ))}
             </div>

@@ -262,12 +262,12 @@ export default async function UserProfilePage({
           {activeTab === "about" && (
             <div className="col-span-12">
               <PublicProfileAbout profile={profile} initialSection="about" />
-            </div>
-          )}
+                    </div>
+                  )}
           {activeTab === "loan-history" && showLoanHistoryTab && (
             <div className="col-span-12">
               <LoanHistorySection userId={userId} />
-            </div>
+                </div>
           )}
 
           {/* Right content area (8/12) */}

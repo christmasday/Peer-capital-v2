@@ -1,71 +1,70 @@
 import { HomeContent } from "@/components/home/home-content"
 import { getUserProfile } from "@/lib/actions/auth"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { checkAuth } from "@/lib/auth-utils"
+import { getMaxLoanAmountByLender, getTotalAmountGivenByLender } from "@/lib/actions/find-lenders"
 
-// Mock data for loan helpers
-const mockLoanHelpers = [
-  {
-    id: "1",
-    name: "Ada Ada",
-    interest_rate: 0.2,
-    max_loan_amount: 2000000,
-    loans_issued: 80,
-    amount_issued: 50000000,
-    profile_image_url: "/vibrant-street-market.png",
-  },
-  {
-    id: "2",
-    name: "Don Halbert",
-    interest_rate: 0.4,
-    max_loan_amount: 5500000,
-    loans_issued: 60,
-    amount_issued: 35000000,
-    profile_image_url: "/vibrant-street-market.png",
-  },
-]
+export default async function HomePage() {
+  // Check authentication
+  await checkAuth()
 
-export default async function HomePage({ searchParams }: { searchParams: { auth?: string } }) {
-  // Get user profile - with fallback for direct auth
-  let userProfile
+  // Get user profile
+  const userProfile = await getUserProfile()
 
+  // Fetch loan offers from followed users
+  let loanHelpers: any[] = []
   try {
-    userProfile = await getUserProfile()
-  } catch (error) {
-    console.error("Error getting user profile:", error)
-
-    // If direct auth parameter is provided, use a fallback profile
-    if (searchParams.auth === "direct") {
-      console.log("Using fallback profile for direct auth")
-
-      // Try to get a user from the database as fallback
+    const { userId } = await checkAuth()
+    if (userId) {
       const adminClient = createAdminClient()
-      const { data: firstUser } = await adminClient.from("profiles").select("*").limit(1).single()
-
-      if (firstUser) {
-        userProfile = {
-          id: firstUser.id,
-          email: firstUser.email,
-          profile: firstUser,
-        }
-      } else {
-        // Create a minimal fallback profile
-        userProfile = {
-          id: "fallback-user",
-          email: "user@example.com",
-          profile: {
-            first_name: "Guest",
-            profile_picture_url: "/vibrant-street-market.png",
-          },
+      // Get the list of user IDs the current user is following
+      const { data: followingConnections } = await adminClient
+        .from("user_connections")
+        .select("following_id")
+        .eq("follower_id", userId)
+        .eq("status", "active")
+      const followingIds = (followingConnections || []).map((conn: { following_id: string }) => conn.following_id)
+      if (followingIds.length > 0) {
+        // Get loan offers from followed users
+        const { data: offers } = await adminClient
+          .from("loan_helper_settings")
+          .select("id, user_id, loan_amount, interest_rate, repayment_time, repayment_unit")
+          .in("user_id", followingIds)
+        if (offers && offers.length > 0) {
+          // For each offer, get profile info
+          loanHelpers = await Promise.all(
+            offers.map(async (offer: any) => {
+              const { data: profileArr } = await adminClient
+                .from("profiles")
+                .select("first_name, last_name, profile_picture_url")
+                .eq("id", offer.user_id)
+              const profile = profileArr && profileArr[0]
+              // Fetch computed stats from loan_history
+              const maxLoanAmount = await getMaxLoanAmountByLender(offer.user_id)
+              const totalAmountGiven = await getTotalAmountGivenByLender(offer.user_id)
+              return {
+                id: offer.user_id,
+                name: `${profile?.first_name || ""} ${profile?.last_name || ""}`.trim(),
+                interest_rate: offer.interest_rate || 0,
+                max_loan_amount: maxLoanAmount,
+                loans_issued: 0, // Optionally fetch
+                amount_issued: totalAmountGiven,
+                profile_image_url: profile?.profile_picture_url || null,
+                rating: 4.5, // Optionally fetch
+                loanAmount: offer.loan_amount,
+                repaymentTime: offer.repayment_time,
+                repaymentUnit: offer.repayment_unit,
+              }
+            })
+          )
         }
       }
-    } else {
-      // Re-throw the error if not using direct auth
-      throw error
     }
+  } catch (e) {
+    // ignore
   }
 
-  // Get loan helpers
-  const loanHelpers = mockLoanHelpers
-
-  return <HomeContent userProfile={userProfile} loanHelpers={loanHelpers} />
+  return (
+    <HomeContent userProfile={userProfile} loanHelpers={loanHelpers} />
+  )
 }

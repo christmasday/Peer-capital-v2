@@ -564,17 +564,91 @@ async function handleTransferFailed(data: any, adminClient: any) {
 
 // The following handlers are kept from the original file
 async function handleCustomerIdentificationSuccess(data: any, adminClient: any) {
-  // Existing implementation
+  // Find user by customer_code or email
+  const customerCode = data.customer?.customer_code;
+  if (customerCode) {
+    // Update profile: set bvn_verified = true, bvn_verified_at = now
+    await adminClient.from("profiles").update({
+      bvn_verified: true,
+      bvn_verified_at: new Date().toISOString(),
+    }).eq("paystack_customer_code", customerCode);
+  }
 }
 
 async function handleCustomerIdentificationFailed(data: any, adminClient: any) {
-  // Existing implementation
+  // Optionally log or update status
+  const customerCode = data.customer?.customer_code;
+  if (customerCode) {
+    await adminClient.from("profiles").update({
+      bvn_verified: false,
+    }).eq("paystack_customer_code", customerCode);
+  }
 }
 
 async function handleDedicatedAccountAssignSuccess(data: any, adminClient: any) {
-  // Existing implementation
+  // Extract relevant details from the event structure
+  const accountData = data;
+  const customer = accountData.customer;
+  const customerCode = customer?.customer_code || customer?.email;
+  const email = customer?.email || customerCode;
+
+  if (!accountData.account_number || !email) {
+    console.error("Missing account_number or email in dedicatedaccount.assign.success event", data);
+    return;
+  }
+
+  // Upsert (insert or update) the virtual account in the database
+  const virtualAccountData = {
+    email: email,
+    account_number: accountData.account_number,
+    account_name: accountData.account_name,
+    bank_name: accountData.bank?.name || accountData.bank_name,
+    bank_code: accountData.bank?.id?.toString() || accountData.bank_code,
+    currency: accountData.currency,
+    assigned: accountData.assigned,
+    paystack_id: accountData.id?.toString(),
+    created_at: accountData.created_at || new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  // Upsert by email (if your table supports upsert, otherwise do update/insert logic)
+  const { error } = await adminClient
+    .from("virtual_accounts")
+    .upsert([virtualAccountData], { onConflict: ["email"] });
+
+  if (error) {
+    console.error("Error upserting virtual account on assign.success:", error);
+    return;
+  }
+
+  // Optionally, update the user's profile to indicate the virtual account is active
+  await adminClient
+    .from("profiles")
+    .update({ virtual_account_active: true })
+    .eq("email", email);
+
+  console.log(`Virtual account assigned and upserted for email: ${email}`);
 }
 
 async function handleDedicatedAccountAssignFailed(data: any, adminClient: any) {
-  // Existing implementation
+  // Extract relevant details
+  const customer = data.customer;
+  const customerCode = customer?.customer_code || customer?.email;
+  const email = customer?.email || customerCode;
+
+  // Log the failure
+  console.error("Paystack dedicatedaccount.assign.failed event:", data);
+
+  // Optionally, update the user's profile or virtual account status to indicate the failure
+  if (email) {
+    await adminClient
+      .from("profiles")
+      .update({ virtual_account_active: false })
+      .eq("email", email);
+    // Optionally, update a status field in virtual_accounts if you have one
+    await adminClient
+      .from("virtual_accounts")
+      .update({ assigned: false, updated_at: new Date().toISOString() })
+      .eq("email", email);
+  }
 }

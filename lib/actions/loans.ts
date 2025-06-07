@@ -6,6 +6,8 @@ import { revalidatePath } from "next/cache"
 import { v4 as uuidv4 } from "uuid"
 import { getJWTFromCookies, verifyJWT } from "@/lib/jwt"
 import fetch from 'node-fetch'
+import type { SupabaseClient } from "@supabase/supabase-js"
+import type { Database } from "@/lib/supabase/database.types"
 
 // Mock data for fallback
 const mockLoanRequests = [
@@ -44,32 +46,42 @@ const mockLoanRequests = [
 ]
 
 export async function createLoanRequest({
+  userId,
   helperId,
   amount,
-  durationMonths,
+  duration,
+  durationUnit,
   purpose,
   purposeDetails,
   interestRate,
 }: {
+  userId: string
   helperId: string
   amount: number
-  durationMonths: number
+  duration: number
+  durationUnit: string
   purpose: string
   purposeDetails: string
   interestRate: number
 }) {
   try {
-    const supabase = createServerClient()
-    const adminClient = createAdminClient()
+    const supabase = createServerClient() as SupabaseClient<Database>
+    const adminClient = createAdminClient() as SupabaseClient<Database>
 
-    // Get the current user
-    const { data: sessionData } = await supabase.auth.getSession()
-
-    if (!sessionData.session?.user) {
-      return { error: "You must be logged in to request a loan" }
+    // Fetch borrower's profile for validation
+    const { data: borrowerProfile, error: borrowerProfileError } = await supabase
+      .from("profiles")
+      .select("first_name, last_name, phone_number, address, city, state, bank_name, account_number, bvn, date_of_birth")
+      .eq("id", userId)
+      .maybeSingle()
+    if (borrowerProfileError) {
+      return { error: "Could not fetch your profile. Please try again." }
     }
+   // const isProfileComplete = borrowerProfile && borrowerProfile.first_name && borrowerProfile.last_name && borrowerProfile.phone_number && borrowerProfile.address && borrowerProfile.city && borrowerProfile.state && borrowerProfile.bank_name && borrowerProfile.account_number && borrowerProfile.bvn && borrowerProfile.date_of_birth
+   // if (!isProfileComplete) {
+   //   return { error: "You must complete your profile before requesting a loan." }
+   // }
 
-    const userId = sessionData.session.user.id
     const loanId = uuidv4()
 
     // Create the loan request using admin client
@@ -81,7 +93,8 @@ export async function createLoanRequest({
         helper_id: helperId,
         amount: amount,
         interest_rate: interestRate,
-        duration_months: durationMonths,
+        duration_months: duration,
+        duration_unit: durationUnit,
         status: "pending",
         purpose: `${purpose}: ${purposeDetails}`,
         created_at: new Date().toISOString(),
@@ -93,6 +106,20 @@ export async function createLoanRequest({
       console.error("Error creating loan request:", error)
       return { error: error.message }
     }
+
+    // Insert into loan_history
+    await adminClient.from("loan_history").insert({
+      loan_request_id: loanId,
+      lender_id: helperId,
+      borrower_id: userId,
+      amount: amount,
+      interest_rate: interestRate,
+      duration: duration,
+      duration_unit: durationUnit,
+      status: "pending",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
 
     // Create a transaction record for the loan request
     const { error: transactionError } = await adminClient.from("transactions").insert({
@@ -139,7 +166,7 @@ export async function getUserLoanRequests() {
 
     // If no userId from JWT, try Supabase session
     if (!userId) {
-      const supabase = createServerClient()
+      const supabase = createServerClient() as SupabaseClient<Database>
       const { data: sessionData } = await supabase.auth.getSession()
 
       if (sessionData.session?.user) {
@@ -155,7 +182,7 @@ export async function getUserLoanRequests() {
     }
 
     // Get all loan requests for the user
-    const supabase = createServerClient()
+    const supabase = createServerClient() as SupabaseClient<Database>
     const { data, error } = await supabase
       .from("loan_requests")
       .select(`
@@ -184,8 +211,8 @@ export async function getUserLoanRequests() {
 
 export async function cancelLoanRequest(loanRequestId: string) {
   try {
-    const supabase = createServerClient()
-    const adminClient = createAdminClient()
+    const supabase = createServerClient() as SupabaseClient<Database>
+    const adminClient = createAdminClient() as SupabaseClient<Database>
 
     // Get the current user
     const { data: sessionData } = await supabase.auth.getSession()
@@ -216,19 +243,30 @@ export async function cancelLoanRequest(loanRequestId: string) {
       return { error: "Loan request not found or you don't have permission to cancel it" }
     }
 
-    // Update the transaction status to cancelled
-    const { error: transactionError } = await adminClient
-      .from("transactions")
-      .update({
-        status: "cancelled",
-      })
-      .eq("reference", loanRequestId)
-      .eq("user_id", userId)
-
-    if (transactionError) {
-      console.error("Error updating transaction record:", transactionError)
-      // We don't return an error here as the loan request cancellation was successful
+    // Fetch the full loan request to get all fields for loan_history
+    const { data: cancelledLoan, error: fetchCancelledError } = await adminClient
+      .from("loan_requests")
+      .select("id, helper_id, user_id, amount, interest_rate, duration_months, duration_unit")
+      .eq("id", loanRequestId)
+      .single()
+    if (fetchCancelledError || !cancelledLoan) {
+      console.error("Error fetching cancelled loan request for loan_history:", fetchCancelledError)
+      return { error: "Failed to fetch cancelled loan request details" }
     }
+
+    // Insert into loan_history for cancellation
+    await adminClient.from("loan_history").insert({
+      loan_request_id: loanRequestId,
+      lender_id: cancelledLoan.helper_id,
+      borrower_id: cancelledLoan.user_id,
+      amount: cancelledLoan.amount,
+      interest_rate: cancelledLoan.interest_rate,
+      duration: cancelledLoan.duration_months,
+      duration_unit: cancelledLoan.duration_unit,
+      status: "cancelled",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
 
     revalidatePath("/loans")
     return { success: true }
@@ -240,7 +278,7 @@ export async function cancelLoanRequest(loanRequestId: string) {
 
 export async function getAllLoanRequests() {
   try {
-    const adminClient = createAdminClient();
+    const adminClient = createAdminClient() as SupabaseClient<Database>
     const { data, error } = await adminClient
       .from("loan_requests")
       .select(`*, loan_helpers (name, profile_image_url)`)
@@ -263,10 +301,10 @@ export async function approveLoanRequest({ loanRequestId, pin, approverId }: { l
   if (!pin || pin.length !== 6) {
     return { success: false, error: "Invalid pin" }
   }
-  const adminClient = createAdminClient()
+  const adminClient = createAdminClient() as SupabaseClient<Database>
   const { data: loanRequest, error: loanError } = await adminClient
     .from("loan_requests")
-    .select("id, user_id, amount, duration_months, interest_rate, purpose, status, helper_id")
+    .select("id, user_id, amount, duration_months, duration_unit, interest_rate, purpose, status, helper_id")
     .eq("id", loanRequestId)
     .single()
   if (loanError || !loanRequest) {
@@ -339,6 +377,19 @@ export async function approveLoanRequest({ loanRequestId, pin, approverId }: { l
   if (updateError) {
     return { success: false, error: "Failed to update loan status" }
   }
+  // Insert into loan_history for approval
+  await adminClient.from("loan_history").insert({
+    loan_request_id: loanRequestId,
+    lender_id: approverId,
+    borrower_id: loanRequest.user_id,
+    amount: loanRequest.amount,
+    interest_rate: loanRequest.interest_rate,
+    duration: loanRequest.duration_months,
+    duration_unit: loanRequest.duration_unit,
+    status: "approved",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  })
   // 4. Create notification for requester
   await adminClient.from("notifications").insert({
     user_id: loanRequest.user_id,
@@ -358,11 +409,11 @@ export async function approveLoanRequest({ loanRequestId, pin, approverId }: { l
  */
 export async function rejectLoanRequest({ loanRequestId, approverId }: { loanRequestId: string, approverId: string }) {
   try {
-    const adminClient = createAdminClient()
+    const adminClient = createAdminClient() as SupabaseClient<Database>
     // Optionally, check that the approver is the helper for this request
     const { data: loanRequest, error: fetchError } = await adminClient
       .from("loan_requests")
-      .select("id, helper_id, user_id")
+      .select("id, helper_id, user_id, amount, interest_rate, duration_months, duration_unit")
       .eq("id", loanRequestId)
       .single()
     if (fetchError || !loanRequest) {
@@ -378,6 +429,19 @@ export async function rejectLoanRequest({ loanRequestId, approverId }: { loanReq
     if (error) {
       return { success: false, error: error.message || "Failed to reject loan request" }
     }
+    // Insert into loan_history for rejection
+    await adminClient.from("loan_history").insert({
+      loan_request_id: loanRequestId,
+      lender_id: loanRequest.helper_id,
+      borrower_id: loanRequest.user_id,
+      amount: loanRequest.amount,
+      interest_rate: loanRequest.interest_rate,
+      duration: loanRequest.duration_months,
+      duration_unit: loanRequest.duration_unit,
+      status: "rejected",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
     // Create notification for requester
     await adminClient.from("notifications").insert({
       user_id: loanRequest.user_id,

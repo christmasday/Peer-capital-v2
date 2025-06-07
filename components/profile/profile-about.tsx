@@ -9,13 +9,16 @@ import { updateSocialMedia } from "@/lib/actions/profile"
 import { updateBio } from "@/lib/actions/profile"
 import { updateProfile, uploadIdDocument, uploadLendingLicenseServer } from "@/lib/actions/profile"
 import { getLoanHelperSettings, updateLoanHelperSettings } from "@/lib/actions/loan-helper-settings"
-import { getVirtualAccount, createVirtualAccount } from "@/lib/actions/paystack"
+import { getVirtualAccount, createVirtualAccount, validateCustomerIdentification } from "@/lib/actions/paystack"
 import { Textarea } from "@/components/ui/textarea"
 import { createAdminClient } from "@/lib/supabase/admin"
 import imageCompression from 'browser-image-compression'
 import { SlateEditor } from "@/components/profile/useSlateEditor"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { useToast } from "@/hooks/use-toast"
+import { LoanHelperSettingsForm } from "@/components/profile/loan-helper-settings-form"
+import { LoanHelperSettingsDisplay } from "@/components/profile/loan-helper-settings-display"
 
 interface ProfileAboutProps {
   profile: any
@@ -104,6 +107,11 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
   const [lastNameText, setLastNameText] = useState(profile.last_name || "");
   const [isSavingFullName, setIsSavingFullName] = useState(false);
   const [fullNameError, setFullNameError] = useState<string | null>(null);
+  // Add state for Paystack response
+  const [paystackResponse, setPaystackResponse] = useState<any>(null);
+  const { toast } = useToast();
+  const [isVerifyingCustomer, setIsVerifyingCustomer] = useState(false);
+  const [customerVerificationMsg, setCustomerVerificationMsg] = useState<string | null>(null);
 
   const sections = [
     { id: "overview", name: "Overview", icon: Info },
@@ -207,6 +215,28 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
       setActiveSection(initialSection);
     }
   }, [initialSection]);
+
+  useEffect(() => {
+    let pollInterval: NodeJS.Timeout | null = null;
+    if (paystackResponse && paystackResponse.inProgress && isCurrentUser && activeSection === "virtual-account") {
+      pollInterval = setInterval(async () => {
+        const res = await getVirtualAccount();
+        if (res && res.virtualAccount) {
+          setVirtualAccount(res.virtualAccount);
+          setPaystackResponse(null);
+          toast({
+            title: "Virtual Account Created",
+            description: "Your virtual account is now ready!",
+            variant: "default",
+          });
+          if (pollInterval) clearInterval(pollInterval);
+        }
+      }, 10000); // Poll every 10 seconds
+    }
+    return () => {
+      if (pollInterval) clearInterval(pollInterval);
+    };
+  }, [paystackResponse, isCurrentUser, activeSection, toast]);
 
   const handleSocialMediaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSocialMediaData({
@@ -562,6 +592,7 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
         Number(loanAmount),
         Number(interestRate),
         Number(paybackPeriod),
+        'months', // Default repayment unit
         loanTerms
       );
       if (result.success) {
@@ -585,7 +616,9 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
   const handleCreateVirtualAccount = async () => {
     setIsCreatingVA(true)
     setVaError(null)
+    setPaystackResponse(null)
     const res = await createVirtualAccount()
+    setPaystackResponse(res)
     if (res.virtualAccount) {
       setVirtualAccount(res.virtualAccount)
     } else if (res.error) {
@@ -1642,7 +1675,7 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
                       onChange={e => setFirstNameText(e.target.value)}
                       placeholder="First Name"
                       className="border-b-2 border-blue-600 focus:border-green-600 outline-none px-3 py-2 w-full"
-                      disabled={isSavingFullName}
+                      disabled={isSavingFullName || profile.bvn_verified}
                     />
                     <input
                       type="text"
@@ -1650,7 +1683,7 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
                       onChange={e => setMiddleNameText(e.target.value)}
                       placeholder="Middle Name"
                       className="border-b-2 border-blue-600 focus:border-green-600 outline-none px-3 py-2 w-full"
-                      disabled={isSavingFullName}
+                      disabled={isSavingFullName || profile.bvn_verified}
                     />
                     <input
                       type="text"
@@ -1658,23 +1691,26 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
                       onChange={e => setLastNameText(e.target.value)}
                       placeholder="Last Name"
                       className="border-b-2 border-blue-600 focus:border-green-600 outline-none px-3 py-2 w-full"
-                      disabled={isSavingFullName}
+                      disabled={isSavingFullName || profile.bvn_verified}
                     />
                     <div className="flex gap-2 mt-2 w-full">
-                      <Button variant="outline" className="w-1/2" onClick={handleCancelEditFullName} type="button" disabled={isSavingFullName}>Cancel</Button>
-                      <Button className="w-1/2" onClick={handleSaveFullName} disabled={isSavingFullName || (firstNameText === (profile.first_name || "") && middleNameText === (profile.middle_name || "") && lastNameText === (profile.last_name || ""))} type="button">
+                      <Button variant="outline" className="w-1/2" onClick={handleCancelEditFullName} type="button" disabled={isSavingFullName || profile.bvn_verified}>Cancel</Button>
+                      <Button className="w-1/2" onClick={handleSaveFullName} disabled={isSavingFullName || (firstNameText === (profile.first_name || "") && middleNameText === (profile.middle_name || "") && lastNameText === (profile.last_name || "")) || profile.bvn_verified} type="button">
                         {isSavingFullName ? "Saving..." : "Save"}
                       </Button>
                     </div>
                     {fullNameError && <div className="text-sm text-red-500 mt-2">{fullNameError}</div>}
                   </div>
                 ) : (
-                  <>
+                  <div className="flex items-center gap-2 mt-1 justify-between w-full">
                     <span className="text-lg font-semibold">{profile.first_name} {profile.middle_name} {profile.last_name}</span>
-                    {isCurrentUser && (
-                      <Button size="sm" variant="ghost" className="ml-auto" onClick={() => { setIsEditingFullName(true); setIsEditingPhone(false); setIsEditingEmail(false); setIsEditingContact(false); }}><Edit className="h-4 w-4" /></Button>
-                    )}
-                  </>
+                    <div className="flex items-center gap-2">
+                      {profile.bvn_verified && <Badge className="bg-green-500 text-white ml-2">Verified</Badge>}
+                      {isCurrentUser && !profile.bvn_verified && (
+                        <Button size="sm" variant="ghost" onClick={() => setIsEditingFullName(true)}><Edit className="h-4 w-4" /></Button>
+                      )}
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
@@ -1929,24 +1965,21 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
                             placeholder="Enter your BVN"
                             className="border-b-2 border-blue-600 focus:border-green-600 outline-none px-3 py-2 w-40"
                             maxLength={11}
+                            disabled={profile.bvn_verified}
                           />
-                          <Button size="sm" onClick={handleSaveBvn} disabled={isSavingBvn || bvnText === (profile.bvn || "")}>{isSavingBvn ? "Saving..." : "Save"}</Button>
-                          <Button size="sm" variant="outline" onClick={handleCancelBvn} disabled={isSavingBvn}>Cancel</Button>
+                          <Button size="sm" onClick={handleSaveBvn} disabled={isSavingBvn || bvnText === (profile.bvn || "") || profile.bvn_verified}>{isSavingBvn ? "Saving..." : "Save"}</Button>
+                          <Button size="sm" variant="outline" onClick={handleCancelBvn} disabled={isSavingBvn || profile.bvn_verified}>Cancel</Button>
                         </>
                       ) : (
                         <>
                           <span className="font-mono border-b-2 border-blue-200 px-3 py-2 bg-gray-50 rounded text-gray-800">{profile.bvn ? `******${profile.bvn.slice(-4)}` : "-"}</span>
-                          {isCurrentUser && (
+                          {profile.bvn_verified && <Badge className="bg-green-500 text-white ml-2">Verified</Badge>}
+                          {isCurrentUser && !profile.bvn_verified && (
                             <Button size="sm" variant="ghost" onClick={() => setIsEditingBvn(true)}><Edit className="h-4 w-4" /></Button>
                           )}
                         </>
                       )}
                       {/* BVN Verification */}
-                      {isCurrentUser && !isEditingBvn && profile.bvn && (
-                        <Button size="sm" variant="secondary" onClick={handleVerifyBvn} disabled={isVerifyingBvn} className="ml-2">
-                          {isVerifyingBvn ? "Verifying..." : bvnVerified ? "Verified" : "Verify"}
-                        </Button>
-                      )}
                       {bvnVerificationMsg && <span className={`ml-2 text-sm ${bvnVerified ? "text-green-600" : "text-red-600"}`}>{bvnVerificationMsg}</span>}
                     </div>
                     {bvnError && <div className="text-sm text-red-500 mt-1">{bvnError}</div>}
@@ -1972,9 +2005,7 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
                           <Button size="sm" variant="ghost" onClick={() => setIsEditingBvn(true)}><Edit className="h-4 w-4" /></Button>
                         )}
                         {isCurrentUser && profile.bvn && (
-                          <Button size="sm" variant="secondary" onClick={handleVerifyBvn} disabled={isVerifyingBvn} className="ml-2">
-                            {isVerifyingBvn ? "Verifying..." : bvnVerified ? "Verified" : "Verify"}
-                          </Button>
+                          null
                         )}
                         {bvnVerificationMsg && <span className={`ml-2 text-sm ${bvnVerified ? "text-green-600" : "text-red-600"}`}>{bvnVerificationMsg}</span>}
                       </div>
@@ -1988,81 +2019,75 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
                 )}
               </div>
             </div>
+            {!profile.bvn_verified && isCurrentUser && (
+              <div className="mt-4">
+                <Button
+                  onClick={async () => {
+                    setIsVerifyingCustomer(true);
+                    setCustomerVerificationMsg(null);
+                    try {
+                      if (!profile.account_number || !profile.bvn || !profile.bank_code) {
+                        setCustomerVerificationMsg("Missing required details for verification.");
+                        setIsVerifyingCustomer(false);
+                        return;
+                      }
+                      const res = await validateCustomerIdentification({
+                        country: "NG",
+                        type: "bank_account",
+                        account_number: profile.account_number,
+                        bvn: profile.bvn,
+                        bank_code: profile.bank_code,
+                        first_name: profile.first_name,
+                        last_name: profile.last_name,
+                        email: profile.email,
+                      });
+                      if (res.success) {
+                        setCustomerVerificationMsg("Verification initiated. You will be notified when verification is complete.");
+                      } else {
+                        setCustomerVerificationMsg(res.error || "Verification failed.");
+                      }
+                    } catch (err: any) {
+                      setCustomerVerificationMsg(err?.message || "Verification failed.");
+                    } finally {
+                      setIsVerifyingCustomer(false);
+                    }
+                  }}
+                  disabled={
+                    isVerifyingCustomer ||
+                    !profile.account_number ||
+                    !profile.bvn ||
+                    !profile.bank_code ||
+                    profile.bvn_verified
+                  }
+                  variant="secondary"
+                >
+                  {isVerifyingCustomer ? "Verifying..." : "Verify Bank Account"}
+                </Button>
+                {customerVerificationMsg && <div className="text-sm mt-2 text-blue-700">{customerVerificationMsg}</div>}
+              </div>
+            )}
           </div>
         )}
 
         {activeSection === "loan-helper" && (
           <div className="space-y-8">
-            <h2 className="text-xl font-medium">Loan Helper Settings</h2>
-            <div className="flex items-start gap-4">
-              <div className="flex-grow">
-                {isEditingLoanHelper ? (
-                  <div className="space-y-6 w-full">
-                    <input
-                      type="number"
-                      value={loanAmount}
-                      onChange={e => setLoanAmount(e.target.value)}
-                      placeholder="Loan Amount Offered"
-                      className="border-b-2 border-blue-600 focus:border-green-600 outline-none px-3 py-2 w-full"
-                    />
-                    <input
-                      type="number"
-                      value={interestRate}
-                      onChange={e => setInterestRate(e.target.value)}
-                      placeholder="Interest Rate (%)"
-                      className="border-b-2 border-blue-600 focus:border-green-600 outline-none px-3 py-2 w-full"
-                    />
-                    <input
-                      type="number"
-                      value={paybackPeriod}
-                      onChange={e => setPaybackPeriod(e.target.value)}
-                      placeholder="Payback Period (weeks)"
-                      className="border-b-2 border-blue-600 focus:border-green-600 outline-none px-3 py-2 w-full"
-                    />
-                    <div className="border-b-2 border-blue-600 focus:border-green-600 outline-none py-4">
-                      <label className="font-semibold mb-2 block">Loan Terms and Conditions</label>
-                      <div className="min-h-[180px]">
-                        <SlateEditor value={loanTerms} onChange={setLoanTerms} />
-                      </div>
-                    </div>
-                    <div className="flex gap-2 mt-2 w-full">
-                      <Button variant="outline" className="w-1/2" onClick={handleCancelLoanHelper} type="button" disabled={isSavingLoanHelper}>Cancel</Button>
-                      <Button className="w-1/2" onClick={handleSaveLoanHelper} disabled={isSavingLoanHelper} type="button">
-                        {isSavingLoanHelper ? "Saving..." : "Save"}
-                      </Button>
-                    </div>
-                    {loanHelperError && <div className="text-sm text-red-500 mt-2">{loanHelperError}</div>}
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-6 w-full">
-                    {/* Move edit button to top right of section */}
-                    <div className="flex justify-between items-center mb-2">
-                      <h3 className="text-lg font-medium mb-1">Loan Amount Offered:</h3>
-                      {isCurrentUser && (
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setIsEditingLoanHelper(true)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                    <p className="text-gray-600">₦{loanAmount ? Number(loanAmount).toLocaleString() : '-'}</p>
-                    <div>
-                      <h3 className="text-lg font-medium mb-1">Interest Rate:</h3>
-                      <p className="text-gray-600">{interestRate || '-'}%</p>
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-medium mb-1">Payback Period:</h3>
-                      <p className="text-gray-600">{paybackPeriod || '-'} weeks</p>
-                    </div>
-                    <div>
-                      <span className="text-lg font-medium block mb-1">Loan Terms and Conditions:</span>
-                      <div className="text-gray-700 mt-1 prose max-w-none min-h-[120px]">
-                        <SlateEditor value={loanTerms} readOnly />
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+            <h2 className="text-xl font-medium flex items-center justify-between">
+              Loan Helper Settings
+              {isCurrentUser && !isEditingLoanHelper && (
+                <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setIsEditingLoanHelper(true)}>
+                  <Edit className="h-4 w-4" />
+                </Button>
+              )}
+            </h2>
+            {isEditingLoanHelper ? (
+              <LoanHelperSettingsForm
+                userId={profile.id}
+                onSave={() => setIsEditingLoanHelper(false)}
+                onCancel={() => setIsEditingLoanHelper(false)}
+              />
+            ) : (
+              <LoanHelperSettingsDisplay userId={profile.id} />
+            )}
           </div>
         )}
 
@@ -2089,6 +2114,18 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
                     {isCreatingVA ? "Creating..." : "Create Virtual Account"}
                   </Button>
                   {vaError && <div className="text-red-500 mt-2">{vaError}</div>}
+                  {paystackResponse && (
+                    <div className="mt-4 p-3 rounded bg-gray-50 border text-xs text-gray-700 whitespace-pre-wrap max-h-64 overflow-auto">
+                      <strong>Paystack Response:</strong>
+                      {paystackResponse.inProgress ? (
+                        <div className="text-blue-700 text-sm">
+                          {paystackResponse.message || "Your virtual account is being created. Please check back in a few minutes."}
+                        </div>
+                      ) : (
+                        <pre className="mt-1">{JSON.stringify(paystackResponse, null, 2)}</pre>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>

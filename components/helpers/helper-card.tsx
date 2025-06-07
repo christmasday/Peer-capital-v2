@@ -6,6 +6,8 @@ import Link from "next/link"
 import { ArrowRight, Star, Shield, TrendingUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { motion } from "framer-motion"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { LoanRequestForm } from "@/components/loans/loan-request-form"
 
 interface HelperCardProps {
   id: string
@@ -16,6 +18,10 @@ interface HelperCardProps {
   amountIssued: string
   profileImage: string
   rating?: number
+  loanAmount?: number
+  repaymentTime?: number
+  repaymentUnit?: string
+  currentUser?: any
 }
 
 export function HelperCard({
@@ -27,8 +33,12 @@ export function HelperCard({
   amountIssued,
   profileImage,
   rating = 4.5,
+  loanAmount,
+  repaymentTime,
+  repaymentUnit,
 }: HelperCardProps) {
   const [isHovered, setIsHovered] = useState(false)
+  const [open, setOpen] = useState(false)
 
   return (
     <motion.div
@@ -82,7 +92,7 @@ export function HelperCard({
               <TrendingUp size={14} className="text-blue-600" />
             </div>
             <p className="text-xs sm:text-sm font-bold text-gray-900 line-clamp-1">{maxLoan}</p>
-            <p className="text-xs text-gray-500">Max Loan</p>
+            <p className="text-xs text-gray-500">Loan Amount</p>
           </div>
           <div className="bg-gray-50 rounded-lg p-2 text-center">
             <div className="flex justify-center mb-1">
@@ -100,11 +110,12 @@ export function HelperCard({
           </div>
         </div>
 
-        <Link href={`/loans/request/${id}`}>
+        <Dialog open={open} onOpenChange={setOpen}>
           <Button
             className={`w-full group transition-all duration-300 text-sm py-2 h-auto ${
               isHovered ? "bg-blue-700" : "bg-blue-600"
             } hover:bg-blue-700`}
+            onClick={() => setOpen(true)}
           >
             Request Loan
             <ArrowRight
@@ -112,7 +123,20 @@ export function HelperCard({
               className={`ml-2 transition-transform duration-300 ${isHovered ? "translate-x-1" : ""}`}
             />
           </Button>
-        </Link>
+          <DialogContent className="max-w-lg w-full">
+            <DialogHeader>
+              <DialogTitle>Request Loan from {name}</DialogTitle>
+            </DialogHeader>
+            <LoanRequestForm
+              helperId={id}
+              helperName={name}
+              interestRate={parseFloat(interestRate)}
+              maxLoanAmount={loanAmount ?? parseFloat(maxLoan)}
+              duration={repaymentTime ?? 0}
+              durationUnit={repaymentUnit ?? "months"}
+            />
+          </DialogContent>
+        </Dialog>
       </div>
     </motion.div>
   )

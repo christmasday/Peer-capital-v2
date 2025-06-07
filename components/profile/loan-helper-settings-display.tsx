@@ -141,7 +141,7 @@ export function LoanHelperSettingsDisplay({ userId }: LoanHelperSettingsDisplayP
             </Tooltip>
           </TooltipProvider>
         </div>
-        <p className="text-2xl font-bold text-blue-700">{settings?.repayment_time || 0} months</p>
+        <p className="text-2xl font-bold text-blue-700">{settings?.repayment_time || 0} {settings?.repayment_unit || 'months'}</p>
       </div>
 
       {settings?.terms_and_conditions && (

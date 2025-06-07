@@ -6,6 +6,9 @@ import { getUserProfile } from "@/lib/actions/auth"
 import { checkAuth } from "@/lib/auth-utils"
 // Import the FinancialDisclaimer component
 import { FinancialDisclaimer } from "@/components/disclaimers/financial-disclaimer"
+import { createAdminClient } from "@/lib/supabase/admin"
+import type { SupabaseClient } from "@supabase/supabase-js"
+import type { Database } from "@/lib/supabase/database.types"
 
 export default async function LoanRequestPage({ params }: { params: { helperId: string } }) {
   // Check authentication
@@ -19,12 +22,22 @@ export default async function LoanRequestPage({ params }: { params: { helperId: 
   }
 
   // Get the helper details
-  const supabase = createServerClient()
+  const supabase = createServerClient() as SupabaseClient<Database>
+  // Fetch helper from loan_helpers
   const { data: helper, error } = await supabase.from("loan_helpers").select("*").eq("id", params.helperId).single()
 
   if (error || !helper) {
     redirect("/home")
   }
+
+  // Fetch helper's loan settings from loan_helper_settings using admin client
+  const adminClient = createAdminClient() as SupabaseClient<Database>
+  const { data: settings } = await adminClient
+    .from('loan_helper_settings')
+    .select('repayment_time, repayment_unit, loan_amount, interest_rate')
+    .eq('user_id', helper.user_id)
+    .maybeSingle()
+
 
   return (
     <MainLayout
@@ -43,8 +56,10 @@ export default async function LoanRequestPage({ params }: { params: { helperId: 
         <LoanRequestForm
           helperId={helper.id}
           helperName={helper.name}
-          interestRate={helper.interest_rate}
-          maxLoanAmount={helper.max_loan_amount}
+          interestRate={settings?.interest_rate ?? helper.interest_rate}
+          maxLoanAmount={settings?.loan_amount ?? helper.max_loan_amount}
+          duration={settings?.repayment_time && settings.repayment_time > 0 ? settings.repayment_time : 1}
+          durationUnit={settings?.repayment_unit || "months"}
         />
       </div>
     </MainLayout>
