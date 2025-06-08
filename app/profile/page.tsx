@@ -166,7 +166,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
       </div>
 
       {/* Main Content */}
-      <div className="container max-w-6xl pt-24 pb-12">
+      <div className="container max-w-7xl pt-24 pb-12">
         {/* Profile Header with reorganized layout */}
         <div className="mb-8">
           <div className="flex justify-between items-start">
