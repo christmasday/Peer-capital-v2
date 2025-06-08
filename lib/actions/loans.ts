@@ -8,6 +8,7 @@ import { getJWTFromCookies, verifyJWT } from "@/lib/jwt"
 import fetch from 'node-fetch'
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/lib/supabase/database.types"
+import { createNotification } from "@/lib/actions/notifications"
 
 // Mock data for fallback
 const mockLoanRequests = [
@@ -106,6 +107,22 @@ export async function createLoanRequest({
       console.error("Error creating loan request:", error)
       return { error: error.message }
     }
+
+    // Notify the helper (lender) of the new loan request
+    await createNotification({
+      userId: helperId, // the lender
+      actorId: userId, // the borrower
+      type: "loan_request",
+      data: {
+        loanRequestId: loanId,
+        amount,
+        interestRate,
+        duration,
+        durationUnit,
+        purpose,
+        purposeDetails,
+      },
+    })
 
     // Insert into loan_history
     await adminClient.from("loan_history").insert({
@@ -396,10 +413,24 @@ export async function approveLoanRequest({ loanRequestId, pin, approverId }: { l
     actor_id: approverId,
     type: "loan_approved",
     content: `Your loan request has been approved and funds transferred.`,
-    data: { message: `Your loan request has been approved and funds transferred.` },
+    data: { message: `Your loan request has been approved and funds transferred.`, loanRequestId },
     reference_id: loanRequestId,
     read: false,
     created_at: new Date().toISOString(),
+  })
+  // Also trigger notification via createNotification
+  await createNotification({
+    userId: loanRequest.user_id,
+    actorId: approverId,
+    type: "loan_approved",
+    data: {
+      loanRequestId,
+      amount: loanRequest.amount,
+      interestRate: loanRequest.interest_rate,
+      duration: loanRequest.duration_months,
+      durationUnit: loanRequest.duration_unit,
+      helperId: approverId,
+    },
   })
   return { success: true }
 }
@@ -448,10 +479,24 @@ export async function rejectLoanRequest({ loanRequestId, approverId }: { loanReq
       actor_id: approverId,
       type: "loan_rejected",
       content: `Your loan request was rejected.`,
-      data: { message: `Your loan request was rejected.` },
+      data: { message: `Your loan request was rejected.`, loanRequestId },
       reference_id: loanRequestId,
       read: false,
       created_at: new Date().toISOString(),
+    })
+    // Also trigger notification via createNotification
+    await createNotification({
+      userId: loanRequest.user_id,
+      actorId: approverId,
+      type: "loan_rejected",
+      data: {
+        loanRequestId,
+        amount: loanRequest.amount,
+        interestRate: loanRequest.interest_rate,
+        duration: loanRequest.duration_months,
+        durationUnit: loanRequest.duration_unit,
+        helperId: approverId,
+      },
     })
     return { success: true }
   } catch (e: any) {
