@@ -195,7 +195,7 @@ export function ConnectionsList({ userId, initialFollowersCount, initialFollowin
                     </Link>
                     <FollowButton
                       userId={follower.userId}
-                      initialFollowingState={false} // We don't know if we're following them
+                      initialFollowingState={following.some(f => f.userId === follower.userId)}
                       onFollowChange={(isFollowing) => handleFollowChange(follower.userId, isFollowing)}
                     />
                   </div>
