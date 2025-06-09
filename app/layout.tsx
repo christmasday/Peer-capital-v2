@@ -4,6 +4,7 @@ import { Inter } from "next/font/google"
 import "./globals.css"
 import { ToastContainer } from "@/components/toast-provider"
 import { SupabaseProvider } from "@/components/supabase/SupabaseProvider"
+import { Analytics } from "@vercel/analytics/next"
 
 const inter = Inter({ subsets: ["latin"] })
 
