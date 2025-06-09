@@ -41,7 +41,6 @@ export function NotificationPreferencesForm() {
         }
       } catch (err) {
         setError("Failed to load notification preferences")
-        console.error(err)
       } finally {
         setIsLoading(false)
       }
@@ -78,7 +77,6 @@ export function NotificationPreferencesForm() {
         description: "An unexpected error occurred",
         variant: "destructive",
       })
-      console.error(err)
     } finally {
       setIsSaving(false)
     }

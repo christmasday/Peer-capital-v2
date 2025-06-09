@@ -10,7 +10,6 @@ export async function ensureStorageBucket() {
     const { data: buckets, error: listError } = await adminClient.storage.listBuckets()
 
     if (listError) {
-      console.error("Error listing buckets:", listError)
       return { error: listError.message }
     }
 
@@ -24,7 +23,6 @@ export async function ensureStorageBucket() {
       })
 
       if (createError) {
-        console.error("Error creating images bucket:", createError)
         return { error: createError.message }
       }
 
@@ -37,14 +35,12 @@ export async function ensureStorageBucket() {
       })
 
       if (policyError && policyError.message !== "The resource was not found") {
-        console.error("Error setting bucket policy:", policyError)
         // Non-blocking - continue even if policy setting fails
       }
     }
 
     return { success: true }
   } catch (error) {
-    console.error("Unexpected error ensuring storage bucket:", error)
     return { error: "An unexpected error occurred. Please try again." }
   }
 }

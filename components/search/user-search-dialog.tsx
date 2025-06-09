@@ -55,12 +55,9 @@ export function UserSearchDialog({ open, onOpenChange }: UserSearchDialogProps) 
       setError(null)
 
       try {
-        console.log("Performing search for:", debouncedSearch)
         const searchResults = await searchUsers(debouncedSearch)
-        console.log("Search results:", searchResults)
         setResults(searchResults)
       } catch (err) {
-        console.error("Search error:", err)
         setError("An error occurred while searching. Please try again.")
         setResults([])
       } finally {

@@ -62,7 +62,6 @@ export function LoginForm() {
       const result = await signIn(formData)
 
       if (result.success) {
-        console.log("Login successful, setting up session...")
 
         // Store JWT in localStorage if available
         if (result.jwt) {
@@ -100,7 +99,6 @@ export function LoginForm() {
         setError(result.error || "Failed to sign in")
       }
     } catch (err) {
-      console.error("Login error:", err)
       setError("An unexpected error occurred. Please try again.")
     } finally {
       setIsLoading(false)

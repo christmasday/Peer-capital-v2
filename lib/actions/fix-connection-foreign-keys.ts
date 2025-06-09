@@ -31,7 +31,6 @@ export async function fixConnectionForeignKeys() {
     const { error } = await adminClient.rpc("execute_sql", { sql_query: sql })
 
     if (error) {
-      console.error("Error fixing connection foreign keys:", error)
       return { error: "Failed to fix connection foreign keys" }
     }
 
@@ -40,7 +39,6 @@ export async function fixConnectionForeignKeys() {
 
     return { success: true }
   } catch (error) {
-    console.error("Unexpected error fixing connection foreign keys:", error)
     return { error: "An unexpected error occurred" }
   }
 }

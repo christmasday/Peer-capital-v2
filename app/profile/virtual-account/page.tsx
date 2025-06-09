@@ -18,16 +18,13 @@ export default async function VirtualAccountPage() {
 
   // If still no user ID, redirect to login
   if (!userId) {
-    console.log("No authenticated user found, redirecting to login")
     redirect("/login?redirect=/profile/virtual-account")
     return null
   }
 
-  console.log("Fetching virtual account for user:", userId)
   const { virtualAccount, error } = await getVirtualAccount(userId)
 
   if (error) {
-    console.error("Error fetching virtual account:", error)
   }
 
   return (

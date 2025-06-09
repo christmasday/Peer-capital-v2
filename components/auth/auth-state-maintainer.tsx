@@ -18,20 +18,17 @@ export function AuthStateMaintainer() {
       // If we have a JWT in localStorage but not in cookies, restore it
       if (jwtToken && !Cookies.get("jwt-token")) {
         Cookies.set("jwt-token", jwtToken, { path: "/", sameSite: "Lax" })
-        console.log("Restored JWT token from localStorage to cookies")
       }
 
       // If we have auth status in localStorage but not in cookies, restore it
       const localAuthStatus = localStorage.getItem("is_authenticated")
       if (localAuthStatus === "true" && !authStatus) {
         Cookies.set("auth-status", "authenticated", { path: "/", sameSite: "Lax" })
-        console.log("Restored auth status from localStorage to cookies")
       }
 
       // If we have any form of authentication, ensure the auth-status cookie is set
       if ((jwtToken || supabaseToken || customAuthToken) && !authStatus) {
         Cookies.set("auth-status", "authenticated", { path: "/", sameSite: "Lax" })
-        console.log("Set auth-status cookie based on existing tokens")
       }
     }
 

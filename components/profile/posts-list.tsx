@@ -43,7 +43,6 @@ export function PostsList({ userId, userName, userImage, initialPosts = [] }: Po
 
       setHasMore(newPosts.length >= 10)
     } catch (error) {
-      console.error("Error loading more posts:", error)
       toast({
         title: "Error",
         description: "Failed to load more posts. Please try again.",
@@ -61,7 +60,6 @@ export function PostsList({ userId, userName, userImage, initialPosts = [] }: Po
 
   // Debug: Log the posts
   useEffect(() => {
-    console.log("Posts in PostsList:", posts.length, posts)
   }, [posts])
 
   if (posts.length === 0) {

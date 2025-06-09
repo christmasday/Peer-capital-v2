@@ -7,7 +7,6 @@ export function storeJWT(jwt: string) {
     localStorage.setItem("jwt-token", jwt)
     return true
   } catch (error) {
-    console.error("Error storing JWT in localStorage:", error)
     return false
   }
 }
@@ -17,7 +16,6 @@ export function getJWTFromStorage() {
   try {
     return localStorage.getItem("jwt-token")
   } catch (error) {
-    console.error("Error getting JWT from localStorage:", error)
     return null
   }
 }
@@ -28,7 +26,6 @@ export function clearJWTFromStorage() {
     localStorage.removeItem("jwt-token")
     return true
   } catch (error) {
-    console.error("Error clearing JWT from localStorage:", error)
     return false
   }
 }
@@ -47,7 +44,6 @@ export function parseJWT(token: string) {
     )
     return JSON.parse(jsonPayload)
   } catch (error) {
-    console.error("Error parsing JWT:", error)
     return null
   }
 }
@@ -61,7 +57,6 @@ export function isJWTExpired(token: string) {
     // exp is in seconds, Date.now() is in milliseconds
     return payload.exp * 1000 < Date.now()
   } catch (error) {
-    console.error("Error checking JWT expiration:", error)
     return true // Assume expired on error
   }
 }
@@ -96,7 +91,6 @@ export async function checkTokenValidity(token: string): Promise<boolean> {
     const data = await response.json()
     return data.valid === true
   } catch (error) {
-    console.error("Error checking token validity:", error)
     return false
   }
 }
@@ -119,7 +113,6 @@ export async function getUserIdFromToken(token: string): Promise<string | null> 
     const data = await response.json()
     return data.userId || null
   } catch (error) {
-    console.error("Error getting user ID from token:", error)
     return null
   }
 }

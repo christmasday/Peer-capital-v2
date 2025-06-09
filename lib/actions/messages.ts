@@ -40,12 +40,10 @@ async function checkTableExists() {
     }
 
     if (error) {
-      console.error("Error checking if messages table exists:", error)
     }
 
     return true
   } catch (error) {
-    console.error("Unexpected error checking if messages table exists:", error)
     return false
   }
 }
@@ -59,17 +57,14 @@ async function checkUserExistsInAuth(userId: string): Promise<boolean> {
     if (error) {
       // If the error is "User not found", don't treat it as an error, just return false
       if (error.message.includes("User not found")) {
-        console.log(`User ${userId} not found in auth system`)
         return false
       }
 
-      console.error("Error checking if user exists in auth:", error)
       return false
     }
 
     return !!data.user
   } catch (error) {
-    console.error("Unexpected error checking if user exists in auth:", error)
     return false
   }
 }
@@ -87,7 +82,6 @@ async function ensureProfileExists(userId: string): Promise<boolean> {
       .maybeSingle()
 
     if (checkError) {
-      console.error("Error checking for profile:", checkError)
       return false
     }
 
@@ -106,7 +100,6 @@ async function ensureProfileExists(userId: string): Promise<boolean> {
     })
 
     if (insertError) {
-      console.error("Error creating profile:", insertError)
       return false
     }
 
@@ -118,13 +111,11 @@ async function ensureProfileExists(userId: string): Promise<boolean> {
       .maybeSingle()
 
     if (verifyError) {
-      console.error("Error verifying profile creation:", verifyError)
       return false
     }
 
     return !!verifyProfile
   } catch (error) {
-    console.error("Error ensuring profile exists:", error)
     return false
   }
 }
@@ -161,7 +152,6 @@ export async function createMinimalProfileIfNeeded(userId: string): Promise<{
     // But don't block profile creation if they don't
     const userExists = await checkUserExistsInAuth(userId)
     if (!userExists) {
-      console.log(`Creating profile for user ${userId} who doesn't exist in auth system`)
       // Continue anyway - we'll create a profile for messaging purposes
     }
 
@@ -176,7 +166,6 @@ export async function createMinimalProfileIfNeeded(userId: string): Promise<{
       .maybeSingle()
 
     if (checkError) {
-      console.error("Error checking for existing profile:", checkError)
     } else if (existingProfile) {
       // Profile was created in the meantime, return it
       return { profile: existingProfile }
@@ -197,13 +186,11 @@ export async function createMinimalProfileIfNeeded(userId: string): Promise<{
       .single()
 
     if (insertError) {
-      console.error("Error creating minimal profile:", insertError)
       return { error: "Failed to create user profile: " + insertError.message }
     }
 
     return { profile: newProfile }
   } catch (error) {
-    console.error("Unexpected error in createMinimalProfileIfNeeded:", error)
     const errorMessage = error instanceof Error ? error.message : String(error)
     return { error: "An unexpected error occurred: " + errorMessage }
   }
@@ -236,22 +223,18 @@ export async function sendMessage({
       return { error: "Message content cannot be empty" }
     }
 
-    console.log(`Sending message from ${senderId} to ${recipientId}`)
 
     // CRITICAL: Create profiles BEFORE attempting any other operations
-    console.log("Ensuring sender profile exists...")
     const senderProfileExists = await ensureProfileExists(senderId)
     if (!senderProfileExists) {
       return { error: "Failed to ensure sender profile exists" }
     }
 
-    console.log("Ensuring recipient profile exists...")
     const recipientProfileExists = await ensureProfileExists(recipientId)
     if (!recipientProfileExists) {
       return { error: "Failed to ensure recipient profile exists" }
     }
 
-    console.log("Both profiles confirmed to exist, proceeding with message creation")
 
     // Use the admin client to bypass RLS policies
     const adminClient = createAdminClient()
@@ -272,11 +255,9 @@ export async function sendMessage({
       .single()
 
     if (error) {
-      console.error("Error sending message:", error)
       return { success: false, error: "Failed to send message: " + error.message }
     }
 
-    console.log("Message created successfully, fetching sender profile for notification")
 
     // Get sender profile for notification data
     const { data: senderProfile } = await adminClient
@@ -292,7 +273,6 @@ export async function sendMessage({
         throw new Error("Message creation failed")
       }
 
-      console.log("Creating notification for recipient")
 
       // Create the notification with detailed logging
       const notificationResult = await createNotification({
@@ -311,13 +291,10 @@ export async function sendMessage({
       })
 
       if (!notificationResult.success) {
-        console.error("Failed to create notification:", notificationResult.error)
         // Don't fail the message send if notification fails
       } else {
-        console.log("Notification created successfully")
       }
     } catch (notificationError) {
-      console.error("Error creating notification:", notificationError)
       // Don't fail the message send if notification fails
     }
 
@@ -326,7 +303,6 @@ export async function sendMessage({
 
     return { success: true, message }
   } catch (error) {
-    console.error("Error in sendMessage:", error)
     const errorMessage = error instanceof Error ? error.message : String(error)
     return { success: false, error: "An unexpected error occurred: " + errorMessage }
   }
@@ -373,7 +349,6 @@ export async function getConversations(): Promise<{
       .order("created_at", { ascending: false })
 
     if (sentError || receivedError) {
-      console.error("Error fetching messages:", sentError || receivedError)
       return { error: "Failed to fetch conversations" }
     }
 
@@ -442,7 +417,6 @@ export async function getConversations(): Promise<{
       .in("id", userIds)
 
     if (profilesError) {
-      console.error("Error fetching profiles:", profilesError)
       return { error: "Failed to fetch user profiles" }
     }
 
@@ -467,7 +441,6 @@ export async function getConversations(): Promise<{
 
     return { conversations }
   } catch (error) {
-    console.error("Unexpected error getting conversations:", error)
     const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred"
     return { error: `Failed to load conversations: ${errorMessage}` }
   }
@@ -508,7 +481,6 @@ export async function getMessages(
       .range(offset, offset + limit - 1)
 
     if (messagesError) {
-      console.error("Error fetching messages:", messagesError)
       return { error: "Failed to fetch messages" }
     }
 
@@ -524,7 +496,6 @@ export async function getMessages(
         .in("id", unreadMessageIds)
 
       if (updateError) {
-        console.error("Error marking messages as read:", updateError)
       }
     }
 
@@ -540,7 +511,6 @@ export async function getMessages(
       .in("id", userIds)
 
     if (profilesError) {
-      console.error("Error fetching profiles:", profilesError)
       return { error: "Failed to fetch user profiles" }
     }
 
@@ -578,7 +548,6 @@ export async function getMessages(
       hasMore: count ? offset + limit < count : false,
     }
   } catch (error) {
-    console.error("Unexpected error getting messages:", error)
     return { error: "An unexpected error occurred" }
   }
 }
@@ -605,13 +574,11 @@ export async function getUnreadMessagesCount(): Promise<{ count: number; error?:
       .eq("is_read", false)
 
     if (error) {
-      console.error("Error getting unread messages count:", error)
       return { count: 0, error: "Failed to get unread messages count" }
     }
 
     return { count: count || 0 }
   } catch (error) {
-    console.error("Unexpected error getting unread messages count:", error)
     return { count: 0, error: "An unexpected error occurred" }
   }
 }
@@ -628,7 +595,6 @@ export async function getUserProfileForMessaging(userId: string): Promise<{
 }> {
   try {
     if (!userId) {
-      console.error("getUserProfileForMessaging called with empty userId")
       return { error: "User ID is required" }
     }
 
@@ -643,18 +609,15 @@ export async function getUserProfileForMessaging(userId: string): Promise<{
       .maybeSingle()
 
     if (error) {
-      console.error("Error fetching user profile:", error)
       return { error: "Failed to fetch user profile" }
     }
 
     if (!data) {
-      console.log(`No profile found for user ID: ${userId}`)
       return { error: "User profile not found" }
     }
 
     return { profile: data }
   } catch (error) {
-    console.error("Unexpected error getting user profile:", error)
     return { error: "An unexpected error occurred" }
   }
 }

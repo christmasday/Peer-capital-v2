@@ -35,7 +35,6 @@ export function VirtualAccountTransactions({ userId }: { userId: string }) {
         }
       } catch (err) {
         setError("Failed to load transactions")
-        console.error(err)
       } finally {
         setLoading(false)
       }

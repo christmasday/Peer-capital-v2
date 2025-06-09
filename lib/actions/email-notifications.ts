@@ -7,7 +7,6 @@ import { sendEmail, getWelcomeEmailTemplate, getTransactionEmailTemplate } from 
  */
 export async function sendWelcomeEmail(email: string, userName: string) {
   try {
-    console.log(`Sending welcome email to ${email}`)
 
     const result = await sendEmail({
       to: email,
@@ -16,13 +15,11 @@ export async function sendWelcomeEmail(email: string, userName: string) {
     })
 
     if (!result.success) {
-      console.error("Failed to send welcome email:", result.error)
       return { success: false, error: result.error }
     }
 
     return { success: true }
   } catch (error) {
-    console.error("Unexpected error sending welcome email:", error)
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error sending welcome email",
@@ -49,7 +46,6 @@ export async function sendTransactionEmail({
   status: string
 }) {
   try {
-    console.log(`Sending transaction email to ${email}`)
 
     // Format the amount as currency
     const formattedAmount = new Intl.NumberFormat("en-NG", {
@@ -77,13 +73,11 @@ export async function sendTransactionEmail({
     })
 
     if (!result.success) {
-      console.error("Failed to send transaction email:", result.error)
       return { success: false, error: result.error }
     }
 
     return { success: true }
   } catch (error) {
-    console.error("Unexpected error sending transaction email:", error)
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error sending transaction email",

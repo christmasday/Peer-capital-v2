@@ -23,13 +23,11 @@ function forceOfflineMode(value: boolean) {
 // Add a new function to refresh JWT tokens
 export async function refreshJWT(currentToken: string) {
   try {
-    console.log("Attempting to refresh JWT token")
 
     // Verify the current token first
     const { payload, error: verifyError } = await import("@/lib/jwt").then((module) => module.verifyJWT(currentToken))
 
     if (verifyError || !payload) {
-      console.error("Failed to verify current JWT:", verifyError)
       return { error: "Invalid token" }
     }
 
@@ -37,7 +35,6 @@ export async function refreshJWT(currentToken: string) {
     const userId = payload.userId || payload.sub
 
     if (!userId) {
-      console.error("No user ID found in JWT payload")
       return { error: "Invalid token payload" }
     }
 
@@ -48,7 +45,6 @@ export async function refreshJWT(currentToken: string) {
 
     // Only refresh if token is expired or about to expire (less than 15 minutes)
     if (timeUntilExpiry > 900) {
-      console.log("Token is still valid for more than 15 minutes, no need to refresh")
       return { success: true, refreshed: false }
     }
 
@@ -62,13 +58,11 @@ export async function refreshJWT(currentToken: string) {
         const { data: userData, error: userError } = await adminClient.auth.admin.getUserById(userId)
 
         if (userError || !userData?.user) {
-          console.error("Error fetching user data for JWT refresh:", userError)
           // Continue with just the user ID
         } else {
           userEmail = userData.user.email
         }
       } catch (error: any) {
-        console.error("Error getting user email for JWT refresh:", error)
         // Continue with just the user ID
       }
     }
@@ -82,7 +76,6 @@ export async function refreshJWT(currentToken: string) {
     })
 
     if (jwtError || !jwt) {
-      console.error("Error generating new JWT:", jwtError)
       return { error: "Failed to generate new token" }
     }
 
@@ -90,14 +83,11 @@ export async function refreshJWT(currentToken: string) {
     const cookieSet = setJWTCookie(jwt)
 
     if (!cookieSet) {
-      console.error("Failed to set JWT cookie")
       return { error: "Failed to set authentication cookie" }
     }
 
-    console.log("JWT refreshed successfully")
     return { success: true, refreshed: true, jwt }
   } catch (error) {
-    console.error("Unexpected error during JWT refresh:", error)
     return {
       error: `An unexpected error occurred during token refresh: ${error instanceof Error ? error.message : String(error)}`,
     }
@@ -123,7 +113,6 @@ async function createAuthUser(userData: {
   profilePictureUrl?: string | null
 }) {
   try {
-    console.log("Creating user in custom auth system...")
     const adminClient = createAdminClient()
 
     // Hash the password
@@ -163,7 +152,6 @@ async function createAuthUser(userData: {
     })
 
     if (authError) {
-      console.error("Auth signup error:", authError.message)
 
       // Check for specific error messages related to existing users
       if (authError.message.includes("duplicate key") || authError.message.includes("unique constraint")) {
@@ -175,7 +163,6 @@ async function createAuthUser(userData: {
       return { error: authError.message }
     }
 
-    console.log("Auth user created successfully with ID:", userId)
     return {
       success: true,
       user: {
@@ -185,7 +172,6 @@ async function createAuthUser(userData: {
       },
     }
   } catch (error: any) { // Explicitly type error
-    console.error("Unexpected error creating auth user:", error)
     return { error: `An unexpected error occurred: ${error.message}` }
   }
 }
@@ -200,7 +186,6 @@ export async function signIn(formData: FormData) {
       return { error: "Email and password are required" }
     }
 
-    console.log("Attempting to sign in user:", email)
     const adminClient = createAdminClient()
 
     // Get user from auth_users table
@@ -211,7 +196,6 @@ export async function signIn(formData: FormData) {
       .single()
 
     if (userError || !userData) {
-      console.error("Login error:", userError?.message || "User not found")
       return { error: "Invalid email or password" }
     }
 
@@ -220,7 +204,6 @@ export async function signIn(formData: FormData) {
     const passwordValid = await comparePassword(password, userData.encrypted_password)
 
     if (!passwordValid) {
-      console.error("Login error: Invalid password")
       return { error: "Invalid email or password" }
     }
 
@@ -233,7 +216,6 @@ export async function signIn(formData: FormData) {
       })
       .eq("id", userData.id) // Await update before eq
 
-    console.log("User signed in successfully:", userData.id)
 
     // Create a session object similar to Supabase's
     const sessionId = uuidv4()
@@ -256,16 +238,13 @@ export async function signIn(formData: FormData) {
       })
 
       if (jwtError) {
-        console.error("JWT generation error:", jwtError)
         // Continue with session as fallback
       } else if (generatedJwt) {
         // Set JWT in cookies
         const cookieSet = setJWTCookie(generatedJwt)
-        console.log("JWT cookie set:", cookieSet)
         jwt = generatedJwt
       }
     } catch (jwtError) {
-      console.error("Error during JWT generation:", jwtError)
       // Continue with session as fallback
     }
 
@@ -300,9 +279,7 @@ export async function signIn(formData: FormData) {
         sameSite: "lax",
       })
 
-      console.log("Auth cookies set successfully")
     } catch (cookieError) {
-      console.error("Error setting cookies:", cookieError)
       // Continue anyway
     }
 
@@ -318,7 +295,6 @@ export async function signIn(formData: FormData) {
       jwt: jwt, // Return the JWT to the client
     }
   } catch (error) {
-    console.error("Unexpected error during sign in:", error)
     return { error: `An unexpected error occurred: ${error instanceof Error ? error.message : String(error)}` }
   }
 }
@@ -326,11 +302,9 @@ export async function signIn(formData: FormData) {
 // Function to ensure a user has a profile
 async function ensureUserProfile(userId: string) {
   try {
-    console.log("Ensuring user profile exists for:", userId)
 
     // Check if we're in offline mode first
     if (isOfflineMode()) {
-      console.log("Skipping profile check in offline mode")
       return { success: true, fallback: true }
     }
 
@@ -349,42 +323,35 @@ async function ensureUserProfile(userId: string) {
         profileCheckPromise,
         timeoutPromise,
       ]).catch((error) => {
-        console.error("Profile check failed:", error.message)
         forceOfflineMode(true)
         return { data: null, error: { message: error.message } }
       })
 
       if (profileCheckError && profileCheckError.code !== "PGRST116") {
         // PGRST116 is the error code for "no rows returned" - that's expected if profile doesn't exist
-        console.error("Error checking for existing profile:", profileCheckError)
         return { error: "Failed to check for existing profile", fallback: true }
       }
 
       if (existingProfile) {
-        console.log("Profile already exists for user:", userId)
         // Check if account balance exists
         try {
           await ensureAccountBalance(userId)
         } catch (balanceError) {
-          console.error("Error ensuring account balance:", balanceError)
         }
         return { success: true }
       }
     } catch (checkError) {
-      console.error("Error checking for existing profile:", checkError)
       // Return a fallback success to prevent blocking the application
       forceOfflineMode(true)
       return { success: true, fallback: true }
     }
 
-    console.log("Creating profile for user:", userId)
 
     // Get user metadata to populate profile
     try {
       const { data: userData, error: userError } = await adminClient.auth.admin.getUserById(userId)
 
       if (userError) {
-        console.error("Error fetching user data:", userError)
         // Create a basic profile anyway
         try {
           // Define metadata here to avoid the "undeclared variable" error
@@ -402,11 +369,9 @@ async function ensureUserProfile(userId: string) {
           })
 
           if (createError) {
-            console.error("Error creating basic profile:", createError)
             return { error: "Failed to create profile", fallback: true }
           }
         } catch (insertError) {
-          console.error("Error inserting basic profile:", insertError)
           return { success: true, fallback: true }
         }
       } else {
@@ -434,16 +399,13 @@ async function ensureUserProfile(userId: string) {
           })
 
           if (createError) {
-            console.error("Error creating profile with metadata:", createError)
             return { error: "Failed to create profile", fallback: true }
           }
         } catch (insertError) {
-          console.error("Error inserting profile with metadata:", insertError)
           return { success: true, fallback: true }
         }
       }
     } catch (userDataError) {
-      console.error("Error fetching user data:", userDataError)
       return { success: true, fallback: true }
     }
 
@@ -451,7 +413,6 @@ async function ensureUserProfile(userId: string) {
     try {
       await ensureNotificationPreferences(userId)
     } catch (preferencesError) {
-      console.error("Error ensuring notification preferences:", preferencesError)
       // Continue anyway, this is not critical
     }
 
@@ -459,12 +420,10 @@ async function ensureUserProfile(userId: string) {
     try {
       await ensureAccountBalance(userId)
     } catch (balanceError) {
-      console.error("Error ensuring account balance:", balanceError)
     }
 
     return { success: true }
   } catch (error) {
-    console.error("Unexpected error in ensureUserProfile:", error)
     // Return success with fallback to prevent blocking the application
     return { success: true, fallback: true }
   }
@@ -475,7 +434,6 @@ async function ensureUserProfile(userId: string) {
 
 async function ensureAccountBalance(userId: string) {
   try {
-    console.log("Ensuring account balance exists for:", userId)
     const adminClient = createAdminClient()
 
     // First, verify that the user exists in auth_users table
@@ -487,11 +445,9 @@ async function ensureAccountBalance(userId: string) {
         .single()
 
       if (userCheckError || !userExists) {
-        console.error("User does not exist in auth_users table:", userCheckError || "No user found")
         return { error: "User does not exist in auth_users table", fallback: true }
       }
     } catch (userCheckError) {
-      console.error("Error checking if user exists in auth_users:", userCheckError)
       return { error: "Failed to verify user existence", fallback: true }
     }
 
@@ -504,20 +460,16 @@ async function ensureAccountBalance(userId: string) {
         .single()
 
       if (balanceCheckError && balanceCheckError.code !== "PGRST116") {
-        console.error("Error checking for existing account balance:", balanceCheckError)
         return { error: "Failed to check for existing account balance", fallback: true }
       }
 
       if (existingBalance) {
-        console.log("Account balance already exists for user:", userId)
         return { success: true }
       }
     } catch (checkError) {
-      console.error("Error checking for existing account balance:", checkError)
       return { success: true, fallback: true }
     }
 
-    console.log("Creating account balance for user:", userId)
 
     // Create account balance with retry logic
     let retryCount = 0
@@ -537,21 +489,17 @@ async function ensureAccountBalance(userId: string) {
         if (balanceError) {
           if (balanceError.code === "23503") {
             // Foreign key violation
-            console.error(`Foreign key violation (attempt ${retryCount + 1}):`, balanceError.message)
             retryCount++
             // Wait a bit before retrying to allow for any pending transactions to complete
             await new Promise((resolve) => setTimeout(resolve, 500))
           } else {
-            console.error("Error creating account balance:", balanceError)
             return { error: "Failed to create account balance: " + balanceError.message, fallback: true }
           }
         } else {
           // Success!
-          console.log("Account balance created successfully for user:", userId)
           return { success: true }
         }
       } catch (insertError) {
-        console.error("Exception during account balance insert:", insertError)
         retryCount++
         if (retryCount >= maxRetries) {
           return { success: true, fallback: true, warning: "Failed to create account balance after retries" }
@@ -562,10 +510,8 @@ async function ensureAccountBalance(userId: string) {
     }
 
     // If we get here, all retries failed
-    console.warn("All retries failed when creating account balance")
     return { success: true, fallback: true, warning: "Failed to create account balance after maximum retries" }
   } catch (error) {
-    console.error("Unexpected error in ensureAccountBalance:", error)
     return { success: true, fallback: true }
   }
 }
@@ -573,7 +519,6 @@ async function ensureAccountBalance(userId: string) {
 // Function to ensure notification preferences exist for a user
 async function ensureNotificationPreferences(userId: string) {
   try {
-    console.log("Ensuring notification preferences exist for:", userId)
     const adminClient = createAdminClient()
 
     // Check if notification preferences exist
@@ -585,20 +530,16 @@ async function ensureNotificationPreferences(userId: string) {
         .single()
 
       if (preferencesCheckError && preferencesCheckError.code !== "PGRST116") {
-        console.error("Error checking for existing notification preferences:", preferencesCheckError)
         return { error: "Failed to check for existing notification preferences", fallback: true }
       }
 
       if (existingPreferences) {
-        console.log("Notification preferences already exist for user:", userId)
         return { success: true }
       }
     } catch (checkError) {
-      console.error("Error checking for existing notification preferences:", checkError)
       return { success: true, fallback: true }
     }
 
-    console.log("Creating notification preferences for user:", userId)
 
     // Create notification preferences
     try {
@@ -616,24 +557,20 @@ async function ensureNotificationPreferences(userId: string) {
       })
 
       if (preferencesError) {
-        console.error("Error creating notification preferences:", preferencesError)
         return { error: "Failed to create notification preferences", fallback: true }
       }
     } catch (insertError) {
-      console.error("Error inserting notification preferences:", insertError)
       return { success: true, fallback: true }
     }
 
     return { success: true }
   } catch (error) {
-    console.error("Unexpected error in ensureNotificationPreferences:", error)
     return { success: true, fallback: true }
   }
 }
 
 // Replace the checkEmailExists function with this implementation
 export async function checkEmailExists(email: string) {
-  console.log("Checking if email exists:", email)
   let errorMessage = ""
 
   try {
@@ -641,7 +578,6 @@ export async function checkEmailExists(email: string) {
 
     // Check if we're in offline mode
     if (isOfflineMode()) {
-      console.log("Skipping email existence check in offline mode")
       return { exists: false }
     }
 
@@ -654,10 +590,8 @@ export async function checkEmailExists(email: string) {
         .limit(1)
 
       if (authQueryError) {
-        console.error("Error checking for existing user by email in auth_users:", authQueryError)
         errorMessage = "Error checking auth system for email"
       } else if (authUsers && authUsers.length > 0) {
-        console.log("Email match found in auth_users:", email)
         return {
           exists: true,
           source: "auth_users",
@@ -665,10 +599,8 @@ export async function checkEmailExists(email: string) {
           message: "This email is already registered. Please use a different email or try logging in.",
         }
       } else {
-        console.log("Email check passed - email not found in auth_users")
       }
     } catch (emailCheckError) {
-      console.error("Failed to check email existence in auth_users:", emailCheckError)
       errorMessage = "Error checking auth system for email"
       // Continue with profiles check
     }
@@ -682,45 +614,30 @@ export async function checkEmailExists(email: string) {
         .limit(1)
 
       if (profileEmailError) {
-        console.error("Error checking for existing email in profiles:", profileEmailError)
       } else if (emailProfiles && emailProfiles.length > 0) {
         // Compare emails case-insensitively
         const submittedEmail = email.toLowerCase().trim()
         const existingEmail = emailProfiles[0].email?.toLowerCase().trim()
 
         if (existingEmail === submittedEmail) {
-          console.log("Email match found in profiles table:", {
-            submitted: submittedEmail,
-            existing: existingEmail,
-          })
           return {
             exists: true,
-            source: "profiles",
-            field: "email",
-            message: "This email is already registered in our system. Please use a different email.",
-          }
-        } else {
-          console.log("Email found in profiles but doesn't match exactly:", {
             submitted: submittedEmail,
             existing: existingEmail,
-          })
+          }
         }
       } else {
-        console.log("Email check passed - email not found in profiles")
       }
     } catch (profileEmailCheckError) {
-      console.error("Failed to check email existence in profiles:", profileEmailCheckError)
       // Continue with result
     }
 
     // If we get here, no existing email was found
-    console.log("Email existence check completed: Email does not exist")
     return {
       exists: false,
       warning: errorMessage || undefined,
     }
   } catch (error) {
-    console.error("Unexpected error in email existence check:", error)
     // Return a non-blocking error
     return {
       exists: false,
@@ -732,7 +649,6 @@ export async function checkEmailExists(email: string) {
 
 // Replace the checkUserExists function with this implementation
 export async function checkUserExists(email: string, phoneNumber: string, bvn: string) {
-  console.log("Starting user existence check for:", { email, phoneNumber, bvn: bvn.substring(0, 4) + "****" })
   let errorMessage = ""
 
   try {
@@ -740,7 +656,6 @@ export async function checkUserExists(email: string, phoneNumber: string, bvn: s
 
     // Check if we're in offline mode
     if (isOfflineMode()) {
-      console.log("Skipping user existence check in offline mode")
       return { exists: false }
     }
 
@@ -753,10 +668,8 @@ export async function checkUserExists(email: string, phoneNumber: string, bvn: s
         .limit(1)
 
       if (authQueryError) {
-        console.error("Error checking for existing user by email in auth_users:", authQueryError)
         errorMessage = "Error checking auth system for email"
       } else if (authUsers && authUsers.length > 0) {
-        console.log("Email match found in auth_users:", email)
         return {
           exists: true,
           source: "auth_users",
@@ -764,10 +677,8 @@ export async function checkUserExists(email: string, phoneNumber: string, bvn: s
           message: "This email is already registered. Please use a different email or try logging in.",
         }
       } else {
-        console.log("Email check passed - email not found in auth_users")
       }
     } catch (emailCheckError) {
-      console.error("Failed to check email existence in auth_users:", emailCheckError)
       errorMessage = "Error checking auth system for email"
       // Continue with profiles check
     }
@@ -781,34 +692,21 @@ export async function checkUserExists(email: string, phoneNumber: string, bvn: s
         .limit(1)
 
       if (profileEmailError) {
-        console.error("Error checking for existing email in profiles:", profileEmailError)
       } else if (emailProfiles && emailProfiles.length > 0) {
         // Compare emails case-insensitively
         const submittedEmail = email.toLowerCase().trim()
         const existingEmail = emailProfiles[0].email?.toLowerCase().trim()
 
         if (existingEmail === submittedEmail) {
-          console.log("Email match found in profiles table:", {
-            submitted: submittedEmail,
-            existing: existingEmail,
-          })
           return {
             exists: true,
-            source: "profiles",
-            field: "email",
-            message: "This email is already registered in our system. Please use a different email.",
-          }
-        } else {
-          console.log("Email found in profiles but doesn't match exactly:", {
             submitted: submittedEmail,
             existing: existingEmail,
-          })
+          }
         }
       } else {
-        console.log("Email check passed - email not found in profiles")
       }
     } catch (profileEmailCheckError) {
-      console.error("Failed to check email existence in profiles:", profileEmailCheckError)
       // Continue with other checks
     }
 
@@ -821,9 +719,7 @@ export async function checkUserExists(email: string, phoneNumber: string, bvn: s
         .limit(1)
 
       if (phoneError) {
-        console.error("Error checking for existing phone number:", phoneError)
       } else if (phoneProfiles && phoneProfiles.length > 0) {
-        console.log("Phone number already exists in profiles")
         return {
           exists: true,
           source: "profiles",
@@ -831,10 +727,8 @@ export async function checkUserExists(email: string, phoneNumber: string, bvn: s
           message: "This phone number is already registered. Please use a different phone number.",
         }
       } else {
-        console.log("Phone number check passed - phone not found in profiles")
       }
     } catch (phoneCheckError) {
-      console.error("Failed to check phone number existence:", phoneCheckError)
       // Continue with other checks
     }
 
@@ -847,9 +741,7 @@ export async function checkUserExists(email: string, phoneNumber: string, bvn: s
         .limit(1)
 
       if (bvnError) {
-        console.error("Error checking for existing BVN:", bvnError)
       } else if (bvnProfiles && bvnProfiles.length > 0) {
-        console.log("BVN already exists in profiles")
         return {
           exists: true,
           source: "profiles",
@@ -857,21 +749,17 @@ export async function checkUserExists(email: string, phoneNumber: string, bvn: s
           message: "This BVN is already registered. Please use a different BVN.",
         }
       } else {
-        console.log("BVN check passed - BVN not found in profiles")
       }
     } catch (bvnCheckError) {
-      console.error("Failed to check BVN existence:", bvnCheckError)
       // Continue anyway
     }
 
     // If we get here, no existing user was found
-    console.log("User existence check completed: User does not exist")
     return {
       exists: false,
       warning: errorMessage || undefined,
     }
   } catch (error) {
-    console.error("Unexpected error in user existence check:", error)
     // Return a non-blocking error
     return {
       exists: false,
@@ -904,7 +792,6 @@ async function createUserProfile(
   },
 ) {
   try {
-    console.log("Creating user profile...")
     const adminClient = createAdminClient()
 
     // Check if a profile with this ID already exists
@@ -915,12 +802,10 @@ async function createUserProfile(
       .maybeSingle()
 
     if (checkError) {
-      console.error("Error checking for existing profile:", checkError)
       // Continue anyway
     }
 
     if (existingProfile) {
-      console.log("Profile already exists for this user, skipping profile creation")
       return { success: true, message: "Profile already exists" }
     }
 
@@ -932,14 +817,11 @@ async function createUserProfile(
         const date = new Date(userData.dateOfBirth)
         if (!isNaN(date.getTime())) {
           formattedDateOfBirth = date.toISOString().split("T")[0]
-          console.log("Formatted date of birth:", formattedDateOfBirth)
         } else {
-          console.error("Invalid date format:", userData.dateOfBirth)
           // Leave as null
         }
       }
     } catch (dateError) {
-      console.error("Error formatting date:", dateError)
       // Continue with null
     }
 
@@ -966,31 +848,18 @@ async function createUserProfile(
       updated_at: new Date().toISOString(),
     }
 
-    // Log the profile data we're about to insert (excluding sensitive info)
-    console.log("Profile data to insert:", {
-      ...profileData,
-      bvn: "***REDACTED***",
-    })
-
     // Try inserting with more detailed error logging
     try {
       const { error: profileError } = await adminClient.from("profiles").insert(profileData)
 
       if (profileError) {
-        console.error("Error creating profile:", profileError)
-        console.error("Profile error details:", JSON.stringify(profileError))
-        console.error("Error code:", profileError.code)
-        console.error("Error message:", profileError.message)
-        console.error("Error details:", profileError.details)
 
         // If there's a unique constraint violation, handle it gracefully
         if (profileError.code === "23505") {
           // PostgreSQL unique violation code
-          console.log("Unique constraint violation - profile may already exist")
           return { success: true, warning: "Profile may already exist" }
         } else if (profileError.code === "23502") {
           // NOT NULL violation
-          console.error("NOT NULL constraint violation - missing required field")
           return {
             error: "Missing required field: " + (profileError.details || profileError.message),
           }
@@ -1001,8 +870,6 @@ async function createUserProfile(
         }
       }
     } catch (insertError) {
-      console.error("Exception during profile insert:", insertError)
-      console.error("Insert error details:", JSON.stringify(insertError))
       return {
         error:
           "Database error creating profile: " +
@@ -1012,7 +879,6 @@ async function createUserProfile(
 
     return { success: true }
   } catch (error) {
-    console.error("Unexpected error creating user profile:", error)
     return { error: `An unexpected error occurred: ${error instanceof Error ? error.message : String(error)}` }
   }
 }
@@ -1037,11 +903,6 @@ export async function signUp(userData: {
   referralCode: string
 }) {
   try {
-    console.log("Starting signup process with data:", {
-      ...userData,
-      password: "***REDACTED***", // Don't log the password
-    })
-
     // Validate referral code
     const adminClient = createAdminClient()
     const { data: referrer, error: referrerError } = await adminClient
@@ -1057,7 +918,6 @@ export async function signUp(userData: {
     const existsCheck = await checkEmailExists(userData.email)
 
     if (existsCheck.exists) {
-      console.log("Email already exists:", existsCheck)
       return { error: existsCheck.message || "This email already exists" }
     }
 
@@ -1065,12 +925,10 @@ export async function signUp(userData: {
     const authResult = await createAuthUser(userData)
 
     if (!authResult.success || !authResult.user) {
-      console.error("Failed to create auth user:", authResult.error)
       return { error: authResult.error || "Failed to create user account" }
     }
 
     const userId = authResult.user.id
-    console.log("Auth user created successfully with ID:", userId)
 
     // Generate a unique referral code for the new user
     const newReferralCode = Math.random().toString(36).substring(2, 10).toUpperCase()
@@ -1083,15 +941,11 @@ export async function signUp(userData: {
     })
 
     if (!profileResult.success) {
-      console.error("Failed to create user profile:", profileResult.error)
-
       // Try to delete the auth user to maintain consistency
       try {
         const adminClient = createAdminClient()
         await adminClient.from("auth_users").delete().eq("id", userId)
-        console.log("Deleted auth user after profile creation failure")
       } catch (deleteError) {
-        console.error("Failed to delete auth user after profile creation failure:", deleteError)
       }
 
       return { error: profileResult.error || "Failed to create user profile" }
@@ -1104,11 +958,9 @@ export async function signUp(userData: {
     try {
       const balanceResult = await ensureAccountBalance(userId)
       if (!balanceResult.success) {
-        console.warn("Warning: Failed to create account balance:", balanceResult.error)
         // Continue anyway, this is not critical
       }
     } catch (balanceError) {
-      console.warn("Exception creating account balance:", balanceError)
       // Continue anyway, this is not critical
     }
 
@@ -1116,11 +968,9 @@ export async function signUp(userData: {
     try {
       const preferencesResult = await ensureNotificationPreferences(userId)
       if (!preferencesResult.success) {
-        console.warn("Warning: Failed to create notification preferences:", preferencesResult.error)
         // Continue anyway, this is not critical
       }
     } catch (preferencesError) {
-      console.warn("Exception creating notification preferences:", preferencesError)
       // Continue anyway, this is not critical
     }
 
@@ -1128,11 +978,9 @@ export async function signUp(userData: {
     try {
       const { sendWelcomeEmail } = await import("@/lib/actions/email-notifications")
       await sendWelcomeEmail(userData.email, `${userData.firstName} ${userData.lastName}`).catch((err) => {
-        console.warn("Failed to send welcome email, but continuing:", err)
         // Non-blocking - continue with signup even if email fails
       })
     } catch (emailError) {
-      console.warn("Error importing or calling sendWelcomeEmail:", emailError)
       // Non-blocking - continue with signup even if email fails
     }
 
@@ -1142,7 +990,6 @@ export async function signUp(userData: {
       message: "Account created successfully! Please log in to continue.",
     }
   } catch (error) {
-    console.error("Unexpected error during signup:", error)
     return { error: `An unexpected error occurred: ${error instanceof Error ? error.message : String(error)}` }
   }
 }
@@ -1160,7 +1007,6 @@ export async function updateUserProfile(userId: string, profileData: any) {
         .single()
 
       if (profileCheckError && profileCheckError.code !== "PGRST116") {
-        console.error("Error checking for existing profile:", profileCheckError)
         return { error: "Failed to check for existing profile", fallback: true }
       }
 
@@ -1176,11 +1022,9 @@ export async function updateUserProfile(userId: string, profileData: any) {
             .eq("id", userId)
 
           if (updateError) {
-            console.error("Error updating profile:", updateError)
             return { error: "Failed to update profile", fallback: true }
           }
         } catch (updateError) {
-          console.error("Error updating profile:", updateError)
           return { success: true, fallback: true }
         }
       } else {
@@ -1194,22 +1038,18 @@ export async function updateUserProfile(userId: string, profileData: any) {
           })
 
           if (createError) {
-            console.error("Error creating profile:", createError)
             return { error: "Failed to create profile", fallback: true }
           }
         } catch (createError) {
-          console.error("Error creating profile:", createError)
           return { success: true, fallback: true }
         }
       }
     } catch (checkError) {
-      console.error("Error checking for existing profile:", checkError)
       return { success: true, fallback: true }
     }
 
     return { success: true }
   } catch (error) {
-    console.error("Unexpected error in updateUserProfile:", error)
     return { success: true, fallback: true }
   }
 }
@@ -1217,7 +1057,6 @@ export async function updateUserProfile(userId: string, profileData: any) {
 // Create a table for password reset tokens if it doesn't exist
 async function ensurePasswordResetTokensTable() {
   try {
-    console.log("Ensuring password_reset_tokens table exists")
     const adminClient = createAdminClient()
 
     // First, try to query the table to see if it exists
@@ -1225,14 +1064,11 @@ async function ensurePasswordResetTokensTable() {
       const { data, error } = await adminClient.from("password_reset_tokens").select("id").limit(1)
 
       if (!error) {
-        console.log("password_reset_tokens table exists and is accessible")
         return true
       } else {
-        console.log("Error querying password_reset_tokens table:", error)
         // Table might not exist, continue to creation
       }
     } catch (queryError) {
-      console.error("Error checking if table exists:", queryError)
       // Continue to creation
     }
 
@@ -1256,11 +1092,9 @@ async function ensurePasswordResetTokensTable() {
         const { error: sqlExtError } = await adminClient.rpc("sql", { query: createTableSQL })
 
         if (!sqlExtError) {
-          console.log("password_reset_tokens table created successfully using sql extension")
           return true
         }
       } catch (sqlError) {
-        console.log("sql extension not available, trying other methods")
       }
 
       // Try using pgfunction if available
@@ -1268,14 +1102,11 @@ async function ensurePasswordResetTokensTable() {
         const { error: pgFuncError } = await adminClient.rpc("pgfunction", { query: createTableSQL })
 
         if (!pgFuncError) {
-          console.log("password_reset_tokens table created successfully using pgfunction")
           return true
         }
       } catch (pgFuncError) {
-        console.log("pgfunction not available, trying executeSQL")
       }
     } catch (directError) {
-      console.log("Direct SQL execution failed, trying executeSQL function")
     }
 
     // Fallback to executeSQL function
@@ -1283,17 +1114,13 @@ async function ensurePasswordResetTokensTable() {
 
     if (success && result && result.length > 0) {
       const exists = result[0].exists
-      console.log(`Table password_reset_tokens exists: ${exists} (method 3)`)
       return exists
     } else if (error) {
-      console.log(`Error with executeSQL method:`, error)
     }
 
     // If all methods fail, assume the table doesn't exist
-    console.log(`Could not definitively determine if table password_reset_tokens exists, assuming it doesn't`)
     return false
   } catch (error) {
-    console.error(`Unexpected error in ensurePasswordResetTokensTable:`, error)
     return false
   }
 }
@@ -1301,7 +1128,6 @@ async function ensurePasswordResetTokensTable() {
 // Create a reset token for a user
 async function createPasswordResetToken(userId: string, email: string) {
   try {
-    console.log("Creating password reset token for user:", userId)
     const adminClient = createAdminClient()
 
     // Generate a secure token - simplify to reduce potential issues
@@ -1315,7 +1141,6 @@ async function createPasswordResetToken(userId: string, email: string) {
     const tableExists = await checkTableExists("password_reset_tokens")
 
     if (!tableExists) {
-      console.log("Table doesn't exist, attempting to create it")
       // Try to create the table using our migration SQL
       try {
         const createTableSQL = `
@@ -1330,9 +1155,7 @@ async function createPasswordResetToken(userId: string, email: string) {
           );
         `
         await executeSQL(createTableSQL)
-        console.log("Created password_reset_tokens table")
       } catch (createError) {
-        console.error("Failed to create table:", createError)
         // Continue anyway - we'll try to insert and see what happens
       }
     }
@@ -1348,14 +1171,12 @@ async function createPasswordResetToken(userId: string, email: string) {
       used: false,
     }
 
-    console.log("Attempting to insert token")
 
     // Try inserting with more detailed error logging
     try {
       const { error } = await adminClient.from("password_reset_tokens").insert(tokenData)
 
       if (error) {
-        console.error("Error creating password reset token:", error)
 
         // Try a direct SQL approach as fallback
         try {
@@ -1366,32 +1187,25 @@ async function createPasswordResetToken(userId: string, email: string) {
           const { success, error: sqlError } = await executeSQL(insertSQL)
 
           if (!success) {
-            console.error("SQL fallback also failed:", sqlError)
 
             // Last resort - store the token in memory (this will only work for the current server instance)
-            console.log("Using in-memory token as last resort")
             // We'll just return the token and handle it in memory
             return { success: true, token, fallback: true }
           } else {
-            console.log("Token created successfully using SQL fallback")
             return { success: true, token }
           }
         } catch (sqlError) {
-          console.error("Error in SQL fallback:", sqlError)
           // Last resort - return the token anyway
           return { success: true, token, fallback: true }
         }
       } else {
-        console.log("Token created successfully")
         return { success: true, token }
       }
     } catch (insertError) {
-      console.error("Exception during token insert:", insertError)
       // Last resort - return the token anyway
       return { success: true, token, fallback: true }
     }
   } catch (error) {
-    console.error("Unexpected error in createPasswordResetToken:", error)
     // Generate a token anyway as a fallback
     const fallbackToken = uuidv4() + uuidv4().replace(/-/g, "")
     return { success: true, token: fallbackToken, fallback: true }
@@ -1403,7 +1217,6 @@ async function createPasswordResetToken(userId: string, email: string) {
 // Send a password reset email using Resend
 async function handlePasswordResetEmail(email: string, token: string) {
   try {
-    console.log("Sending password reset email to:", email)
 
     // Create the reset URL
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
@@ -1420,14 +1233,11 @@ async function handlePasswordResetEmail(email: string, token: string) {
     })
 
     if (!emailResult.success) {
-      console.error("Error sending password reset email:", emailResult.error)
       return { success: false, error: emailResult.error }
     }
 
-    console.log("Password reset email sent successfully")
     return { success: true }
   } catch (error) {
-    console.error("Unexpected error sending password reset email:", error)
     // Return success anyway to avoid revealing if email exists
     return { success: true }
   }
@@ -1462,7 +1272,6 @@ export async function resetPassword(formData: FormData) {
   }
 
   try {
-    console.log("Processing password reset request for:", email)
     const adminClient = createAdminClient()
 
     // Check if the user exists
@@ -1473,13 +1282,11 @@ export async function resetPassword(formData: FormData) {
       .single()
 
     if (userError) {
-      console.error("Error checking if user exists:", userError)
       // Don't reveal if the email exists or not for security
       return { success: true, message: "If your email is registered, you will receive password reset instructions." }
     }
 
     if (!userData) {
-      console.log("No user found with email:", email)
       // Don't reveal if the email exists or not for security
       return { success: true, message: "If your email is registered, you will receive password reset instructions." }
     }
@@ -1488,7 +1295,6 @@ export async function resetPassword(formData: FormData) {
     const tokenResult = await createPasswordResetToken(userData.id, email)
 
     if (!tokenResult.success || !tokenResult.token) {
-      console.error("Failed to create reset token:", tokenResult.error)
       return { success: true, message: "If your email is registered, you will receive password reset instructions." }
     }
 
@@ -1496,7 +1302,6 @@ export async function resetPassword(formData: FormData) {
     const emailResult = await handlePasswordResetEmail(email, tokenResult.token)
 
     if (!emailResult.success) {
-      console.error("Failed to send reset email:", emailResult.error)
       return { success: true, message: "If your email is registered, you will receive password reset instructions." }
     }
 
@@ -1506,7 +1311,6 @@ export async function resetPassword(formData: FormData) {
       message: "If your email is registered, you will receive password reset instructions.",
     }
   } catch (error) {
-    console.error("Error in resetPassword:", error)
     return {
       success: true,
       message: "If your email is registered, you will receive password reset instructions.",
@@ -1538,13 +1342,11 @@ export async function signOut() {
         sameSite: "lax",
       })
     } catch (cookieError) {
-      console.error("Error setting signout cookie:", cookieError)
     }
 
     // Return success immediately
     return { success: true, redirectUrl: "/?signout=true" }
   } catch (error) {
-    console.error("Unexpected error during sign out:", error)
     return { success: false, redirectUrl: "/?signout=true", error: String(error) }
   }
 }
@@ -1559,7 +1361,6 @@ export async function getUserProfile() {
   try {
     // Check if we're in offline mode
     if (isOfflineMode()) {
-      console.log("getUserProfile running in offline mode")
       // Return mock data in offline mode
       return {
         user: { id: "offline-user", email: "user@example.com" },
@@ -1596,14 +1397,11 @@ export async function getUserProfile() {
           userId = payload.userId || payload.sub
           // Validate userId is not "undefined" or empty
           if (!userId || userId === "undefined") {
-            console.error("Invalid user ID found in JWT:", userId)
             userId = null
           } else {
-            console.log("Using userId from JWT:", userId)
           }
         }
       } catch (error) {
-        console.error("Error verifying JWT:", error)
       }
     }
 
@@ -1623,21 +1421,17 @@ export async function getUserProfile() {
 
           if (!error && userData && userData.id && userData.id !== "undefined") {
             userId = userData.id
-            console.log("Using userId from custom auth token:", userId)
           }
         }
       } catch (error) {
-        console.error("Error getting userId from custom auth token:", error)
       }
     }
 
     // If still no userId, return fallback data
     if (!userId) {
-      console.log("No authenticated user found, returning fallback data")
       return fallbackUserData
     }
 
-    console.log("Getting profile for user:", userId)
     const adminClient = createAdminClient()
 
     // Fetch user profile data using admin client to bypass RLS
@@ -1649,7 +1443,6 @@ export async function getUserProfile() {
       .single()
 
     if (profileError) {
-      console.error("Error fetching profile:", profileError)
       // Continue with fallback data
       return fallbackUserData
     }
@@ -1660,12 +1453,10 @@ export async function getUserProfile() {
       const { data, error } = await adminClient.from("account_balances").select("*").eq("user_id", userId).single()
 
       if (error) {
-        console.error("Error fetching account balance:", error)
       } else {
         accountData = data
       }
     } catch (error) {
-      console.error("Error fetching account balance:", error)
     }
 
     // Return whatever data we have, even if some parts are missing
@@ -1679,7 +1470,6 @@ export async function getUserProfile() {
       account: accountData || { balance: 120000, loan_balance: 50000 },
     }
   } catch (error) {
-    console.error("Critical error in getUserProfile:", error)
     // Return fallback data to prevent the application from crashing
     return {
       user: { id: "error-fallback", email: "user@example.com" },
@@ -1697,7 +1487,6 @@ export async function getUserProfile() {
 // Verify a password reset token
 export async function verifyResetToken(token: string) {
   try {
-    console.log("Verifying password reset token")
     const adminClient = createAdminClient()
 
     // Ensure the table exists
@@ -1711,12 +1500,10 @@ export async function verifyResetToken(token: string) {
       .single()
 
     if (error) {
-      console.error("Error verifying reset token:", error)
       return { error: "Invalid or expired token" }
     }
 
     if (!data) {
-      console.log("Token not found")
       return { error: "Invalid or expired token" }
     }
 
@@ -1725,13 +1512,11 @@ export async function verifyResetToken(token: string) {
     const expiresAt = new Date(data.expires_at)
 
     if (now > expiresAt) {
-      console.log("Token expired")
       return { error: "This reset link has expired. Please request a new one." }
     }
 
     // Check if the token has been used
     if (data.used) {
-      console.log("Token already used")
       return { error: "This reset link has already been used. Please request a new one." }
     }
 
@@ -1743,7 +1528,6 @@ export async function verifyResetToken(token: string) {
       .single()
 
     if (userError || !userData) {
-      console.error("Error fetching user data for token:", userError)
       return { error: "Invalid token" }
     }
 
@@ -1753,7 +1537,6 @@ export async function verifyResetToken(token: string) {
       email: userData.email,
     }
   } catch (error) {
-    console.error("Error verifying reset token:", error)
     return { error: "An unexpected error occurred" }
   }
 }
@@ -1761,7 +1544,6 @@ export async function verifyResetToken(token: string) {
 // Reset password with token
 export async function resetPasswordWithToken(token: string, newPassword: string) {
   try {
-    console.log("Resetting password with token")
 
     // First verify the token
     const tokenResult = await verifyResetToken(token)
@@ -1788,7 +1570,6 @@ export async function resetPasswordWithToken(token: string, newPassword: string)
       .eq("id", userId)
 
     if (updateError) {
-      console.error("Error updating password:", updateError)
       return { error: "Failed to update password" }
     }
 
@@ -1799,13 +1580,11 @@ export async function resetPasswordWithToken(token: string, newPassword: string)
       .eq("token", token)
 
     if (tokenUpdateError) {
-      console.error("Error marking token as used:", tokenUpdateError)
       // Continue anyway, the password was updated successfully
     }
 
     return { success: true }
   } catch (error) {
-    console.error("Error resetting password with token:", error)
     return { error: "An unexpected error occurred" }
   }
 }
@@ -1830,10 +1609,8 @@ export async function changePassword(currentPassword: string, newPassword: strin
           const { payload, error } = await verifyJWT(jwt)
           if (!error && payload && (payload.userId || payload.sub)) {
             userId = payload.userId || payload.sub
-            console.log("Using userId from JWT for password change:", userId)
           }
         } catch (error) {
-          console.error("Error verifying JWT during password change:", error)
         }
       }
 
@@ -1852,11 +1629,9 @@ export async function changePassword(currentPassword: string, newPassword: strin
 
             if (!error && userData) {
               userId = userData.id
-              console.log("Using userId from custom auth token for password change:", userId)
             }
           }
         } catch (error) {
-          console.error("Error getting userId from custom auth token during password change:", error)
         }
       }
     }
@@ -1873,7 +1648,6 @@ export async function changePassword(currentPassword: string, newPassword: strin
       .single()
 
     if (userError || !userData) {
-      console.error("Error fetching user data:", userError)
       return { error: "Failed to verify current password" }
     }
 
@@ -1899,13 +1673,11 @@ export async function changePassword(currentPassword: string, newPassword: strin
       .eq("id", userId)
 
     if (updateError) {
-      console.error("Error updating password:", updateError)
       return { error: "Failed to update password" }
     }
 
     return { success: true }
   } catch (error) {
-    console.error("Error changing password:", error)
     return { error: "An unexpected error occurred" }
   }
 }
@@ -1916,7 +1688,6 @@ export { createPasswordResetToken, handlePasswordResetEmail }
 // Utility function to check if a table exists
 async function checkTableExists(tableName: string): Promise<boolean> {
   try {
-    console.log(`Checking if table ${tableName} exists`)
     const adminClient = createAdminClient()
 
     // Method 1: Try to query the information_schema.tables view
@@ -1929,14 +1700,11 @@ async function checkTableExists(tableName: string): Promise<boolean> {
         .limit(1)
 
       if (!error && data && data.length > 0) {
-        console.log(`Table ${tableName} exists (method 1)`)
         return true
       } else if (error) {
-        console.log(`Error checking table with information_schema:`, error)
         // Continue to next method
       }
     } catch (error) {
-      console.log(`Error with information_schema method:`, error)
       // Continue to next method
     }
 
@@ -1946,19 +1714,15 @@ async function checkTableExists(tableName: string): Promise<boolean> {
 
       // If we don't get an error, the table exists
       if (!error) {
-        console.log(`Table ${tableName} exists (method 2)`)
         return true
       } else {
-        console.log(`Error querying table directly:`, error)
         // If the error is about the relation not existing, the table doesn't exist
         if (error.message && error.message.includes("relation") && error.message.includes("does not exist")) {
-          console.log(`Table ${tableName} does not exist`)
           return false
         }
         // Otherwise, it might be a permission issue or something else
       }
     } catch (error) {
-      console.log(`Exception querying table directly:`, error)
       // Continue to next method
     }
 
@@ -1976,20 +1740,15 @@ async function checkTableExists(tableName: string): Promise<boolean> {
 
       if (success && result && result.length > 0) {
         const exists = result[0].exists
-        console.log(`Table ${tableName} exists: ${exists} (method 3)`)
         return exists
       } else if (error) {
-        console.log(`Error with executeSQL method:`, error)
       }
     } catch (error) {
-      console.log(`Exception with executeSQL method:`, error)
     }
 
     // If all methods fail, assume the table doesn't exist
-    console.log(`Could not definitively determine if table ${tableName} exists, assuming it doesn't`)
     return false
   } catch (error) {
-    console.error(`Unexpected error in checkTableExists:`, error)
     return false
   }
 }

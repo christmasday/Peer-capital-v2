@@ -25,11 +25,9 @@ export function NotificationBadge({ className }: NotificationBadgeProps) {
         if (result.success && result.count !== undefined) {
           setUnreadCount(result.count)
         } else if (result.error) {
-          console.error("Error fetching unread notifications count:", result.error)
           setError(result.error)
         }
       } catch (error) {
-        console.error("Unexpected error fetching unread notifications count:", error)
         setError("Failed to load notifications")
       } finally {
         setLoading(false)

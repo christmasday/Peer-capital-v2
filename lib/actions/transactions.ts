@@ -49,10 +49,8 @@ export async function getUserTransactions() {
         const { payload, error } = await verifyJWT(jwt)
         if (!error && payload && payload.userId) {
           userId = payload.userId
-          console.log("Using userId from JWT:", userId)
         }
       } catch (error) {
-        console.error("Error verifying JWT:", error)
       }
     }
 
@@ -63,13 +61,11 @@ export async function getUserTransactions() {
 
       if (sessionData.session?.user) {
         userId = sessionData.session.user.id
-        console.log("Using userId from Supabase session:", userId)
       }
     }
 
     // If still no userId, return mock data
     if (!userId) {
-      console.log("No authenticated user found, returning mock transactions")
       return { transactions: mockTransactions }
     }
 
@@ -82,14 +78,12 @@ export async function getUserTransactions() {
       .order("created_at", { ascending: false })
 
     if (error) {
-      console.error("Error fetching transactions:", error)
       // Return mock data as fallback
       return { transactions: mockTransactions }
     }
 
     return { success: true, transactions: data }
   } catch (error) {
-    console.error("Unexpected error fetching transactions:", error)
     // Return mock data as fallback
     return { transactions: mockTransactions }
   }
@@ -108,7 +102,6 @@ export async function getTransactionById(id: string) {
           userId = payload.userId
         }
       } catch (error) {
-        console.error("Error verifying JWT:", error)
       }
     }
 
@@ -139,13 +132,11 @@ export async function getTransactionById(id: string) {
       .single()
 
     if (error) {
-      console.error("Error fetching transaction:", error)
       return { error: "Transaction not found" }
     }
 
     return { transaction: data }
   } catch (error) {
-    console.error("Unexpected error fetching transaction:", error)
     return { error: "An unexpected error occurred" }
   }
 }

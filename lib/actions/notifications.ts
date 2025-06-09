@@ -90,7 +90,6 @@ export async function getNotificationPreferences(userId?: string) {
       .maybeSingle()
 
     if (error) {
-      console.error("Error getting notification preferences:", error)
       return { success: false, error }
     }
 
@@ -121,7 +120,6 @@ export async function getNotificationPreferences(userId?: string) {
 
     return { success: true, preferences: data }
   } catch (error) {
-    console.error("Error in getNotificationPreferences:", error)
     return { success: false, error }
   }
 }
@@ -141,7 +139,6 @@ export async function updateNotificationPreferences(
       .maybeSingle()
 
     if (checkError) {
-      console.error("Error checking notification preferences:", checkError)
       return { success: false, error: checkError }
     }
 
@@ -161,7 +158,6 @@ export async function updateNotificationPreferences(
         .single()
 
       if (error) {
-        console.error("Error updating notification preferences:", error)
         return { success: false, error }
       }
 
@@ -181,7 +177,6 @@ export async function updateNotificationPreferences(
         .single()
 
       if (error) {
-        console.error("Error creating notification preferences:", error)
         return { success: false, error }
       }
 
@@ -191,7 +186,6 @@ export async function updateNotificationPreferences(
     revalidatePath("/profile/notifications")
     return { success: true, preferences: result }
   } catch (error) {
-    console.error("Error in updateNotificationPreferences:", error)
     return { success: false, error }
   }
 }
@@ -210,17 +204,14 @@ export async function createNotification({
 }) {
   try {
     if (!userId) {
-      console.error("createNotification called with empty userId")
       return { success: false, error: "User ID is required" }
     }
 
-    console.log(`Creating notification for user ${userId} of type ${type}`)
 
     // Always use admin client for all operations to bypass RLS
     const adminClient = createAdminClient()
 
     // STEP 1: Check if profile exists
-    console.log(`Checking if profile exists for user ${userId}`)
     const { data: existingProfile, error: profileCheckError } = await adminClient
       .from("profiles")
       .select("id")
@@ -228,13 +219,11 @@ export async function createNotification({
       .maybeSingle()
 
     if (profileCheckError) {
-      console.error(`Error checking profile existence for ${userId}:`, profileCheckError)
       return { success: false, error: profileCheckError }
     }
 
     // STEP 2: Create profile if it doesn't exist
     if (!existingProfile) {
-      console.log(`Profile doesn't exist for ${userId}, creating now...`)
 
       const { error: createProfileError } = await adminClient.from("profiles").insert({
         id: userId,
@@ -246,13 +235,10 @@ export async function createNotification({
       })
 
       if (createProfileError) {
-        console.error(`Failed to create profile for ${userId}:`, createProfileError)
         return { success: false, error: createProfileError }
       }
 
-      console.log(`Successfully created profile for ${userId}`)
     } else {
-      console.log(`Profile already exists for ${userId}`)
     }
 
     // STEP 3: Verify profile was created successfully
@@ -263,11 +249,9 @@ export async function createNotification({
       .single()
 
     if (verifyError || !verifyProfile) {
-      console.error(`Failed to verify profile for ${userId}:`, verifyError || "Profile not found after creation")
       return { success: false, error: verifyError || new Error("Profile not found after creation") }
     }
 
-    console.log(`Verified profile exists for ${userId}, proceeding with notification creation`)
 
     // STEP 4: Create notification with actor_id as null
     const notificationData = {
@@ -277,7 +261,6 @@ export async function createNotification({
 
     const now = new Date().toISOString()
 
-    console.log(`Inserting notification for ${userId}`)
     const { data: notification, error: notificationError } = await adminClient
       .from("notifications")
       .insert({
@@ -294,14 +277,11 @@ export async function createNotification({
       .single()
 
     if (notificationError) {
-      console.error(`Error creating notification for ${userId}:`, notificationError)
       return { success: false, error: notificationError }
     }
 
-    console.log(`Successfully created notification for ${userId}`)
     return { success: true, notification }
   } catch (error) {
-    console.error("Unexpected error in createNotification:", error)
     return { success: false, error }
   }
 }
@@ -354,7 +334,6 @@ export async function getNotifications(pageOrUserId?: number | string, limit = 1
     const { data: notifications, error, count } = await query
 
     if (error) {
-      console.error("Error getting notifications:", error)
       return { error: "Failed to get notifications" }
     }
 
@@ -366,7 +345,6 @@ export async function getNotifications(pageOrUserId?: number | string, limit = 1
       .eq("is_read", false)
 
     if (countError) {
-      console.error("Error getting unread count:", countError)
     }
 
     return {
@@ -375,7 +353,6 @@ export async function getNotifications(pageOrUserId?: number | string, limit = 1
       unreadCount: unreadCount || 0,
     }
   } catch (error) {
-    console.error("Unexpected error getting notifications:", error)
     return { error: "An unexpected error occurred" }
   }
 }
@@ -397,13 +374,11 @@ export async function getUnreadNotificationsCount() {
       .eq("is_read", false)
 
     if (error) {
-      console.error("Error fetching unread notifications count:", error)
       return { success: false, error: error.message }
     }
 
     return { success: true, count: count || 0 }
   } catch (error) {
-    console.error("Error in getUnreadNotificationsCount:", error)
     const errorMessage = error instanceof Error ? error.message : String(error)
     return { success: false, error: errorMessage }
   }
@@ -422,19 +397,16 @@ export async function markNotificationAsRead(notificationId: string) {
       .maybeSingle()
 
     if (checkError) {
-      console.error("Error checking notification existence:", checkError)
       return { success: false, error: checkError }
     }
 
     // If notification doesn't exist, return early
     if (!existingNotification) {
-      console.log(`Notification ${notificationId} not found`)
       return { success: false, error: new Error("Notification not found") }
     }
 
     // If notification is already read, return early with success
     if (existingNotification.is_read) {
-      console.log(`Notification ${notificationId} is already marked as read`)
       return { success: true, notification: existingNotification }
     }
 
@@ -450,14 +422,12 @@ export async function markNotificationAsRead(notificationId: string) {
       .select()
 
     if (error) {
-      console.error("Error marking notification as read:", error)
       return { success: false, error }
     }
 
     revalidatePath("/notifications")
     return { success: true, notification: data?.[0] || null }
   } catch (error) {
-    console.error("Error in markNotificationAsRead:", error)
     return { success: false, error }
   }
 }
@@ -472,7 +442,6 @@ export async function markAllNotificationsAsRead(userId?: string) {
       }
     }
 
-    console.log(`Marking all notifications as read for user ${userId}`)
 
     // Use admin client to bypass RLS
     const adminClient = createAdminClient()
@@ -490,15 +459,12 @@ export async function markAllNotificationsAsRead(userId?: string) {
       .select()
 
     if (error) {
-      console.error(`Error marking all notifications as read for ${userId}:`, error)
       return { success: false, error }
     }
 
-    console.log(`Successfully marked ${data?.length || 0} notifications as read for ${userId}`)
     revalidatePath("/notifications")
     return { success: true, notifications: data }
   } catch (error) {
-    console.error("Error in markAllNotificationsAsRead:", error)
     return { success: false, error }
   }
 }
@@ -516,13 +482,11 @@ export async function deleteNotification(notificationId: string) {
       .maybeSingle()
 
     if (checkError) {
-      console.error("Error checking notification existence:", checkError)
       return { success: false, error: checkError }
     }
 
     // If notification doesn't exist, return early with success (already deleted)
     if (!existingNotification) {
-      console.log(`Notification ${notificationId} not found (already deleted)`)
       return { success: true }
     }
 
@@ -530,14 +494,12 @@ export async function deleteNotification(notificationId: string) {
     const { error } = await adminClient.from("notifications").delete().eq("id", notificationId)
 
     if (error) {
-      console.error("Error deleting notification:", error)
       return { success: false, error }
     }
 
     revalidatePath("/notifications")
     return { success: true }
   } catch (error) {
-    console.error("Error in deleteNotification:", error)
     return { success: false, error }
   }
 }

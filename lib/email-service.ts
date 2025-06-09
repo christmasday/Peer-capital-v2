@@ -29,13 +29,11 @@ export async function sendEmail({
     })
 
     if (error) {
-      console.error("Error sending email:", error)
       return { success: false, error }
     }
 
     return { success: true, data }
   } catch (error) {
-    console.error("Unexpected error sending email:", error)
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error sending email",

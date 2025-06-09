@@ -26,7 +26,6 @@ export function CreateCheckTableExistsFunctionButton() {
         })
       }
     } catch (error) {
-      console.error("Error creating check_table_exists function:", error)
       toast({
         title: "Error",
         description: "An unexpected error occurred",

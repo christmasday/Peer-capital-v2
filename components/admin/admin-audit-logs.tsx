@@ -51,7 +51,6 @@ export function AdminAuditLogs() {
           setTotalPages(result.totalPages || 1)
         }
       } catch (err) {
-        console.error("Error fetching audit logs:", err)
         setError("An unexpected error occurred")
       } finally {
         setLoading(false)

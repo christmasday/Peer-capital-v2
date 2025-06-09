@@ -341,10 +341,65 @@ export async function approveLoanRequest({ loanRequestId, pin, approverId }: { l
   if (!helperProfile || !requesterProfile) {
     return { success: false, error: "Could not fetch user bank details" }
   }
-  // Calculate fees (placeholder)
-  const fee = Math.ceil(loanRequest.amount * 0.01)
-  const total = loanRequest.amount + fee
-  // 1. Register recipient with Paystack (if not already)
+
+  // 1. Debit lender, credit borrower
+  // Get lender's account balance
+  const { data: lenderAccount, error: lenderAccountError } = await adminClient
+    .from("account_balances")
+    .select("id, balance")
+    .eq("user_id", approverId)
+    .single()
+  if (lenderAccountError || !lenderAccount) {
+    return { success: false, error: "Could not fetch lender's account balance" }
+  }
+  if (lenderAccount.balance < loanRequest.amount) {
+    return { success: false, error: "Lender does not have enough funds to approve this loan" }
+  }
+  // Debit lender
+  const newLenderBalance = lenderAccount.balance - loanRequest.amount
+  await adminClient
+    .from("account_balances")
+    .update({ balance: newLenderBalance, updated_at: new Date().toISOString() })
+    .eq("user_id", approverId)
+  // Credit borrower
+  const { data: borrowerAccount, error: borrowerAccountError } = await adminClient
+    .from("account_balances")
+    .select("id, balance")
+    .eq("user_id", loanRequest.user_id)
+    .single()
+  if (borrowerAccountError || !borrowerAccount) {
+    return { success: false, error: "Could not fetch borrower's account balance" }
+  }
+  const newBorrowerBalance = borrowerAccount.balance + loanRequest.amount
+  await adminClient
+    .from("account_balances")
+    .update({ balance: newBorrowerBalance, updated_at: new Date().toISOString() })
+    .eq("user_id", loanRequest.user_id)
+
+  // 2. Calculate repayment due date
+  let dueDate = new Date()
+  if (loanRequest.duration_unit === "days") {
+    dueDate.setDate(dueDate.getDate() + loanRequest.duration_months)
+  } else if (loanRequest.duration_unit === "weeks") {
+    dueDate.setDate(dueDate.getDate() + loanRequest.duration_months * 7)
+  } else {
+    // Default to months
+    dueDate.setMonth(dueDate.getMonth() + loanRequest.duration_months)
+  }
+
+  // 3. Insert into loan_repayments
+  await adminClient.from("loan_repayments").insert({
+    loan_request_id: loanRequestId,
+    lender_id: approverId,
+    borrower_id: loanRequest.user_id,
+    amount: loanRequest.amount,
+    due_date: dueDate.toISOString(),
+    status: "pending",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  })
+
+  // 4. Register recipient with Paystack (if not already)
   const paystackKey = process.env.PAYSTACK_SECRET_KEY
   if (!paystackKey) {
     return { success: false, error: "Paystack secret key not configured" }
@@ -368,7 +423,7 @@ export async function approveLoanRequest({ loanRequestId, pin, approverId }: { l
   if (!recipientData.status || !recipientData.data?.recipient_code) {
     return { success: false, error: recipientData.message || "Failed to create transfer recipient" }
   }
-  // 2. Initiate transfer
+  // 5. Initiate transfer
   const transferRes = await fetch("https://api.paystack.co/transfer", {
     method: "POST",
     headers: {
@@ -386,7 +441,7 @@ export async function approveLoanRequest({ loanRequestId, pin, approverId }: { l
   if (!transferData.status) {
     return { success: false, error: transferData.message || "Paystack transfer failed" }
   }
-  // 3. Update loan request status
+  // 6. Update loan request status
   const { error: updateError } = await adminClient
     .from("loan_requests")
     .update({ status: "approved" })
@@ -407,7 +462,7 @@ export async function approveLoanRequest({ loanRequestId, pin, approverId }: { l
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   })
-  // 4. Create notification for requester
+  // 7. Create notification for requester
   await adminClient.from("notifications").insert({
     user_id: loanRequest.user_id,
     actor_id: approverId,
@@ -501,5 +556,179 @@ export async function rejectLoanRequest({ loanRequestId, approverId }: { loanReq
     return { success: true }
   } catch (e: any) {
     return { success: false, error: e.message || "Unexpected error" }
+  }
+}
+
+// Utility: Process loan repayments and send reminders
+export async function processLoanRepayments() {
+  const adminClient = createAdminClient() as SupabaseClient<Database>
+  const now = new Date()
+  const oneWeek = 7 * 24 * 60 * 60 * 1000
+  const oneDay = 24 * 60 * 60 * 1000
+
+  // 1. Reminders: 1 week and 1 day before due date
+  const reminderWindows = [oneWeek, oneDay]
+  for (const window of reminderWindows) {
+    const reminderDate = new Date(now.getTime() + window)
+    const { data: repayments } = await adminClient
+      .from("loan_repayments")
+      .select("*, borrower_id, lender_id, due_date, amount, status, loan_request_id")
+      .eq("status", "pending")
+    if (repayments) {
+      for (const repayment of repayments) {
+        const due = new Date(repayment.due_date)
+        const diff = due.getTime() - now.getTime()
+        if (diff > 0 && diff < window + oneDay && diff > window - oneDay) {
+          // Send reminder
+          await sendRepaymentReminder(repayment, window === oneWeek ? "week" : "day")
+          // Optionally update status to 'reminded'
+        }
+      }
+    }
+  }
+
+  // 2. On due date: process repayment
+  const { data: dueRepayments } = await adminClient
+    .from("loan_repayments")
+    .select("*, borrower_id, lender_id, due_date, amount, status, loan_request_id")
+    .eq("status", "pending")
+  if (dueRepayments) {
+    for (const repayment of dueRepayments) {
+      const due = new Date(repayment.due_date)
+      if (
+        now.getFullYear() === due.getFullYear() &&
+        now.getMonth() === due.getMonth() &&
+        now.getDate() === due.getDate()
+      ) {
+        // Attempt to debit borrower
+        const { data: borrowerAccount } = await adminClient
+          .from("account_balances")
+          .select("id, balance")
+          .eq("user_id", repayment.borrower_id)
+          .single()
+        if (borrowerAccount && borrowerAccount.balance >= repayment.amount) {
+          // Debit borrower
+          await adminClient
+            .from("account_balances")
+            .update({ balance: borrowerAccount.balance - repayment.amount, updated_at: new Date().toISOString() })
+            .eq("user_id", repayment.borrower_id)
+          // Credit lender
+          const { data: lenderAccount } = await adminClient
+            .from("account_balances")
+            .select("id, balance")
+            .eq("user_id", repayment.lender_id)
+            .single()
+          if (lenderAccount) {
+            await adminClient
+              .from("account_balances")
+              .update({ balance: lenderAccount.balance + repayment.amount, updated_at: new Date().toISOString() })
+              .eq("user_id", repayment.lender_id)
+          }
+          // Mark as paid
+          await adminClient
+            .from("loan_repayments")
+            .update({ status: "paid", updated_at: new Date().toISOString() })
+            .eq("id", repayment.id)
+          // Notify borrower and lender
+          await sendRepaymentSuccessNotification(repayment)
+        } else {
+          // Mark as defaulted
+          await adminClient
+            .from("loan_repayments")
+            .update({ status: "defaulted", updated_at: new Date().toISOString() })
+            .eq("id", repayment.id)
+          // Notify borrower of default
+          await sendRepaymentDefaultNotification(repayment)
+        }
+      }
+    }
+  }
+}
+
+// Helper: Send repayment reminder
+async function sendRepaymentReminder(repayment: any, window: "week" | "day") {
+  // Send email and in-app notification to borrower
+  // You can use your existing notification/email system here
+  const adminClient = createAdminClient() as SupabaseClient<Database>
+  const { data: borrower } = await adminClient.from("profiles").select("email, first_name").eq("id", repayment.borrower_id).single()
+  const message = window === "week"
+    ? `Your loan repayment of ₦${repayment.amount} is due in 1 week.`
+    : `Your loan repayment of ₦${repayment.amount} is due in 24 hours.`
+  // In-app notification
+  await adminClient.from("notifications").insert({
+    user_id: repayment.borrower_id,
+    actor_id: repayment.lender_id,
+    type: "loan_repayment_reminder",
+    content: message,
+    data: { loanRequestId: repayment.loan_request_id, amount: repayment.amount, dueDate: repayment.due_date },
+    reference_id: repayment.loan_request_id,
+    read: false,
+    created_at: new Date().toISOString(),
+  })
+  // Email
+  if (borrower && borrower.email) {
+    try {
+      const { sendEmail } = await import("@/lib/email-service")
+      await sendEmail({
+        to: borrower.email,
+        subject: "Loan Repayment Reminder",
+        html: `<p>Dear ${borrower.first_name},<br>Your loan repayment of ₦${repayment.amount} is due soon.<br>${message}</p>`
+      })
+    } catch (e) {}
+  }
+}
+
+// Helper: Send repayment success notification
+async function sendRepaymentSuccessNotification(repayment: any) {
+  const adminClient = createAdminClient() as SupabaseClient<Database>
+  // Notify borrower
+  await adminClient.from("notifications").insert({
+    user_id: repayment.borrower_id,
+    actor_id: repayment.lender_id,
+    type: "loan_repayment_paid",
+    content: `Your loan repayment of ₦${repayment.amount} has been paid successfully.`,
+    data: { loanRequestId: repayment.loan_request_id, amount: repayment.amount },
+    reference_id: repayment.loan_request_id,
+    read: false,
+    created_at: new Date().toISOString(),
+  })
+  // Optionally notify lender
+  await adminClient.from("notifications").insert({
+    user_id: repayment.lender_id,
+    actor_id: repayment.borrower_id,
+    type: "loan_repayment_received",
+    content: `You have received a loan repayment of ₦${repayment.amount} from your borrower.`,
+    data: { loanRequestId: repayment.loan_request_id, amount: repayment.amount },
+    reference_id: repayment.loan_request_id,
+    read: false,
+    created_at: new Date().toISOString(),
+  })
+}
+
+// Helper: Send repayment default notification
+async function sendRepaymentDefaultNotification(repayment: any) {
+  const adminClient = createAdminClient() as SupabaseClient<Database>
+  // Notify borrower
+  await adminClient.from("notifications").insert({
+    user_id: repayment.borrower_id,
+    actor_id: repayment.lender_id,
+    type: "loan_repayment_defaulted",
+    content: `Your loan repayment of ₦${repayment.amount} could not be processed due to insufficient funds. Your loan is now marked as defaulted.`,
+    data: { loanRequestId: repayment.loan_request_id, amount: repayment.amount },
+    reference_id: repayment.loan_request_id,
+    read: false,
+    created_at: new Date().toISOString(),
+  })
+  // Email
+  const { data: borrower } = await adminClient.from("profiles").select("email, first_name").eq("id", repayment.borrower_id).single()
+  if (borrower && borrower.email) {
+    try {
+      const { sendEmail } = await import("@/lib/email-service")
+      await sendEmail({
+        to: borrower.email,
+        subject: "Loan Repayment Failed - Default Notice",
+        html: `<p>Dear ${borrower.first_name},<br>Your loan repayment of ₦${repayment.amount} could not be processed due to insufficient funds. Your loan is now marked as defaulted.</p>`
+      })
+    } catch (e) {}
   }
 }

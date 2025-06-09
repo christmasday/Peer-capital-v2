@@ -28,7 +28,6 @@ export default function FixConnectionForeignKeysButton() {
         })
       }
     } catch (error) {
-      console.error("Error fixing connection foreign keys:", error)
       toast({
         title: "Error",
         description: "An unexpected error occurred",

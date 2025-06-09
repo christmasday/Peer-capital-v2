@@ -56,7 +56,6 @@ export function TopNav({ userName, userImage, hideSearch }: TopNavProps) {
           const messagesResult = await getUnreadMessagesCount()
           messagesCount = messagesResult.count || 0
         } catch (error) {
-          console.error("Error getting unread messages count:", error)
           // Continue with other fetches even if this one fails
         }
 
@@ -66,14 +65,12 @@ export function TopNav({ userName, userImage, hideSearch }: TopNavProps) {
           const notificationsResult = await getUnreadNotificationsCount()
           notificationsCount = notificationsResult.count || 0
         } catch (error) {
-          console.error("Error getting unread notifications count:", error)
         }
 
         // Update state with whatever data we were able to fetch
         setUnreadMessages(messagesCount)
         setUnreadNotifications(notificationsCount)
       } catch (error) {
-        console.error("Error in fetchUnreadCounts:", error)
         setFetchError(true)
       }
     }

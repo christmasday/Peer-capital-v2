@@ -22,15 +22,12 @@ export function useAuthState() {
 
         if (timeUntilExpiry < 600) {
           // 10 minutes
-          console.log("Session expiring soon, refreshing...")
           const { data: refreshData, error } = await supabase.auth.refreshSession()
 
           if (error) {
-            console.error("Error refreshing session:", error)
             // If refresh fails, redirect to login
             router.push("/")
           } else if (refreshData.session) {
-            console.log("Session refreshed successfully")
             try {
               localStorage.setItem(
                 "auth_state",
@@ -40,18 +37,15 @@ export function useAuthState() {
                 }),
               )
             } catch (e) {
-              console.error("Error setting localStorage:", e)
             }
           }
         }
       } else {
-        console.log("No session found in useAuthState")
 
         // Check localStorage as fallback
         try {
           const authState = localStorage.getItem("auth_state")
           if (!authState) {
-            console.log("No auth state in localStorage, redirecting")
             router.push("/")
             return
           }
@@ -60,16 +54,13 @@ export function useAuthState() {
           const oneHourAgo = Date.now() - 60 * 60 * 1000
 
           if (!isLoggedIn || timestamp <= oneHourAgo) {
-            console.log("Auth state expired or invalid, redirecting")
             router.push("/")
           }
         } catch (e) {
-          console.error("Error checking localStorage:", e)
           router.push("/")
         }
       }
     } catch (error) {
-      console.error("Error in checkAndRefreshSession:", error)
     }
   }, [supabase, router])
 
@@ -136,7 +127,6 @@ export function useAuthState() {
         router.push("/")
       }
     } catch (error) {
-      console.error("Error checking signout timestamp:", error)
     }
 
     // Set up auth state change listener
@@ -145,14 +135,12 @@ export function useAuthState() {
     if (supabase) {
       try {
         authListener = supabase.auth.onAuthStateChange((event, session) => {
-          console.log("Auth state changed:", event)
 
           if (event === "SIGNED_OUT") {
             // Clear local storage
             try {
               localStorage.removeItem("auth_state")
             } catch (e) {
-              console.error("Error clearing localStorage:", e)
             }
 
             // Redirect to login
@@ -168,12 +156,10 @@ export function useAuthState() {
                 }),
               )
             } catch (e) {
-              console.error("Error setting localStorage:", e)
             }
           }
         })
       } catch (error) {
-        console.error("Error setting up auth state change listener:", error)
       }
     }
 
@@ -182,7 +168,6 @@ export function useAuthState() {
         try {
           authListener.data.subscription.unsubscribe()
         } catch (error) {
-          console.error("Error unsubscribing from auth state changes:", error)
         }
       }
     }

@@ -184,7 +184,6 @@ export function LoanRequestForm({ helperId, helperName, interestRate, maxLoanAmo
         router.push("/loans")
       }, 2000)
     } catch (err) {
-      console.error("Error submitting loan request:", err)
       setError("An unexpected error occurred. Please try again.")
     } finally {
       setIsSubmitting(false)

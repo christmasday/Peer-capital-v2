@@ -30,7 +30,6 @@ export async function GET(request: NextRequest) {
     // Verify the payment with Paystack
     const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY
     if (!PAYSTACK_SECRET_KEY) {
-      console.error("Paystack secret key not found")
       return NextResponse.json({ error: "Payment provider configuration error" }, { status: 500 })
     }
 
@@ -62,13 +61,11 @@ export async function GET(request: NextRequest) {
       .single()
 
     if (transactionError || !transaction) {
-      console.error("Error fetching transaction:", transactionError)
       return NextResponse.json({ error: "Transaction not found" }, { status: 404 })
     }
 
     // Verify that the transaction belongs to the current user
     if (transaction.user_id !== userId) {
-      console.error("Transaction user ID mismatch:", transaction.user_id, userId)
       return NextResponse.json({ error: "Unauthorized access to transaction" }, { status: 403 })
     }
 
@@ -80,7 +77,6 @@ export async function GET(request: NextRequest) {
       .single()
 
     if (balanceError) {
-      console.error("Error fetching account balance:", balanceError)
       return NextResponse.json({ error: "Could not fetch account balance" }, { status: 500 })
     }
 
@@ -93,7 +89,6 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error("Error verifying payment:", error)
     return NextResponse.json({ error: "An unexpected error occurred" }, { status: 500 })
   }
 }

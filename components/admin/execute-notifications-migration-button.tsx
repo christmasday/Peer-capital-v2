@@ -16,7 +16,6 @@ export function ExecuteNotificationsMigrationButton() {
       const migrationResult = await executeMigration("create-notifications-table.sql")
       setResult(migrationResult)
     } catch (error) {
-      console.error("Error executing migration:", error)
       setResult({ error: "An unexpected error occurred" })
     } finally {
       setIsLoading(false)

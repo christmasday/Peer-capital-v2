@@ -60,7 +60,6 @@ export function AdminPasswordResetForm({ userId, userEmail }: AdminPasswordReset
         }
       }
     } catch (error) {
-      console.error("Error resetting password:", error)
       setResult({ error: "An unexpected error occurred" })
       toast({
         title: "Error",

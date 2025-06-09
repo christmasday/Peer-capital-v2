@@ -8,7 +8,6 @@ import * as ts from "typescript"
 function checkSyntax(filePath: string): void {
   try {
     // Read the file
-    console.log(`Reading file: ${filePath}`)
     const fileContent = fs.readFileSync(filePath, "utf8")
 
     // Create a TypeScript program to check syntax
@@ -43,38 +42,24 @@ function checkSyntax(filePath: string): void {
 
     // Output results
     if (diagnostics.length === 0) {
-      console.log("✅ No syntax errors found!")
     } else {
-      console.log(`❌ Found ${diagnostics.length} syntax errors:`)
       diagnostics.forEach((diagnostic) => {
         const message = ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n")
         if (diagnostic.file && diagnostic.start !== undefined) {
           const { line, character } = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start)
-          console.log(`Line ${line + 1}, Column ${character + 1}: ${message}`)
         } else {
-          console.log(message)
         }
       })
     }
   } catch (error) {
-    console.error("Error checking syntax:", error)
   }
 }
 
 // Since we can't directly access the file system in this environment,
 // let's manually check for common syntax issues
 
-console.log("Performing manual syntax check on lib/actions/auth.ts")
 
 // Common issues to look for:
-console.log("✅ Checking for mismatched brackets/braces: No issues found")
-console.log("✅ Checking for undefined variables: No issues found")
-console.log("✅ Checking for missing imports: No issues found")
-console.log("✅ Checking for type errors: No issues found")
 
 // Specific check for the modified code
-console.log("✅ Checking RPC function call: Syntax is correct")
-console.log("✅ Checking email comparison logic: Logic is sound")
 
-console.log("\nManual syntax check complete. No obvious syntax errors detected.")
-console.log("Note: A full TypeScript compilation would provide more thorough checking.")

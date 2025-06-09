@@ -54,7 +54,6 @@ export function LoanHistoryWithLender({ lenderId, onSelectLoan }: LoanHistoryWit
 
         setLoans(data || [])
       } catch (err) {
-        console.error("Error fetching loans:", err)
         setError("Failed to load loan history")
         toast({
           title: "Error",

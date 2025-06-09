@@ -29,7 +29,6 @@ export async function checkAuth() {
       return { authenticated: true, userId: data.session.user.id }
     }
   } catch (error) {
-    console.error("Error checking Supabase session:", error)
   }
 
   // Check for custom auth token
@@ -64,10 +63,8 @@ export async function getCurrentUserId() {
           if (userId && userId !== "undefined" && typeof userId === "string") {
             return userId
           }
-          console.warn("Invalid user ID found in JWT:", userId)
         }
       } catch (error) {
-        console.error("Error verifying JWT:", error)
       }
     }
 
@@ -83,7 +80,6 @@ export async function getCurrentUserId() {
       if (session.user.id !== "undefined" && typeof session.user.id === "string") {
         return session.user.id
       }
-      console.warn("Invalid user ID found in session:", session.user.id)
     }
 
     // If no Supabase session, try to get from custom auth token
@@ -102,7 +98,6 @@ export async function getCurrentUserId() {
         if (userData.id !== "undefined" && typeof userData.id === "string") {
           return userData.id
         }
-        console.warn("Invalid user ID found in auth_users:", userData.id)
       }
     }
 
@@ -111,7 +106,6 @@ export async function getCurrentUserId() {
     if (authStatus === "authenticated") {
       // We know the user is authenticated, but we don't know their ID
       // This is a fallback case - we should log this situation
-      console.warn("User is authenticated but ID could not be determined")
     }
 
     // Last resort for dev mode
@@ -120,14 +114,12 @@ export async function getCurrentUserId() {
       const { data: firstUser } = await adminClient.from("profiles").select("id").limit(1).single()
 
       if (firstUser?.id) {
-        console.log("Development mode: Using first user from database:", firstUser.id)
         return firstUser.id
       }
     }
 
     return null
   } catch (error) {
-    console.error("Error getting current user ID:", error)
     return null
   }
 }
@@ -162,7 +154,6 @@ export async function getUserEmail(userId: string): Promise<string | null> {
     // If all else fails, create a placeholder email
     return `user-${userId}@example.com`
   } catch (error) {
-    console.error("Error getting user email:", error)
     return null
   }
 }

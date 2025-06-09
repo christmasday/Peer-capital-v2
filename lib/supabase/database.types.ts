@@ -524,6 +524,41 @@ export interface Database {
           created_at?: string
         }
       }
+      transfer_beneficiaries: {
+        Row: {
+          id: string
+          user_id: string
+          account_name: string
+          account_number: string
+          bank_name: string
+          bank_code: string
+          recipient_code: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          account_name: string
+          account_number: string
+          bank_name: string
+          bank_code: string
+          recipient_code: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          account_name?: string
+          account_number?: string
+          bank_name?: string
+          bank_code?: string
+          recipient_code?: string
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never

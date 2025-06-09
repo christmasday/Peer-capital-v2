@@ -27,7 +27,6 @@ async function getCurrentUserId() {
         return { userId: sessionData.session.user.id, method: "supabase-session" }
       }
     } catch (sessionError: any) {
-      console.error("Error getting session:", sessionError)
       // Continue to next method
     }
 
@@ -42,7 +41,6 @@ async function getCurrentUserId() {
         }
       }
     } catch (jwtError) {
-      console.error("Error verifying JWT:", jwtError)
       // Continue to next method
     }
 
@@ -62,14 +60,12 @@ async function getCurrentUserId() {
         }
       }
     } catch (customAuthError) {
-      console.error("Error checking custom auth token:", customAuthError)
       // Continue to next method
     }
 
     // No valid authentication found
     return { userId: null, method: "none" }
   } catch (error) {
-    console.error("Error in getCurrentUserId:", error)
     return { userId: null, method: "error" }
   }
 }
@@ -78,26 +74,22 @@ async function getCurrentUserId() {
 async function ensureBucketExists(bucketName: string) {
   try {
     if (isOfflineMode()) {
-      console.log(`Skipping ${bucketName} bucket check/creation in offline mode`)
       return { success: true }
     }
 
     const adminClient = createAdminClient()
 
     // Check if the bucket exists
-    console.log(`Checking if ${bucketName} bucket exists...`)
     const { data: buckets, error: listError } = await adminClient.storage
       .listBuckets()
 
     if (listError) {
-      console.error(`Error listing buckets:`, listError)
       return { error: `Failed to list buckets: ${listError.message}` }
     }
 
     const bucketExists = buckets?.some((bucket: { name: string }) => bucket.name === bucketName)
 
     if (!bucketExists) {
-      console.log(`Creating ${bucketName} bucket...`)
       const { error: createError } = await adminClient.storage.createBucket(
         bucketName,
         {
@@ -106,18 +98,14 @@ async function ensureBucketExists(bucketName: string) {
       )
 
       if (createError) {
-        console.error(`Error creating ${bucketName} bucket:`, createError)
         return { error: `Failed to create ${bucketName} bucket: ${createError.message}` }
       }
 
-      console.log(`${bucketName} bucket created successfully`)
     } else {
-      console.log(`${bucketName} bucket already exists`)
     }
 
     return { success: true }
   } catch (error: any) {
-    console.error(`Unexpected error ensuring ${bucketName} bucket:`, error)
     return { error: `An unexpected error occurred while checking/creating the ${bucketName} bucket: ${error.message}` }
   }
 }
@@ -126,7 +114,6 @@ async function ensureBucketExists(bucketName: string) {
 async function createBucketIfNotExists(bucketName: string) {
   try {
     if (isOfflineMode()) {
-      console.log(`Skipping ${bucketName} bucket creation in offline mode`)
       return { success: true }
     }
 
@@ -137,7 +124,6 @@ async function createBucketIfNotExists(bucketName: string) {
       .listBuckets()
 
     if (listError) {
-      console.error(`Error listing buckets:`, listError)
       return { success: false, error: `Failed to list buckets: ${listError.message}` }
     }
 
@@ -153,18 +139,14 @@ async function createBucketIfNotExists(bucketName: string) {
       )
 
       if (createError) {
-        console.error(`Error creating ${bucketName} bucket:`, createError)
         return { success: false, error: `Failed to create ${bucketName} bucket: ${createError.message}` }
       }
 
-      console.log(`${bucketName} bucket created successfully`)
     } else {
-      console.log(`${bucketName} bucket already exists`)
     }
 
     return { success: true }
   } catch (error: any) {
-    console.error(`Error in createBucketIfNotExists:`, error)
     return { success: false, error: `An unexpected error occurred: ${error.message}` }
   }
 }
@@ -216,7 +198,6 @@ type UpdateProfileInput = {
 export async function updateProfile(input: UpdateProfileInput) {
   try {
     if (isOfflineMode()) {
-      console.log("Skipping profile update in offline mode")
       // Return a mock success response, adjust as needed based on expected behavior
       return { success: true, data: {} };
     }
@@ -231,10 +212,8 @@ export async function updateProfile(input: UpdateProfileInput) {
       const { data: sessionData } = await supabase.auth.getSession()
       if (sessionData.session?.user) {
         userId = sessionData.session.user.id
-        console.log("Using user ID from Supabase session for profile update:", userId)
       }
     } catch (sessionError) {
-      console.error("Error getting session for profile update:", sessionError)
       // Continue to next method
     }
 
@@ -247,11 +226,9 @@ export async function updateProfile(input: UpdateProfileInput) {
           const { payload, error } = await verifyJWT(jwt)
           if (!error && payload && (payload.userId || payload.sub)) {
             userId = payload.userId || payload.sub
-            console.log("Using user ID from JWT for profile update:", userId)
           }
         }
       } catch (jwtError) {
-        console.error("Error verifying JWT for profile update:", jwtError)
         // Continue to next method
       }
     }
@@ -270,17 +247,14 @@ export async function updateProfile(input: UpdateProfileInput) {
 
           if (!error && data) {
             userId = data.id
-            console.log("Using user ID from custom auth token for profile update:", userId)
           }
         }
       } catch (customAuthError) {
-        console.error("Error checking custom auth token for profile update:", customAuthError)
         // Continue to next method
       }
     }
 
     if (!userId) {
-      console.error("User ID not found after multiple attempts.");
       return { success: false, error: "Authentication failed." };
     }
 
@@ -340,11 +314,9 @@ export async function updateProfile(input: UpdateProfileInput) {
       .single();
 
     if (error) {
-      console.error("Error updating profile:", error);
       return { success: false, error: error.message };
     }
 
-    console.log("Profile updated successfully:", data);
 
     // Create activity notification for profile update
     // Check if relevant fields were updated before creating notification
@@ -364,7 +336,6 @@ export async function updateProfile(input: UpdateProfileInput) {
 
     return { success: true, data: data };
   } catch (error: any) {
-    console.error("Unexpected error in updateProfile:", error);
     return { success: false, error: "An unexpected error occurred: " + error.message };
   }
 }
@@ -373,7 +344,6 @@ export async function updateProfile(input: UpdateProfileInput) {
 export async function updateBio(userId: string, bio: string) {
   try {
     if (isOfflineMode()) {
-      console.log("Skipping bio update in offline mode")
       // Return a mock success response
       return { success: true }
     }
@@ -399,7 +369,6 @@ export async function updateBio(userId: string, bio: string) {
       .eq("id", userId)
 
     if (error) {
-      console.error("Error updating bio:", error)
       return { error: error.message }
     }
 
@@ -411,7 +380,6 @@ export async function updateBio(userId: string, bio: string) {
         details: "Your profile bio has been updated",
       })
     } catch (notificationError) {
-      console.error("Error creating profile update notification:", notificationError)
       // Non-blocking - continue even if notification fails
     }
 
@@ -420,7 +388,6 @@ export async function updateBio(userId: string, bio: string) {
 
     return { success: true }
   } catch (error) {
-    console.error("Unexpected error updating bio:", error)
     return { error: "An unexpected error occurred. Please try again." }
   }
 }
@@ -429,7 +396,6 @@ export async function updateBio(userId: string, bio: string) {
 export async function uploadIdDocument(file: File) {
   try {
     if (isOfflineMode()) {
-      console.log("Skipping ID document upload in offline mode")
       // Return a mock success response with a placeholder URL
       return { success: true, url: "/placeholder-id.svg" }
     }
@@ -444,10 +410,8 @@ export async function uploadIdDocument(file: File) {
       const { data: sessionData } = await supabase.auth.getSession()
       if (sessionData.session?.user) {
         userId = sessionData.session.user.id
-        console.log("Using user ID from Supabase session:", userId)
       }
     } catch (sessionError) {
-      console.error("Error getting session:", sessionError)
       // Continue to next method
     }
 
@@ -460,25 +424,21 @@ export async function uploadIdDocument(file: File) {
           const { payload, error } = await verifyJWT(jwt)
           if (!error && payload && (payload.userId || payload.sub)) {
             userId = payload.userId || payload.sub
-            console.log("Using user ID from JWT:", userId)
           }
         }
       } catch (jwtError) {
-        console.error("Error verifying JWT:", jwtError)
         // Continue to next method
       }
     }
 
     // If we still don't have a user ID, return an error
     if (!userId) {
-      console.error("No authenticated user found for ID document upload")
       return { error: "Authentication failed. Please try logging in again." }
     }
 
     // Ensure the id_documents bucket exists
     const bucketResult = await ensureBucketExists("id_documents")
     if (bucketResult.error) {
-      console.error("Error ensuring id_documents bucket:", bucketResult.error)
       return { error: bucketResult.error }
     }
 
@@ -499,7 +459,6 @@ export async function uploadIdDocument(file: File) {
     })
 
     if (uploadError) {
-      console.error("Error uploading ID document:", uploadError)
       return { error: `Failed to upload ID document: ${uploadError.message}` }
     }
 
@@ -510,7 +469,6 @@ export async function uploadIdDocument(file: File) {
 
     return { success: true, url: publicUrl }
   } catch (error) {
-    console.error("Unexpected error uploading ID document:", error)
     return {
       error: `An unexpected error occurred. Please try again. ${error instanceof Error ? error.message : String(error)}`,
     }
@@ -533,7 +491,6 @@ function extractStoragePath(url: string, bucket: string): string | null {
 export async function uploadBannerImage(file: File) {
   try {
     if (isOfflineMode()) {
-      console.log("Skipping banner image upload in offline mode")
       // Return a mock success response with a placeholder URL
       return { success: true, url: "/placeholder-banner.svg" }
     }
@@ -545,16 +502,13 @@ export async function uploadBannerImage(file: File) {
     const { userId, method } = await getCurrentUserId()
 
     if (!userId) {
-      console.error("No authenticated user found for banner upload")
       return { error: "You must be logged in to upload a banner image. Please refresh and try again." }
     }
 
-    console.log(`User authenticated via ${method} for banner upload. User ID: ${userId}`)
 
     // Ensure the profile-images bucket exists
     const bucketResult = await ensureBucketExists("profile-images")
     if (bucketResult.error) {
-      console.error("Error ensuring profile-images bucket:", bucketResult.error)
       return { error: bucketResult.error }
     }
 
@@ -574,7 +528,6 @@ export async function uploadBannerImage(file: File) {
     })
 
     if (uploadError) {
-      console.error("Error uploading banner image:", uploadError)
       return { error: `Failed to upload banner image: ${uploadError.message}. Please try again.` }
     }
 
@@ -595,7 +548,6 @@ export async function uploadBannerImage(file: File) {
       .eq("id", userId)
 
     if (updateError) {
-      console.error("Error updating profile with banner image:", updateError)
       return { error: "Failed to update profile with banner image. Please try again." }
     }
 
@@ -607,7 +559,6 @@ export async function uploadBannerImage(file: File) {
         details: "Your profile banner has been updated",
       })
     } catch (notificationError) {
-      console.error("Error creating profile update notification:", notificationError)
       // Non-blocking - continue even if notification fails
     }
 
@@ -637,13 +588,11 @@ export async function uploadBannerImage(file: File) {
         try {
           await adminClient.storage.from("profile-images").remove([oldPath])
         } catch (e) {
-          console.error("Failed to delete old banner image:", e)
         }
       }
     }
     return { success: true, url: publicUrlData.publicUrl }
   } catch (error) {
-    console.error("Error in uploadBannerImage:", error)
     return { error: "An unexpected error occurred. Please try again." }
   }
 }
@@ -652,7 +601,6 @@ export async function uploadBannerImage(file: File) {
 export async function selectBannerImage(bannerUrl: string) {
   try {
     if (isOfflineMode()) {
-      console.log("Skipping banner image selection in offline mode")
       // Return a mock success response
       return { success: true }
     }
@@ -662,11 +610,9 @@ export async function selectBannerImage(bannerUrl: string) {
     const { userId, method } = await getCurrentUserId()
 
     if (!userId) {
-      console.error("No authenticated user found for banner selection")
       return { error: "You must be logged in to select a banner image. Please refresh and try again." }
     }
 
-    console.log(`User authenticated via ${method} for banner selection. User ID: ${userId}`)
 
     // Update the user's profile with the selected banner image URL
     const { error: updateError } = await adminClient
@@ -678,7 +624,6 @@ export async function selectBannerImage(bannerUrl: string) {
       .eq("id", userId)
 
     if (updateError) {
-      console.error("Error updating profile with banner image:", updateError)
       return { error: "Failed to update profile with banner image. Please try again." }
     }
 
@@ -690,7 +635,6 @@ export async function selectBannerImage(bannerUrl: string) {
         details: "Your profile banner has been updated",
       })
     } catch (notificationError) {
-      console.error("Error creating profile update notification:", notificationError)
       // Non-blocking - continue even if notification fails
     }
 
@@ -700,7 +644,6 @@ export async function selectBannerImage(bannerUrl: string) {
 
     return { success: true }
   } catch (error) {
-    console.error("Error in selectBannerImage:", error)
     return { error: "An unexpected error occurred. Please try again." }
   }
 }
@@ -709,7 +652,6 @@ export async function selectBannerImage(bannerUrl: string) {
 export async function uploadProfilePicture(file: File) {
   try {
     if (isOfflineMode()) {
-      console.log("Skipping profile picture upload in offline mode")
       // Return a mock success response with a placeholder URL
       return { success: true, url: "/placeholder-avatar.svg" }
     }
@@ -724,10 +666,8 @@ export async function uploadProfilePicture(file: File) {
       const { data: sessionData } = await supabase.auth.getSession()
       if (sessionData.session?.user) {
         userId = sessionData.session.user.id
-        console.log("Using user ID from Supabase session:", userId)
       }
     } catch (sessionError) {
-      console.error("Error getting session:", sessionError)
       // Continue to next method
     }
 
@@ -740,25 +680,21 @@ export async function uploadProfilePicture(file: File) {
           const { payload, error } = await verifyJWT(jwt)
           if (!error && payload && (payload.userId || payload.sub)) {
             userId = payload.userId || payload.sub
-            console.log("Using user ID from JWT:", userId)
           }
         }
       } catch (jwtError) {
-        console.error("Error verifying JWT:", jwtError)
         // Continue to next method
       }
     }
 
     // If we still don't have a user ID, return an error
     if (!userId) {
-      console.error("No authenticated user found for profile picture upload")
       return { error: "Authentication failed. Please try logging in again." }
     }
 
     // Ensure the profiles bucket exists
     const bucketResult = await ensureBucketExists("profiles")
     if (bucketResult.error) {
-      console.error("Error ensuring profiles bucket:", bucketResult.error)
 
       // Try to create bucket one more time with a different approach
       try {
@@ -767,7 +703,6 @@ export async function uploadProfilePicture(file: File) {
           return { error: "Unable to access storage system. Please try again later." }
         }
       } catch (createError) {
-        console.error("Second attempt to create bucket failed:", createError)
         return { error: "Storage system is temporarily unavailable." }
       }
     }
@@ -803,7 +738,6 @@ export async function uploadProfilePicture(file: File) {
     })
 
     if (uploadError) {
-      console.error("Error uploading profile picture:", uploadError)
 
       if (uploadError.message.includes("Duplicate")) {
         // If duplicate error, try with a different filename
@@ -838,7 +772,6 @@ export async function uploadProfilePicture(file: File) {
             try {
               await adminClient.storage.from("profiles").remove([oldPath])
             } catch (e) {
-              console.error("Failed to delete old profile image:", e)
             }
           }
         }
@@ -860,7 +793,6 @@ export async function uploadProfilePicture(file: File) {
       .eq("id", userId)
 
     if (updateError) {
-      console.error("Error updating profile with new avatar URL:", updateError)
       // Return success anyway as the image was uploaded successfully
       // Delete the old profile image if it exists and is not a placeholder
       if (oldProfilePictureUrl && !oldProfilePictureUrl.includes("placeholder")) {
@@ -869,7 +801,6 @@ export async function uploadProfilePicture(file: File) {
           try {
             await adminClient.storage.from("profiles").remove([oldPath])
           } catch (e) {
-            console.error("Failed to delete old profile image:", e)
           }
         }
       }
@@ -883,13 +814,11 @@ export async function uploadProfilePicture(file: File) {
         try {
           await adminClient.storage.from("profiles").remove([oldPath])
         } catch (e) {
-          console.error("Failed to delete old profile image:", e)
         }
       }
     }
     return { success: true, url: publicUrl }
   } catch (error) {
-    console.error("Unexpected error uploading profile picture:", error)
     return { error: "An unexpected error occurred. Please try again." }
   }
 }
@@ -905,7 +834,6 @@ export async function updateSocialMedia(
 ) {
   try {
     if (isOfflineMode()) {
-      console.log("Skipping social media update in offline mode")
       // Return a mock success response
       return { success: true }
     }
@@ -923,14 +851,11 @@ export async function updateSocialMedia(
       .eq("id", userId); // Await update before eq
 
     if (error) {
-      console.error("Error updating social media:", error)
       return { success: false, error: error.message }
     }
 
-    console.log("Social media updated successfully for user:", userId)
     return { success: true }
   } catch (error: any) {
-    console.error("Unexpected error updating social media:", error)
     return { success: false, error: "An unexpected error occurred." }
   }
 }
@@ -938,7 +863,6 @@ export async function updateSocialMedia(
 export async function uploadLendingLicenseServer(file: File) {
   try {
     if (isOfflineMode()) {
-      console.log("Skipping lending license upload in offline mode");
       return { success: true, url: "/placeholder.svg" };
     }
     const adminClient = createAdminClient();
@@ -955,7 +879,6 @@ export async function uploadLendingLicenseServer(file: File) {
         upsert: true,
       });
     if (uploadError) {
-      console.error("Error uploading lending license:", uploadError);
       return { error: `Failed to upload lending license: ${uploadError.message}` };
     }
     const { data: publicUrlData } = adminClient.storage
@@ -966,7 +889,6 @@ export async function uploadLendingLicenseServer(file: File) {
     }
     return { success: true, url: publicUrlData.publicUrl };
   } catch (error: any) {
-    console.error("Unexpected error uploading lending license:", error);
     return { error: `An unexpected error occurred. Please try again. ${error instanceof Error ? error.message : String(error)}` };
   }
 }

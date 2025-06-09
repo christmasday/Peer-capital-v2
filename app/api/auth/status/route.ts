@@ -33,7 +33,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ authenticated, userId }, { status: 200 })
   } catch (error) {
-    console.error("Error checking auth status:", error)
     return NextResponse.json({ authenticated: false, userId: null }, { status: 500 })
   }
 }

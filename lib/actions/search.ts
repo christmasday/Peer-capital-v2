@@ -10,7 +10,6 @@ export async function searchUsers(query: string) {
     const supabase = createServerClient(cookieStore)
 
     // For debugging - log the search query
-    console.log("Searching for:", query)
 
     // Normalize the search query and escape special characters
     const searchTerm = query.trim().toLowerCase()
@@ -27,11 +26,9 @@ export async function searchUsers(query: string) {
       .limit(10)
 
     // Log the results for debugging
-    console.log("Search results:", data, "Error:", error)
 
     // If no results or error, try with admin client to bypass RLS
     if ((!data || data.length === 0 || error) && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      console.log("Trying with admin client")
       const adminClient = createAdminClient()
 
       const { data: adminData, error: adminError } = await adminClient
@@ -40,10 +37,8 @@ export async function searchUsers(query: string) {
         .or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`)
         .limit(10)
 
-      console.log("Admin search results:", adminData, "Error:", adminError)
 
       if (adminError) {
-        console.error("Admin search error:", adminError)
       } else if (adminData && adminData.length > 0) {
         data = adminData
         error = null
@@ -51,7 +46,6 @@ export async function searchUsers(query: string) {
     }
 
     if (error) {
-      console.error("Error searching users:", error)
       throw new Error(`Error searching users: ${error.message}`)
     }
 
@@ -63,7 +57,6 @@ export async function searchUsers(query: string) {
         .limit(10)
 
       if (fallbackError) {
-        console.error("Fallback search error:", fallbackError)
       } else if (fallbackData && fallbackData.length > 0) {
         // Filter the results manually
         data = fallbackData.filter((user) => {
@@ -85,7 +78,6 @@ export async function searchUsers(query: string) {
       avatarUrl: user.profile_picture_url,
     }))
   } catch (error) {
-    console.error("Error in searchUsers:", error)
     // Return empty array instead of throwing to prevent UI errors
     return []
   }

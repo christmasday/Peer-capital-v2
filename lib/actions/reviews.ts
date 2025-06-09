@@ -20,7 +20,6 @@ export async function submitReview({
     const { error: tableCheckError } = await adminClient.from("user_reviews").select("id").limit(1)
 
     if (tableCheckError) {
-      console.log("User reviews table does not exist yet. This is a placeholder for future implementation.")
       // In a real implementation, you would create the table or handle this differently
       return { success: false, message: "Review functionality coming soon" }
     }
@@ -35,14 +34,12 @@ export async function submitReview({
     })
 
     if (error) {
-      console.error("Error submitting review:", error)
       return { success: false, message: error.message }
     }
 
     revalidatePath(`/profile/${userId}`)
     return { success: true }
   } catch (error) {
-    console.error("Unexpected error submitting review:", error)
     return {
       success: false,
       message: "An unexpected error occurred. Please try again.",

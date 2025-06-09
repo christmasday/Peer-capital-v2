@@ -56,11 +56,11 @@ export function AccountCard({ balance, loanBalance }: AccountCardProps) {
             <span className="text-sm">Fund</span>
           </Link>
 
-          <Link href="/account/withdraw" className="flex flex-col items-center">
+          <Link href="/account/transfer" className="flex flex-col items-center">
             <div className="bg-white p-3 rounded-lg mb-2">
               <ArrowDown className="h-5 w-5 text-blue-700" />
             </div>
-            <span className="text-sm">Withdraw</span>
+            <span className="text-sm">Transfer</span>
           </Link>
 
           <div className="flex flex-col items-center">

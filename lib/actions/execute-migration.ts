@@ -5,7 +5,6 @@ import { createAdminClient } from "@/lib/supabase/admin"
 // Function to ensure the execute_sql function exists
 async function ensureExecuteSqlFunction() {
   try {
-    console.log("Ensuring execute_sql function exists")
     const adminClient = createAdminClient()
 
     // Check if the function exists
@@ -17,12 +16,10 @@ async function ensureExecuteSqlFunction() {
       .maybeSingle()
 
     if (error) {
-      console.error("Error checking if execute_sql function exists:", error)
       return false
     }
 
     if (!data) {
-      console.log("Creating execute_sql function")
 
       // Create the function directly
       const createFunctionSQL = `
@@ -49,7 +46,6 @@ async function ensureExecuteSqlFunction() {
       const { error: createError } = await adminClient
         .rpc("execute_sql", { sql_query: createFunctionSQL })
         .catch(async (e) => {
-          console.log("Failed to create execute_sql function using RPC, trying direct query")
 
           // If the RPC fails (because the function doesn't exist yet), try a direct query
           const { error: directError } = await adminClient
@@ -59,13 +55,11 @@ async function ensureExecuteSqlFunction() {
 
           // If that also fails, try a raw query as a last resort
           if (directError) {
-            console.log("Failed with direct RPC call, trying raw query")
             try {
               // This is a workaround since we can't use raw SQL queries directly with the Supabase client
               // We'll create a temporary function to execute our SQL
               const { error: tempError } = await adminClient.from("auth_users").select("id").limit(1)
               if (!tempError) {
-                console.log("Raw query approach not implemented - would require custom SQL client")
                 return { error: "Could not create execute_sql function" }
               }
               return { error: tempError }
@@ -78,18 +72,14 @@ async function ensureExecuteSqlFunction() {
         })
 
       if (createError) {
-        console.error("Error creating execute_sql function:", createError)
         return false
       }
 
-      console.log("execute_sql function created successfully")
     } else {
-      console.log("execute_sql function already exists")
     }
 
     return true
   } catch (error) {
-    console.error("Unexpected error in ensureExecuteSqlFunction:", error)
     return false
   }
 }
@@ -97,7 +87,6 @@ async function ensureExecuteSqlFunction() {
 // Add the missing executeSql function as a named export
 export async function executeSql(sql: string) {
   try {
-    console.log("Executing SQL:", sql.substring(0, 100) + (sql.length > 100 ? "..." : ""))
 
     // First ensure the execute_sql function exists
     const functionExists = await ensureExecuteSqlFunction()
@@ -115,14 +104,11 @@ export async function executeSql(sql: string) {
     const { data, error } = await adminClient.rpc("execute_sql", { sql_query: sql })
 
     if (error) {
-      console.error("Error executing SQL:", error)
       return { success: false, error: error.message }
     }
 
-    console.log("SQL executed successfully")
     return { success: true, data }
   } catch (error) {
-    console.error("Unexpected error executing SQL:", error)
     return {
       success: false,
       error: `An unexpected error occurred: ${error instanceof Error ? error.message : String(error)}`,
@@ -137,7 +123,6 @@ export async function executeSqlMigration(sql: string) {
 
 export async function executeMigration(migrationFile: string) {
   try {
-    console.log(`Executing migration: ${migrationFile}`)
 
     // First ensure the execute_sql function exists
     const functionExists = await ensureExecuteSqlFunction()
@@ -153,7 +138,6 @@ export async function executeMigration(migrationFile: string) {
     // Get the migration SQL
     const response = await fetch(`/migrations/${migrationFile}`)
     if (!response.ok) {
-      console.error(`Failed to fetch migration file: ${migrationFile}`)
       return { error: `Failed to fetch migration file: ${migrationFile}` }
     }
 
@@ -163,14 +147,11 @@ export async function executeMigration(migrationFile: string) {
     const { error } = await adminClient.rpc("execute_sql", { sql_query: sql })
 
     if (error) {
-      console.error(`Error executing migration: ${error.message}`)
       return { error: error.message }
     }
 
-    console.log(`Migration ${migrationFile} executed successfully`)
     return { success: true }
   } catch (error) {
-    console.error(`Unexpected error executing migration: ${error}`)
     return { error: `An unexpected error occurred: ${error instanceof Error ? error.message : String(error)}` }
   }
 }
@@ -178,17 +159,14 @@ export async function executeMigration(migrationFile: string) {
 // Function to execute the migration to add ID verification and employment fields
 export async function executeProfileMigration() {
   try {
-    console.log("Executing profile migration to add ID verification and employment fields...")
 
     // Since adminClient.query is not available, we'll use the alternative approach directly
     // by executing individual ALTER TABLE statements
     return await executeIndividualMigrations()
   } catch (error) {
-    console.error("Unexpected error executing profile migration:", error)
 
     // Log detailed error for debugging
     if (error instanceof Error) {
-      console.error("Error details:", error.message, error.stack)
     }
 
     // If this fails, we'll handle the missing columns in the updateProfile function
@@ -204,7 +182,6 @@ export async function executeProfileMigration() {
 // Execute individual ALTER TABLE statements one by one
 async function executeIndividualMigrations() {
   try {
-    console.log("Executing individual column migrations...")
     const adminClient = createAdminClient()
 
     // Execute individual ALTER TABLE statements one by one
@@ -229,14 +206,12 @@ async function executeIndividualMigrations() {
     const { data: existingColumns, error: columnsError } = await adminClient.from("profiles").select("*").limit(1)
 
     if (columnsError) {
-      console.error("Error checking existing columns:", columnsError)
       return { success: false, error: "Failed to check existing columns" }
     }
 
     // Get column names from the first row
     const existingColumnNames = existingColumns && existingColumns.length > 0 ? Object.keys(existingColumns[0]) : []
 
-    console.log("Existing columns:", existingColumnNames)
 
     // Track success/failure for each column
     const results = []
@@ -245,7 +220,6 @@ async function executeIndividualMigrations() {
     for (const { column, type, default: defaultValue } of alterTableStatements) {
       // Skip if column already exists
       if (existingColumnNames.includes(column)) {
-        console.log(`Column ${column} already exists, skipping`)
         results.push({ column, success: true, skipped: true })
         continue
       }
@@ -259,14 +233,11 @@ async function executeIndividualMigrations() {
         })
 
         if (error) {
-          console.warn(`Failed to add column ${column}:`, error)
           results.push({ column, success: false, error: error.message })
         } else {
-          console.log(`Successfully added column ${column}`)
           results.push({ column, success: true })
         }
       } catch (columnError) {
-        console.warn(`Error adding column ${column}:`, columnError)
         results.push({ column, success: false, error: String(columnError) })
       }
     }
@@ -287,7 +258,6 @@ async function executeIndividualMigrations() {
       }
     }
   } catch (error) {
-    console.error("Unexpected error in executeIndividualMigrations:", error)
     return { success: false, error: "Migration failed, but application will continue" }
   }
 }
@@ -295,7 +265,6 @@ async function executeIndividualMigrations() {
 // Add a new function to execute a migration from a file
 export async function executeMigrationFromFile(filename: string) {
   try {
-    console.log(`Executing migration from file: ${filename}`)
 
     // First ensure the execute_sql function exists
     const functionExists = await ensureExecuteSqlFunction()
@@ -429,13 +398,11 @@ export async function executeMigrationFromFile(filename: string) {
     const { error } = await adminClient.rpc("execute_sql", { sql_query: sqlContent })
 
     if (error) {
-      console.error(`Error executing migration ${filename}:`, error)
       return { success: false, error: `Failed to execute migration: ${error.message}` }
     }
 
     return { success: true, message: `Migration ${filename} executed successfully` }
   } catch (error) {
-    console.error(`Unexpected error executing migration ${filename}:`, error)
     return { success: false, error: `An unexpected error occurred: ${String(error)}` }
   }
 }

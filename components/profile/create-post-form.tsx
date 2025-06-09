@@ -48,7 +48,6 @@ export function CreatePostForm({ userId, userName, userImage, onPostCreated }: C
         onPostCreated()
       }
     } catch (error) {
-      console.error("Error creating post:", error)
       toast({
         title: "Error",
         description: "Failed to create post. Please try again.",

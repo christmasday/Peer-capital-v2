@@ -42,6 +42,7 @@ import { LoanRequestsList } from "@/components/loans/LoanRequestsList"
 import { getAllLoanRequests } from "@/lib/actions/loans"
 import { getVirtualAccount } from "@/lib/actions/paystack"
 import { CreateVirtualAccountButton } from '@/components/profile/CreateVirtualAccountButton'
+import { BeneficiariesList } from "@/components/profile/beneficiaries-list"
 
 export const dynamic = "force-dynamic"
 export const revalidate = 0
@@ -94,10 +95,6 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
 
   // Fetch user's posts
   const { posts, error: postsError } = await getUserPosts(user.id, 10)
-
-  if (postsError) {
-    console.error("Error fetching posts:", postsError)
-  }
 
   // Fetch followers and following counts for friends tab
   const followersResult = await getFollowersCount(user.id)
@@ -212,6 +209,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
               { name: "Posts", href: "/profile", active: activeTab === "posts" },
               { name: "About", href: "/profile?tab=about", active: activeTab === "about" },
               { name: "Friends", href: "/profile/?tab=friends", active: activeTab === "friends" },
+              { name: "Transfer Beneficiaries", href: "/profile?tab=beneficiaries", active: activeTab === "beneficiaries" },
               { name: "Loan Requests", href: "/profile?tab=more", active: activeTab === "more" },
             ].map((tab) => (
               <Link
@@ -240,6 +238,8 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
             initialFollowersCount={followersCount}
             initialFollowingCount={followingCount}
           />
+        ) : activeTab === "beneficiaries" ? (
+          <BeneficiariesList userId={user.id} />
         ) : activeTab === "about" ? (
           <ProfileAbout profile={profile} isCurrentUser={true} virtualAccount={virtualAccount} initialSection="about" />
         ) : activeTab === "more" ? (

@@ -17,7 +17,6 @@ export function SupabaseStorageInitializer() {
       setIsInitializing(true)
 
       try {
-        console.log("Initializing storage from client component")
 
         // Call the API route to initialize storage
         const response = await fetch("/api/storage/initialize", {
@@ -33,15 +32,12 @@ export function SupabaseStorageInitializer() {
         }
 
         const data = await response.json()
-        console.log("Storage initialization result:", data)
 
         setIsInitialized(true)
       } catch (error) {
-        console.error("Failed to initialize storage from client:", error)
 
         // Retry logic
         if (retryCount < MAX_RETRIES) {
-          console.log(`Retrying storage initialization (${retryCount + 1}/${MAX_RETRIES})...`)
           setRetryCount((prev) => prev + 1)
 
           // Wait before retrying
@@ -53,7 +49,6 @@ export function SupabaseStorageInitializer() {
           ) // Exponential backoff
         } else {
           // Max retries reached, mark as initialized anyway to prevent further attempts
-          console.warn("Max retries reached for storage initialization")
           setIsInitialized(true)
         }
       } finally {
@@ -72,7 +67,6 @@ export function SupabaseStorageInitializer() {
     // even if something goes wrong with the initialization process
     const fallbackTimer = setTimeout(() => {
       if (!isInitialized) {
-        console.warn("Storage initialization fallback timeout triggered")
         setIsInitialized(true)
         setIsInitializing(false)
       }

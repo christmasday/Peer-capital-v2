@@ -24,7 +24,6 @@ export function AddBannerImageUrlButton() {
         setResult("Successfully added banner_image_url column to profiles table")
       }
     } catch (err) {
-      console.error("Error executing migration:", err)
       setError("An unexpected error occurred")
     } finally {
       setIsLoading(false)

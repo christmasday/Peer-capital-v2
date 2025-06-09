@@ -46,7 +46,6 @@ export function ConversationList() {
         setConversations(result.conversations || [])
       }
     } catch (err) {
-      console.error("Error fetching conversations:", err)
       setError("Failed to load conversations")
     } finally {
       setIsLoading(false)

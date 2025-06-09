@@ -23,7 +23,6 @@ export default async function ProfileEditPage({ searchParams }: { searchParams: 
   try {
     await executeProfileMigration()
   } catch (error) {
-    console.error("Error executing profile migration:", error)
     // Continue anyway, we'll handle missing columns in the updateProfile function
   }
 

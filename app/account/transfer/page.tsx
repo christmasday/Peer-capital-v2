@@ -1,12 +1,12 @@
 import { redirect } from "next/navigation"
-import { WithdrawForm } from "@/components/account/withdraw-form"
+import { TransferForm } from "@/components/account/transfer-form"
 import { MainLayout } from "@/components/layouts/main-layout"
 import { getUserProfile } from "@/lib/actions/auth"
 import { checkAuth } from "@/lib/auth-utils"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ArrowRight, Clock, AlertTriangle } from "lucide-react"
 
-export default async function WithdrawPage() {
+export default async function TransferPage() {
   // Check authentication
   await checkAuth()
 
@@ -28,7 +28,7 @@ export default async function WithdrawPage() {
       <div className="max-w-6xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2">
-            <WithdrawForm currentBalance={accountBalance} />
+            <TransferForm currentBalance={accountBalance} />
           </div>
 
           <div className="space-y-6">
@@ -71,10 +71,10 @@ export default async function WithdrawPage() {
               </CardContent>
             </Card>
 
-            {/* Withdrawal Information */}
+            {/* Transfer Information */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Withdrawal Information</CardTitle>
+                <CardTitle className="text-lg">Transfer Information</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-start gap-2">
@@ -82,7 +82,7 @@ export default async function WithdrawPage() {
                   <div>
                     <p className="font-medium">Processing Time</p>
                     <p className="text-sm text-gray-500">
-                      Withdrawals are typically processed within 24 hours during business days.
+                      Transfers are typically processed within 24 hours during business days.
                     </p>
                   </div>
                 </div>
@@ -90,7 +90,7 @@ export default async function WithdrawPage() {
                 <div className="flex items-start gap-2">
                   <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
                   <div>
-                    <p className="font-medium">Withdrawal Limits</p>
+                    <p className="font-medium">Transfer Limits</p>
                     <p className="text-sm text-gray-500">
                       Minimum: ₦1,000
                       <br />
@@ -103,7 +103,7 @@ export default async function WithdrawPage() {
 
                 <div className="pt-4 border-t text-sm text-gray-500">
                   <p>
-                    For withdrawals above ₦1,000,000, please contact our support team at{" "}
+                    For transfers above ₦1,000,000, please contact our support team at{" "}
                     <a href="mailto:support@peercapital.com" className="text-blue-600">
                       support@peercapital.com
                     </a>
@@ -116,4 +116,4 @@ export default async function WithdrawPage() {
       </div>
     </MainLayout>
   )
-}
+} 

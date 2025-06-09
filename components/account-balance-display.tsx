@@ -16,7 +16,6 @@ export default function AccountBalanceDisplay() {
         setAccountBalance(balance)
       } catch (err) {
         setError("Failed to load account balance")
-        console.error(err)
       } finally {
         setLoading(false)
       }

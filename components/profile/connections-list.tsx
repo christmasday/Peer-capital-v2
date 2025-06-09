@@ -6,15 +6,17 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Skeleton } from "@/components/ui/skeleton"
-import { UserPlus, Users } from "lucide-react"
+import { UserPlus, Users, Plus } from "lucide-react"
 import { getFollowers, getFollowing } from "@/lib/actions/connections"
 import { FollowButton } from "@/components/profile/follow-button"
 import Link from "next/link"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 
 interface ConnectionsListProps {
   userId: string
   initialFollowersCount: number
   initialFollowingCount: number
+  initialTab?: string
 }
 
 interface UserConnection {
@@ -27,8 +29,8 @@ interface UserConnection {
   followedAt: string
 }
 
-export function ConnectionsList({ userId, initialFollowersCount, initialFollowingCount }: ConnectionsListProps) {
-  const [activeTab, setActiveTab] = useState("followers")
+export function ConnectionsList({ userId, initialFollowersCount, initialFollowingCount, initialTab = "followers" }: ConnectionsListProps) {
+  const [activeTab, setActiveTab] = useState(initialTab)
   const [followers, setFollowers] = useState<UserConnection[]>([])
   const [following, setFollowing] = useState<UserConnection[]>([])
   const [isLoadingFollowers, setIsLoadingFollowers] = useState(false)
@@ -38,6 +40,20 @@ export function ConnectionsList({ userId, initialFollowersCount, initialFollowin
   const [currentPage, setCurrentPage] = useState(1)
   const [hasMore, setHasMore] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [beneficiaries, setBeneficiaries] = useState<any[]>([])
+  const [isBeneficiaryModalOpen, setIsBeneficiaryModalOpen] = useState(false)
+  const [beneficiaryAccountNumber, setBeneficiaryAccountNumber] = useState("")
+  const [beneficiaryBank, setBeneficiaryBank] = useState("")
+  const [beneficiaryBanks, setBeneficiaryBanks] = useState<{ name: string; code: string }[]>([])
+  const [beneficiaryAccountName, setBeneficiaryAccountName] = useState("")
+  const [isResolving, setIsResolving] = useState(false)
+  const [resolveError, setResolveError] = useState("")
+  const [isAdding, setIsAdding] = useState(false)
+  const [addError, setAddError] = useState("")
+  const [isLoadingBeneficiaries, setIsLoadingBeneficiaries] = useState(false)
+  const [beneficiariesError, setBeneficiariesError] = useState("")
+  const [removingId, setRemovingId] = useState<string | null>(null)
+  const [removeError, setRemoveError] = useState("")
 
   useEffect(() => {
     if (activeTab === "followers") {
@@ -47,13 +63,80 @@ export function ConnectionsList({ userId, initialFollowersCount, initialFollowin
     }
   }, [activeTab, userId])
 
+  // Fetch beneficiaries and banks on mount
+  useEffect(() => {
+    // TODO: Fetch beneficiaries from API
+    // setBeneficiaries(...)
+    async function fetchBanks() {
+      try {
+        const res = await fetch("https://api.paystack.co/bank", {
+          headers: { Authorization: `Bearer ${process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || ""}` },
+        })
+        const data = await res.json()
+        if (data.status && Array.isArray(data.data)) {
+          setBeneficiaryBanks(data.data.map((bank: any) => ({ name: bank.name, code: bank.code })))
+        }
+      } catch {}
+    }
+    fetchBanks()
+  }, [])
+
+  // Resolve account name
+  useEffect(() => {
+    async function resolveAccount() {
+      if (beneficiaryBank && beneficiaryAccountNumber.length === 10) {
+        setIsResolving(true)
+        setResolveError("")
+        try {
+          const bankCode = beneficiaryBanks.find(b => b.name === beneficiaryBank)?.code
+          const res = await fetch(`https://api.paystack.co/bank/resolve?account_number=${beneficiaryAccountNumber}&bank_code=${bankCode}`, {
+            headers: { Authorization: `Bearer ${process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || ""}` },
+          })
+          const data = await res.json()
+          if (data.status && data.data && data.data.account_name) {
+            setBeneficiaryAccountName(data.data.account_name)
+          } else {
+            setResolveError("Could not resolve account name")
+            setBeneficiaryAccountName("")
+          }
+        } catch {
+          setResolveError("Could not resolve account name")
+          setBeneficiaryAccountName("")
+        } finally {
+          setIsResolving(false)
+        }
+      } else {
+        setBeneficiaryAccountName("")
+        setResolveError("")
+      }
+    }
+    resolveAccount()
+  }, [beneficiaryBank, beneficiaryAccountNumber])
+
+  // Fetch beneficiaries when tab is active
+  useEffect(() => {
+    if (activeTab === "beneficiaries") {
+      setIsLoadingBeneficiaries(true)
+      setBeneficiariesError("")
+      fetch("/api/beneficiaries")
+        .then(async (res) => {
+          if (!res.ok) throw new Error("Failed to fetch beneficiaries")
+          const data = await res.json()
+          setBeneficiaries(data.beneficiaries || [])
+        })
+        .catch((err) => {
+          setBeneficiariesError(err.message || "Failed to fetch beneficiaries")
+        })
+        .finally(() => setIsLoadingBeneficiaries(false))
+    }
+  }, [activeTab, isBeneficiaryModalOpen])
+
   const loadFollowers = async (page: number) => {
     setIsLoadingFollowers(true)
     setError(null)
     try {
       const result = await getFollowers(userId, page)
       if (result.error) {
-        console.error("Error loading followers:", result.error)
         setError(result.error)
         return
       }
@@ -67,7 +150,6 @@ export function ConnectionsList({ userId, initialFollowersCount, initialFollowin
       setHasMore((result.followers || []).length === 10) // Assuming 10 is the limit
       setCurrentPage(page)
     } catch (error) {
-      console.error("Error loading followers:", error)
       setError("Failed to load followers.")
     } finally {
       setIsLoadingFollowers(false)
@@ -80,7 +162,6 @@ export function ConnectionsList({ userId, initialFollowersCount, initialFollowin
     try {
       const result = await getFollowing(userId, page)
       if (result.error) {
-        console.error("Error loading following:", result.error)
         setError(result.error)
         return
       }
@@ -94,7 +175,6 @@ export function ConnectionsList({ userId, initialFollowersCount, initialFollowin
       setHasMore((result.following || []).length === 10) // Assuming 10 is the limit
       setCurrentPage(page)
     } catch (error) {
-      console.error("Error loading following:", error)
       setError("Failed to load following.")
     } finally {
       setIsLoadingFollowing(false)
@@ -132,6 +212,96 @@ export function ConnectionsList({ userId, initialFollowersCount, initialFollowin
       .map((name) => name?.[0])
       .join("")
       .toUpperCase()
+  }
+
+  const handleAddBeneficiary = async () => {
+    setIsAdding(true)
+    setAddError("")
+    try {
+      // Call Paystack transferrecipient API
+      const bankCode = beneficiaryBanks.find(b => b.name === beneficiaryBank)?.code
+      const res = await fetch("/api/paystack/transferrecipient", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "nuban",
+          name: beneficiaryAccountName,
+          account_number: beneficiaryAccountNumber,
+          bank_code: bankCode,
+          currency: "NGN",
+        }),
+      })
+      const data = await res.json()
+      if (!data.status || !data.data?.recipient_code) throw new Error(data.message || "Failed to add beneficiary")
+      // Save beneficiary in DB
+      const saveRes = await fetch("/api/beneficiaries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          account_name: beneficiaryAccountName,
+          account_number: beneficiaryAccountNumber,
+          bank_name: beneficiaryBank,
+          bank_code: bankCode,
+          recipient_code: data.data.recipient_code,
+        }),
+      })
+      if (!saveRes.ok) {
+        const errData = await saveRes.json()
+        throw new Error(errData.error || "Failed to save beneficiary")
+      }
+      setIsBeneficiaryModalOpen(false)
+      setBeneficiaryAccountNumber("")
+      setBeneficiaryBank("")
+      setBeneficiaryAccountName("")
+      // Refresh beneficiaries list
+      setIsLoadingBeneficiaries(true)
+      fetch("/api/beneficiaries")
+        .then(async (res) => {
+          if (!res.ok) throw new Error("Failed to fetch beneficiaries")
+          const data = await res.json()
+          setBeneficiaries(data.beneficiaries || [])
+        })
+        .catch((err) => {
+          setBeneficiariesError(err.message || "Failed to fetch beneficiaries")
+        })
+        .finally(() => setIsLoadingBeneficiaries(false))
+    } catch (err: any) {
+      setAddError(err.message || "Failed to add beneficiary")
+    } finally {
+      setIsAdding(false)
+    }
+  }
+
+  const handleRemoveBeneficiary = async (id: string) => {
+    setRemovingId(id)
+    setRemoveError("")
+    try {
+      const res = await fetch("/api/beneficiaries", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      })
+      if (!res.ok) {
+        const errData = await res.json()
+        throw new Error(errData.error || "Failed to remove beneficiary")
+      }
+      // Refresh beneficiaries list
+      setIsLoadingBeneficiaries(true)
+      fetch("/api/beneficiaries")
+        .then(async (res) => {
+          if (!res.ok) throw new Error("Failed to fetch beneficiaries")
+          const data = await res.json()
+          setBeneficiaries(data.beneficiaries || [])
+        })
+        .catch((err) => {
+          setBeneficiariesError(err.message || "Failed to fetch beneficiaries")
+        })
+        .finally(() => setIsLoadingBeneficiaries(false))
+    } catch (err: any) {
+      setRemoveError(err.message || "Failed to remove beneficiary")
+    } finally {
+      setRemovingId(null)
+    }
   }
 
   return (

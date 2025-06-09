@@ -16,7 +16,6 @@ export async function POST(request: NextRequest) {
 
     // Method 0: Use the user ID from the request body if available
     if (requestUserId) {
-      console.log("Using user ID from request body:", requestUserId)
       userId = requestUserId
     }
 
@@ -28,11 +27,9 @@ export async function POST(request: NextRequest) {
           const { payload, error } = await verifyJWT(jwt)
           if (!error && payload && (payload.sub || payload.userId)) {
             userId = payload.sub || payload.userId
-            console.log("Authentication successful via JWT")
           }
         }
       } catch (error) {
-        console.error("JWT verification error:", error)
       }
     }
 
@@ -45,10 +42,8 @@ export async function POST(request: NextRequest) {
 
         if (data.session?.user?.id) {
           userId = data.session.user.id
-          console.log("Authentication successful via Supabase session")
         }
       } catch (error) {
-        console.error("Supabase session error:", error)
       }
     }
 
@@ -66,11 +61,9 @@ export async function POST(request: NextRequest) {
 
           if (!error && data?.id) {
             userId = data.id
-            console.log("Authentication successful via custom auth token")
           }
         }
       } catch (error) {
-        console.error("Custom auth token error:", error)
       }
     }
 
@@ -82,16 +75,13 @@ export async function POST(request: NextRequest) {
 
         if (data?.id) {
           userId = data.id
-          console.log("DEVELOPMENT MODE: Using first user from database:", userId)
         }
       } catch (error) {
-        console.error("Development fallback error:", error)
       }
     }
 
     // If all authentication methods failed
     if (!userId) {
-      console.error("Authentication failed: No valid user ID found")
       return NextResponse.json({ error: "Authentication required" }, { status: 401 })
     }
 
@@ -108,7 +98,6 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (profileError || !profile || !profile.email) {
-      console.error("Error fetching user profile:", profileError)
       return NextResponse.json({ error: "Could not fetch user profile or email is missing" }, { status: 500 })
     }
 
@@ -129,14 +118,12 @@ export async function POST(request: NextRequest) {
     })
 
     if (transactionError) {
-      console.error("Error creating transaction record:", transactionError)
       return NextResponse.json({ error: "Failed to create transaction record" }, { status: 500 })
     }
 
     // Initialize Paystack transaction
     const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY
     if (!PAYSTACK_SECRET_KEY) {
-      console.error("Paystack secret key not found")
       return NextResponse.json({ error: "Payment provider configuration error" }, { status: 500 })
     }
 
@@ -178,7 +165,6 @@ export async function POST(request: NextRequest) {
     const responseData = await response.json()
 
     if (!responseData.status) {
-      console.error("Paystack API error:", responseData.message)
       return NextResponse.json({ error: responseData.message || "Failed to initialize payment" }, { status: 500 })
     }
 
@@ -190,7 +176,6 @@ export async function POST(request: NextRequest) {
       transactionId: transactionId,
     })
   } catch (error) {
-    console.error("Unexpected error initializing payment:", error)
     return NextResponse.json({ error: "An unexpected error occurred. Please try again." }, { status: 500 })
   }
 }

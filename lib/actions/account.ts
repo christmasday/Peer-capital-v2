@@ -43,7 +43,6 @@ export async function fundAccount(data: FundAccountData) {
     })
 
     if (transactionError) {
-      console.error("Error creating transaction record:", transactionError)
       return { error: "Failed to create transaction record" }
     }
 
@@ -55,7 +54,6 @@ export async function fundAccount(data: FundAccountData) {
       .single()
 
     if (accountError) {
-      console.error("Error fetching account balance:", accountError)
       return { error: "Failed to fetch account balance" }
     }
 
@@ -71,7 +69,6 @@ export async function fundAccount(data: FundAccountData) {
       .eq("user_id", userId)
 
     if (updateError) {
-      console.error("Error updating account balance:", updateError)
       return { error: "Failed to update account balance" }
     }
 
@@ -85,7 +82,6 @@ export async function fundAccount(data: FundAccountData) {
         description: `Account funded with ₦${data.amount.toLocaleString()} via ${data.paymentMethod}`,
       })
     } catch (notificationError) {
-      console.error("Error creating activity notification:", notificationError)
       // Non-blocking - continue even if notification fails
     }
 
@@ -111,13 +107,11 @@ export async function fundAccount(data: FundAccountData) {
           amount: data.amount,
           reference: reference,
           status: "completed",
-        }).catch((err) => {
-          console.warn("Failed to send transaction email, but continuing:", err)
+        }).catch(() => {
           // Non-blocking - continue even if email fails
         })
       }
     } catch (emailError) {
-      console.warn("Error sending transaction email:", emailError)
       // Non-blocking - continue even if email fails
     }
 
@@ -128,19 +122,25 @@ export async function fundAccount(data: FundAccountData) {
       newBalance,
     }
   } catch (error) {
-    console.error("Unexpected error funding account:", error)
     return { error: "An unexpected error occurred. Please try again." }
   }
 }
 
-export type WithdrawAccountData = {
+function generateShortUUIDv4(length = 20) {
+  // Generate a v4 UUID and remove dashes, then trim to the desired length
+  return uuidv4().replace(/-/g, "").slice(0, length)
+}
+
+export type TransferAccountData = {
   amount: number
   bankName: string
   accountNumber: string
   accountName: string
+  recipientCode: string // Add this to support Paystack transfer
+  reason?: string // Optional transfer reason
 }
 
-export async function withdrawFromAccount(data: WithdrawAccountData) {
+export async function transferFromAccount(data: TransferAccountData) {
   try {
     const supabase = createServerClient()
     const adminClient = createAdminClient()
@@ -149,7 +149,7 @@ export async function withdrawFromAccount(data: WithdrawAccountData) {
     const { data: sessionData } = await supabase.auth.getSession()
 
     if (!sessionData.session?.user) {
-      return { error: "You must be logged in to withdraw from your account" }
+      return { error: "You must be logged in to transfer from your account" }
     }
 
     const userId = sessionData.session.user.id
@@ -162,7 +162,6 @@ export async function withdrawFromAccount(data: WithdrawAccountData) {
       .single()
 
     if (accountError) {
-      console.error("Error fetching account balance:", accountError)
       return { error: "Failed to fetch account balance" }
     }
 
@@ -170,62 +169,70 @@ export async function withdrawFromAccount(data: WithdrawAccountData) {
 
     // Check if the user has sufficient balance
     if (currentBalance < data.amount) {
-      return { error: "Insufficient balance for this withdrawal" }
+      return { error: "Insufficient balance for this transfer" }
     }
 
-    // Generate a unique reference
-    const reference = `WTH${Date.now().toString().substring(7)}${Math.floor(Math.random() * 1000)}`
+    // Generate a unique reference (20-char UUID v4)
+    const reference = generateShortUUIDv4(20)
 
-    // Create a transaction record
+    // Call Paystack /transfer API
+    const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY
+    if (!PAYSTACK_SECRET_KEY) {
+      return { error: "Payment provider configuration error" }
+    }
+    const paystackRes = await fetch("https://api.paystack.co/transfer", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        source: "balance",
+        amount: Math.round(data.amount * 100), // Paystack expects kobo
+        recipient: data.recipientCode,
+        reference,
+        reason: data.reason || `Transfer to ${data.bankName} - ${data.accountNumber} (${data.accountName})`,
+      }),
+    })
+    const paystackData = await paystackRes.json()
+    if (!paystackData.status) {
+      return { error: paystackData.message || "Failed to initiate transfer" }
+    }
+
+    // Create a transaction record (status: pending)
     const transactionId = uuidv4()
     const { error: transactionError } = await adminClient.from("transactions").insert({
       id: transactionId,
       user_id: userId,
       amount: data.amount,
-      type: "withdrawal",
-      description: `Withdrawal to ${data.bankName} - ${data.accountNumber} (${data.accountName})`,
+      type: "transfer",
+      description: data.reason || `Transfer to ${data.bankName} - ${data.accountNumber} (${data.accountName})`,
       reference: reference,
-      status: "pending", // In a real app, this would be updated when the withdrawal is processed
+      status: "pending", // Will be updated by webhook
       created_at: new Date().toISOString(),
     })
 
     if (transactionError) {
-      console.error("Error creating transaction record:", transactionError)
       return { error: "Failed to create transaction record" }
     }
 
-    // Update the account balance
-    const newBalance = currentBalance - data.amount
+    // Do NOT update the account balance yet; wait for webhook
 
-    const { error: updateError } = await adminClient
-      .from("account_balances")
-      .update({
-        balance: newBalance,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("user_id", userId)
-
-    if (updateError) {
-      console.error("Error updating account balance:", updateError)
-      return { error: "Failed to update account balance" }
-    }
-
-    // Create activity notification
+    // Create activity notification (optional)
     try {
       await createTransactionActivityNotification({
         userId,
-        amount: -data.amount, // Negative amount for withdrawal
-        type: "withdrawal",
+        amount: -data.amount, // Negative amount for transfer
+        type: "transfer",
         reference,
-        description: `Withdrawal of ₦${data.amount.toLocaleString()} to ${data.bankName} - ${data.accountNumber}`,
+        description: `Transfer of ₦${data.amount.toLocaleString()} to ${data.bankName} - ${data.accountNumber}`,
       })
     } catch (notificationError) {
-      console.error("Error creating activity notification:", notificationError)
       // Non-blocking - continue even if notification fails
     }
 
-    // Revalidate the account and home pages to reflect the new balance
-    revalidatePath("/account/withdraw")
+    // Revalidate the account and home pages to reflect the new transaction
+    revalidatePath("/account/transfer")
     revalidatePath("/home")
     revalidatePath("/profile")
 
@@ -233,10 +240,10 @@ export async function withdrawFromAccount(data: WithdrawAccountData) {
       success: true,
       transactionId,
       reference,
-      newBalance,
+      newBalance: currentBalance, // Not updated until webhook
+      paystackTransfer: paystackData,
     }
   } catch (error) {
-    console.error("Unexpected error withdrawing from account:", error)
     return { error: "An unexpected error occurred. Please try again." }
   }
 }

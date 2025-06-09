@@ -30,7 +30,6 @@ export default async function LoansPage() {
   const { loanRequests, error } = await getUserLoanRequests()
 
   if (error) {
-    console.error("Error fetching loan requests:", error)
   }
 
   const formatCurrency = (amount: number) => {

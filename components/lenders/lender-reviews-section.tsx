@@ -28,7 +28,6 @@ export default function LenderReviewsSection({ lenderId }: LenderReviewsSectionP
         setReviews(result.data || [])
       }
     } catch (err) {
-      console.error(err)
       setError("An error occurred while loading reviews")
     } finally {
       setIsLoading(false)

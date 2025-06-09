@@ -53,7 +53,6 @@ export function UserSearch({ onSelectUser }: UserSearchProps) {
         setTotalPages(result.totalPages || 1)
       }
     } catch (err) {
-      console.error("Error fetching users:", err)
       setError("An unexpected error occurred")
     } finally {
       setLoading(false)

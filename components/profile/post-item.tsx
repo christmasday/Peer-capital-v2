@@ -64,7 +64,6 @@ export function PostItem({
         }
         router.refresh()
       } catch (error) {
-        console.error("Error deleting post:", error)
         toast({
           title: "Error",
           description: error instanceof Error ? error.message : "Failed to delete post. Please try again.",

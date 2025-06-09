@@ -61,7 +61,6 @@ export default async function UserProfilePage({
 
   // Add validation to prevent undefined userId being passed to queries
   if (!userId || userId === "undefined") {
-    console.error("Invalid user ID provided:", userId)
     notFound()
   }
 
@@ -92,7 +91,6 @@ export default async function UserProfilePage({
   const { data: profile, error } = await adminClient.from("profiles").select("*").eq("id", userId).single()
 
   if (error || !profile) {
-    console.error("Error fetching user profile:", error)
     notFound()
   }
 
@@ -120,7 +118,6 @@ export default async function UserProfilePage({
   const postsError = postsResult.error
 
   if (postsError) {
-    console.error("Error fetching posts:", postsError)
   }
 
   const user = userProfile.user

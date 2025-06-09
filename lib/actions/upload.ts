@@ -4,11 +4,9 @@ import { createAdminClient, isOfflineMode } from "@/lib/supabase/admin"
 
 export async function uploadProfilePicture(file: File): Promise<string | { error: string }> {
   try {
-    console.log("Starting profile picture upload for file:", file.name, "size:", file.size)
 
     // Check if we're in offline mode first
     if (isOfflineMode()) {
-      console.log("Upload skipped - in offline mode")
       return "/diverse-professional-profiles.png" // Return default image in offline mode
     }
 
@@ -31,12 +29,10 @@ export async function uploadProfilePicture(file: File): Promise<string | { error
         ])
 
         if (result.error) {
-          console.error("Supabase connectivity check failed:", result.error)
           // Return the placeholder URL if storage is unavailable
           return placeholderUrl
         }
       } catch (fetchError) {
-        console.error("Network error during connectivity check:", fetchError)
         return placeholderUrl
       }
 
@@ -49,7 +45,6 @@ export async function uploadProfilePicture(file: File): Promise<string | { error
         const bucketsResult = await Promise.race([supabaseAdmin.storage.listBuckets(), timeoutPromise])
 
         if (bucketsResult.error) {
-          console.error("Storage service check failed:", bucketsResult.error)
           return placeholderUrl
         }
 
@@ -57,7 +52,6 @@ export async function uploadProfilePicture(file: File): Promise<string | { error
         const profilesBucketExists = bucketsResult.data?.some((bucket) => bucket.name === "profiles")
 
         if (!profilesBucketExists) {
-          console.log("Profiles bucket doesn't exist, attempting to create it...")
           try {
             const { error: createError } = await supabaseAdmin.storage.createBucket("profiles", {
               public: true,
@@ -65,11 +59,9 @@ export async function uploadProfilePicture(file: File): Promise<string | { error
             })
 
             if (createError) {
-              console.error("Failed to create profiles bucket:", createError)
               return placeholderUrl
             }
           } catch (createError) {
-            console.error("Error creating bucket:", createError)
             return placeholderUrl
           }
         }
@@ -79,7 +71,6 @@ export async function uploadProfilePicture(file: File): Promise<string | { error
         const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`
         const filePath = `${fileName}`
 
-        console.log("Generated file path for upload:", filePath)
 
         // Convert File to ArrayBuffer
         const arrayBuffer = await file.arrayBuffer()
@@ -99,7 +90,6 @@ export async function uploadProfilePicture(file: File): Promise<string | { error
           ])
 
           if (uploadResult.error) {
-            console.error("Server error uploading file:", uploadResult.error)
             return placeholderUrl
           }
 
@@ -108,22 +98,17 @@ export async function uploadProfilePicture(file: File): Promise<string | { error
             data: { publicUrl },
           } = supabaseAdmin.storage.from("profiles").getPublicUrl(filePath)
 
-          console.log("File uploaded successfully, public URL:", publicUrl)
           return publicUrl
         } catch (uploadError) {
-          console.error("Error during upload operation:", uploadError)
           return placeholderUrl
         }
       } catch (storageError) {
-        console.error("Error accessing storage service:", storageError)
         return placeholderUrl
       }
     } catch (connectionError) {
-      console.error("Failed to connect to Supabase service:", connectionError)
       return placeholderUrl
     }
   } catch (error) {
-    console.error("Error in server upload:", error)
     return "/diverse-professional-profiles.png" // Return default image on error
   }
 }

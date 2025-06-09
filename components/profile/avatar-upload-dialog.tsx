@@ -117,7 +117,6 @@ export function AvatarUploadDialog({ userId, currentAvatarUrl, userName, childre
       })
 
       if (!bucketCheckResult.ok) {
-        console.warn("Storage bucket check failed, attempting to initialize...")
         // Try to initialize storage if bucket check fails
         await fetch("/api/storage/initialize", { method: "POST" })
       }
@@ -125,7 +124,6 @@ export function AvatarUploadDialog({ userId, currentAvatarUrl, userName, childre
       const result = await uploadProfilePicture(avatarImage)
 
       if (result.error) {
-        console.error("Profile picture upload error:", result.error)
         setError(
           result.error.includes("storage") ? "Storage system error. Please try again in a few moments." : result.error,
         )
@@ -149,7 +147,6 @@ export function AvatarUploadDialog({ userId, currentAvatarUrl, userName, childre
         router.refresh()
       }, 1500)
     } catch (err) {
-      console.error("Error uploading avatar:", err)
       setError(
         err instanceof Error ? `Upload failed: ${err.message}` : "An unexpected error occurred. Please try again.",
       )

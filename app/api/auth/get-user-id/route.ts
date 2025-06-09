@@ -23,7 +23,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ userId }, { status: 200 })
   } catch (error) {
-    console.error("Error getting user ID from token:", error)
     return NextResponse.json({ userId: null }, { status: 500 })
   }
 }

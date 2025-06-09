@@ -5,14 +5,12 @@ import { createAdminClient } from "@/lib/supabase/admin"
 // Sync users from auth.users to public.auth_users
 export async function syncAuthUsers() {
   try {
-    console.log("Starting sync of auth.users to public.auth_users")
     const supabase = createAdminClient()
 
     // Get all users from auth.users
     const { data: authUsers, error: fetchError } = await supabase.auth.admin.listUsers()
 
     if (fetchError) {
-      console.error("Error fetching auth users:", fetchError)
       return { error: `Failed to fetch auth users: ${fetchError.message}` }
     }
 
@@ -20,7 +18,6 @@ export async function syncAuthUsers() {
       return { error: "No auth users found to sync" }
     }
 
-    console.log(`Found ${authUsers.users.length} users to sync`)
 
     // Keep track of phone numbers we've already processed to avoid duplicates
     const processedPhones = new Set<string>()
@@ -38,7 +35,6 @@ export async function syncAuthUsers() {
           .maybeSingle()
 
         if (checkError) {
-          console.error(`Error checking if user ${user.id} exists:`, checkError)
           skippedCount++
           continue // Skip this user and continue with others
         }
@@ -52,7 +48,6 @@ export async function syncAuthUsers() {
           if (processedPhones.has(phoneToUse)) {
             // Phone already exists, make it unique by appending user ID suffix
             phoneToUse = `${phoneToUse}_${user.id.substring(0, 8)}`
-            console.log(`Modified duplicate phone ${user.phone} to ${phoneToUse} for user ${user.id}`)
           } else {
             // Check if phone already exists in the database
             const { data: phoneExists, error: phoneCheckError } = await supabase
@@ -63,11 +58,9 @@ export async function syncAuthUsers() {
               .maybeSingle()
 
             if (phoneCheckError) {
-              console.error(`Error checking phone uniqueness for ${user.id}:`, phoneCheckError)
             } else if (phoneExists) {
               // Phone already exists for another user, make it unique
               phoneToUse = `${phoneToUse}_${user.id.substring(0, 8)}`
-              console.log(`Modified duplicate phone ${user.phone} to ${phoneToUse} for user ${user.id}`)
             }
           }
 
@@ -104,7 +97,6 @@ export async function syncAuthUsers() {
           const { error: updateError } = await supabase.from("auth_users").update(userData).eq("id", user.id)
 
           if (updateError) {
-            console.error(`Error updating user ${user.id}:`, updateError)
             skippedCount++
             continue // Skip this user and continue with others
           }
@@ -113,17 +105,14 @@ export async function syncAuthUsers() {
           const { error: insertError } = await supabase.from("auth_users").insert(userData)
 
           if (insertError) {
-            console.error(`Error inserting user ${user.id}:`, insertError)
 
             // If it's a unique constraint violation, try one more time with null phone
             if (insertError.message.includes("unique constraint") && insertError.message.includes("phone")) {
-              console.log(`Retrying insert for user ${user.id} with null phone`)
               userData.phone = null
 
               const { error: retryError } = await supabase.from("auth_users").insert(userData)
 
               if (retryError) {
-                console.error(`Error on retry insert for user ${user.id}:`, retryError)
                 skippedCount++
                 continue // Skip this user and continue with others
               }
@@ -135,17 +124,13 @@ export async function syncAuthUsers() {
         }
 
         syncedCount++
-        console.log(`Successfully synced user ${user.id}`)
       } catch (userError) {
-        console.error(`Unexpected error processing user ${user.id}:`, userError)
         skippedCount++
       }
     }
 
-    console.log(`Successfully synced ${syncedCount} users, skipped ${skippedCount} users`)
     return { success: true, count: syncedCount, skipped: skippedCount }
   } catch (error) {
-    console.error("Unexpected error during sync:", error)
     return {
       error: `An unexpected error occurred: ${error instanceof Error ? error.message : String(error)}`,
     }
@@ -171,7 +156,6 @@ export async function getPublicAuthUsers(includeBalances = false) {
         .order("created_at", { ascending: false })
 
       if (error) {
-        console.error("Error fetching users with balances:", error)
         return { error: `Failed to fetch users: ${error.message}` }
       }
 
@@ -194,14 +178,12 @@ export async function getPublicAuthUsers(includeBalances = false) {
         .order("created_at", { ascending: false })
 
       if (error) {
-        console.error("Error fetching users:", error)
         return { error: `Failed to fetch users: ${error.message}` }
       }
 
       return { users: data }
     }
   } catch (error) {
-    console.error("Unexpected error fetching users:", error)
     return {
       error: `An unexpected error occurred: ${error instanceof Error ? error.message : String(error)}`,
     }

@@ -37,7 +37,6 @@ export default function LenderReviewForm({ lenderId, onReviewSubmitted }: Lender
         // Check if user has already reviewed this lender
         const reviewResult = await getUserReviewForLender(lenderId)
         if (reviewResult.error) {
-          console.error(reviewResult.error)
         } else if (reviewResult.data) {
           setExistingReview(reviewResult.data)
           setRating(reviewResult.data.rating)
@@ -48,7 +47,6 @@ export default function LenderReviewForm({ lenderId, onReviewSubmitted }: Lender
         // Get user's loan history with this lender
         const loansResult = await getUserLoanHistory(lenderId)
         if (loansResult.error) {
-          console.error(loansResult.error)
           setError("Failed to load loan history")
         } else if (loansResult.data) {
           setLoans(loansResult.data)
@@ -59,7 +57,6 @@ export default function LenderReviewForm({ lenderId, onReviewSubmitted }: Lender
           }
         }
       } catch (err) {
-        console.error(err)
         setError("An error occurred while loading data")
       } finally {
         setIsLoading(false)
@@ -123,7 +120,6 @@ export default function LenderReviewForm({ lenderId, onReviewSubmitted }: Lender
         setExistingReview(result.data)
       }
     } catch (err) {
-      console.error(err)
       toast({
         title: "Error",
         description: "An unexpected error occurred",

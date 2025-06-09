@@ -22,7 +22,6 @@ export default async function EditBannerPage() {
     const jwt = cookies().get("jwt-token")?.value
     // If no valid authentication is found, handle gracefully without redirecting
     if (!jwt) {
-      console.log("No session found, but continuing to render page")
       // We'll continue rendering the page and let the client-side auth in MainLayout handle redirects if needed
     }
   }

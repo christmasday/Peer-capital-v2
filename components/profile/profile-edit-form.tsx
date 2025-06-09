@@ -253,7 +253,6 @@ export function ProfileEditForm({ profile, initialTab = "personal" }: ProfileEdi
         }, 2000)
       }
     } catch (err) {
-      console.error("Error updating profile:", err)
       setError("An unexpected error occurred. Please try again.")
     } finally {
       setIsSubmitting(false)

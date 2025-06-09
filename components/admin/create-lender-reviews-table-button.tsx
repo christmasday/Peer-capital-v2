@@ -23,7 +23,6 @@ export function CreateLenderReviewsTableButton() {
         setError(message || "Failed to create lender reviews table")
       }
     } catch (err) {
-      console.error("Error creating lender reviews table:", err)
       setError("An unexpected error occurred")
     } finally {
       setIsLoading(false)

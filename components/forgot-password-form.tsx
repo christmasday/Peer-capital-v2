@@ -57,7 +57,6 @@ export function ForgotPasswordForm() {
       setSuccess(true)
     } catch (err) {
       setError("An unexpected error occurred. Please try again.")
-      console.error(err)
     } finally {
       setIsLoading(false)
     }

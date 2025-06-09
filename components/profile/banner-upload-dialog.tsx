@@ -166,7 +166,6 @@ export function BannerUploadDialog({ userId, currentBannerUrl, children }: Banne
         router.refresh()
       }, 1500)
     } catch (err) {
-      console.error("Error uploading banner:", err)
       setError("An unexpected error occurred. Please try again.")
     } finally {
       setIsUploading(false)
@@ -202,7 +201,6 @@ export function BannerUploadDialog({ userId, currentBannerUrl, children }: Banne
         router.refresh()
       }, 1500)
     } catch (err) {
-      console.error("Error selecting banner:", err)
       setError("An unexpected error occurred. Please try again.")
     } finally {
       setIsSelecting(false)

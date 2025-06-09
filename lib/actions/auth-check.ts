@@ -34,7 +34,6 @@ export async function checkAuthStatus() {
         }
       }
     } catch (error) {
-      console.error("Error checking Supabase session:", error)
     }
 
     // Check for custom auth token
@@ -56,14 +55,12 @@ export async function checkAuthStatus() {
           }
         }
       } catch (error) {
-        console.error("Error checking custom auth token:", error)
       }
     }
 
     // If we get here, user is not authenticated
     return { authenticated: false }
   } catch (error) {
-    console.error("Error in checkAuthStatus:", error)
     return { authenticated: false, error: String(error) }
   }
 }

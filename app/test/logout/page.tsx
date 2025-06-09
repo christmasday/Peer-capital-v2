@@ -63,7 +63,6 @@ export default function LogoutTest() {
         }
         setActiveAuthMethod(method)
       } catch (error) {
-        console.error("Error collecting auth data:", error)
       }
     }
 

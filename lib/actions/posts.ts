@@ -30,12 +30,10 @@ async function getCurrentUserId() {
         }
       }
     } catch (jwtError) {
-      console.error("Error verifying JWT:", jwtError)
     }
 
     return null
   } catch (error) {
-    console.error("Error in getCurrentUserId:", error)
     return null
   }
 }
@@ -52,7 +50,6 @@ export async function createPost(formData: FormData) {
       try {
         imageSizes = JSON.parse(imageSizesJson)
       } catch (e) {
-        console.error("Error parsing image sizes:", e)
       }
     }
 
@@ -79,12 +76,10 @@ export async function createPost(formData: FormData) {
         .eq("table_name", "posts")
 
       if (countError) {
-        console.error("Error checking if posts table exists:", countError)
       }
 
       // If the table doesn't exist, create it
       if (!count || count === 0) {
-        console.log("Posts table doesn't exist, creating it...")
 
         // Create the table using raw SQL
         const { error: createError } = await adminClient.from("_temp_create_posts").select("*").limit(1)
@@ -125,14 +120,12 @@ export async function createPost(formData: FormData) {
           const { error: pgError } = await adminClient.rpc("pgSQL", { query: createTableQuery })
 
           if (pgError) {
-            console.error("Error creating posts table:", pgError)
             // Try alternative method if this fails
             // This is a fallback and might not work in all environments
           }
         }
       }
     } catch (tableError) {
-      console.error("Error ensuring posts table exists:", tableError)
       // Continue anyway, the table might already exist
     }
 
@@ -152,7 +145,6 @@ export async function createPost(formData: FormData) {
     })
 
     if (insertError) {
-      console.error("Error creating post:", insertError)
       return { error: insertError.message }
     }
 
@@ -166,7 +158,6 @@ export async function createPost(formData: FormData) {
         resourceType: "post",
       })
     } catch (notificationError) {
-      console.error("Error creating post notification:", notificationError)
       // Non-blocking - continue even if notification fails
     }
 
@@ -180,7 +171,6 @@ export async function createPost(formData: FormData) {
       message: "Post created successfully",
     }
   } catch (error) {
-    console.error("Unexpected error creating post:", error)
     return { error: "An unexpected error occurred. Please try again." }
   }
 }
@@ -192,7 +182,6 @@ export async function getUserPosts(userId: string, limit = 10, offset = 0) {
       return { error: "User ID is required", posts: [] }
     }
 
-    console.log(`Fetching posts for user ${userId}, limit: ${limit}, offset: ${offset}`)
 
     const adminClient = createAdminClient()
 
@@ -208,18 +197,14 @@ export async function getUserPosts(userId: string, limit = 10, offset = 0) {
       if (error) {
         // If the error is because the table doesn't exist, return an empty array
         if (error.message.includes("relation") && error.message.includes("does not exist")) {
-          console.log("Posts table doesn't exist yet")
           return { posts: [] }
         }
 
-        console.error("Error fetching posts:", error)
         return { error: error.message, posts: [] }
       }
 
-      console.log(`Found ${posts?.length || 0} posts for user ${userId}`)
       return { posts: posts || [] }
     } catch (error) {
-      console.error("Error in direct query:", error)
       // Continue to fallback method
     }
 
@@ -233,13 +218,11 @@ export async function getUserPosts(userId: string, limit = 10, offset = 0) {
         .eq("table_name", "posts")
 
       if (countError) {
-        console.error("Error checking if posts table exists:", countError)
         return { error: "Error checking if posts table exists", posts: [] }
       }
 
       // If the table doesn't exist, return an empty array
       if (!count || count === 0) {
-        console.log("Posts table doesn't exist")
         return { posts: [] }
       }
 
@@ -252,18 +235,14 @@ export async function getUserPosts(userId: string, limit = 10, offset = 0) {
         .range(offset, offset + limit - 1)
 
       if (error) {
-        console.error("Error fetching posts in fallback:", error)
         return { error: error.message, posts: [] }
       }
 
-      console.log(`Found ${posts?.length || 0} posts for user ${userId} in fallback`)
       return { posts: posts || [] }
     } catch (fallbackError) {
-      console.error("Error in fallback method:", fallbackError)
       return { error: "Error fetching posts", posts: [] }
     }
   } catch (error) {
-    console.error("Unexpected error fetching posts:", error)
     return { error: "An unexpected error occurred. Please try again.", posts: [] }
   }
 }
@@ -291,7 +270,6 @@ export async function deletePost(postId: string) {
       .single()
 
     if (fetchError) {
-      console.error("Error fetching post:", fetchError)
       return { error: fetchError.message }
     }
 
@@ -307,7 +285,6 @@ export async function deletePost(postId: string) {
     const { error: deleteError } = await adminClient.from("posts").delete().eq("id", postId)
 
     if (deleteError) {
-      console.error("Error deleting post:", deleteError)
       return { error: deleteError.message }
     }
 
@@ -326,7 +303,6 @@ export async function deletePost(postId: string) {
           const { error: storageError } = await supabase.storage.from("images").remove([path])
 
           if (storageError) {
-            console.error("Error deleting image from storage:", storageError)
             // Non-blocking - continue even if image deletion fails
           }
         }
@@ -346,7 +322,6 @@ export async function deletePost(postId: string) {
                   pathsToDelete.push(sizePathMatch[1])
                 }
               } catch (e) {
-                console.error("Error parsing size URL:", e)
               }
             }
           }
@@ -355,12 +330,10 @@ export async function deletePost(postId: string) {
             const { error: bulkDeleteError } = await supabase.storage.from("images").remove(pathsToDelete)
 
             if (bulkDeleteError) {
-              console.error("Error deleting image size variants:", bulkDeleteError)
             }
           }
         }
       } catch (storageError) {
-        console.error("Error processing image deletion:", storageError)
         // Non-blocking - continue even if image deletion fails
       }
     }
@@ -374,7 +347,6 @@ export async function deletePost(postId: string) {
       message: "Post deleted successfully",
     }
   } catch (error) {
-    console.error("Unexpected error deleting post:", error)
     return { error: "An unexpected error occurred. Please try again." }
   }
 }

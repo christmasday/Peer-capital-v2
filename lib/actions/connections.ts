@@ -15,13 +15,11 @@ async function getUserProfileInfo(userId: string) {
       .single()
 
     if (error) {
-      console.error("Error getting user profile info:", error)
       return null
     }
 
     return data
   } catch (error) {
-    console.error("Error getting user profile info:", error)
     return null
   }
 }
@@ -33,13 +31,11 @@ async function checkProfileExists(userId: string) {
     const { data, error } = await adminClient.from("profiles").select("id").eq("id", userId).single()
 
     if (error) {
-      console.error("Error checking if profile exists:", error)
       return false
     }
 
     return !!data
   } catch (error) {
-    console.error("Error checking if profile exists:", error)
     return false
   }
 }
@@ -61,12 +57,10 @@ async function checkTableExists() {
     // If there's any other error, log it but assume the table exists
     // to avoid blocking functionality unnecessarily
     if (error) {
-      console.error("Error checking if table exists:", error)
     }
 
     return true
   } catch (error) {
-    console.error("Unexpected error checking if table exists:", error)
     return false
   }
 }
@@ -115,7 +109,6 @@ export async function followUser(followingId: string) {
 
     if (checkError && checkError.code !== "PGRST116") {
       // PGRST116 means no rows returned, which is expected if not following
-      console.error("Error checking existing connection:", checkError)
       return { error: "Failed to check if already following" }
     }
 
@@ -132,7 +125,6 @@ export async function followUser(followingId: string) {
         .eq("id", existingConnection.id)
 
       if (updateError) {
-        console.error("Error updating connection:", updateError)
         return { error: "Failed to update connection" }
       }
     } else {
@@ -144,7 +136,6 @@ export async function followUser(followingId: string) {
       })
 
       if (insertError) {
-        console.error("Error creating connection:", insertError)
         if (insertError.message && insertError.message.includes("violates foreign key constraint")) {
           return {
             error:
@@ -178,7 +169,6 @@ export async function followUser(followingId: string) {
         }
       } catch (notificationError) {
         // Log the error but don't fail the follow action
-        console.error("Error creating follow notification:", notificationError)
       }
     }
 
@@ -188,7 +178,6 @@ export async function followUser(followingId: string) {
 
     return { success: true }
   } catch (error) {
-    console.error("Unexpected error following user:", error)
     return { error: "An unexpected error occurred" }
   }
 }
@@ -218,7 +207,6 @@ export async function unfollowUser(followingId: string) {
       .eq("following_id", followingId)
 
     if (error) {
-      console.error("Error unfollowing user:", error)
       return { error: "Failed to unfollow user" }
     }
 
@@ -228,7 +216,6 @@ export async function unfollowUser(followingId: string) {
 
     return { success: true }
   } catch (error) {
-    console.error("Unexpected error unfollowing user:", error)
     return { error: "An unexpected error occurred" }
   }
 }
@@ -261,13 +248,11 @@ export async function isFollowingUser(followingId: string) {
 
     if (error && error.code !== "PGRST116") {
       // PGRST116 means no rows returned, which is expected if not following
-      console.error("Error checking if following:", error)
       return { error: "Failed to check if following" }
     }
 
     return { following: !!data }
   } catch (error) {
-    console.error("Unexpected error checking if following:", error)
     return { error: "An unexpected error occurred" }
   }
 }
@@ -289,13 +274,11 @@ export async function getFollowersCount(userId: string) {
       .eq("status", "active")
 
     if (error) {
-      console.error("Error getting followers count:", error)
       return { error: "Failed to get followers count" }
     }
 
     return { count }
   } catch (error) {
-    console.error("Unexpected error getting followers count:", error)
     return { error: "An unexpected error occurred" }
   }
 }
@@ -317,13 +300,11 @@ export async function getFollowingCount(userId: string) {
       .eq("status", "active")
 
     if (error) {
-      console.error("Error getting following count:", error)
       return { error: "Failed to get following count" }
     }
 
     return { count }
   } catch (error) {
-    console.error("Unexpected error getting following count:", error)
     return { error: "An unexpected error occurred" }
   }
 }
@@ -349,7 +330,6 @@ export async function getFollowers(userId: string, page = 1, limit = 10) {
       .range(offset, offset + limit - 1)
 
     if (connectionsError) {
-      console.error("Error getting followers connections:", connectionsError)
       return { error: "Failed to get followers" }
     }
 
@@ -367,7 +347,6 @@ export async function getFollowers(userId: string, page = 1, limit = 10) {
       .in("id", followerIds)
 
     if (profilesError) {
-      console.error("Error getting follower profiles:", profilesError)
       return { error: "Failed to get follower profiles" }
     }
 
@@ -393,7 +372,6 @@ export async function getFollowers(userId: string, page = 1, limit = 10) {
 
     return { followers }
   } catch (error) {
-    console.error("Unexpected error getting followers:", error)
     return { error: "An unexpected error occurred" }
   }
 }
@@ -419,7 +397,6 @@ export async function getFollowing(userId: string, page = 1, limit = 10) {
       .range(offset, offset + limit - 1)
 
     if (connectionsError) {
-      console.error("Error getting following connections:", connectionsError)
       return { error: "Failed to get following" }
     }
 
@@ -437,7 +414,6 @@ export async function getFollowing(userId: string, page = 1, limit = 10) {
       .in("id", followingIds)
 
     if (profilesError) {
-      console.error("Error getting following profiles:", profilesError)
       return { error: "Failed to get following profiles" }
     }
 
@@ -463,7 +439,6 @@ export async function getFollowing(userId: string, page = 1, limit = 10) {
 
     return { following }
   } catch (error) {
-    console.error("Unexpected error getting following:", error)
     return { error: "An unexpected error occurred" }
   }
 }

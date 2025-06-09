@@ -51,7 +51,6 @@ export function AuthStatusProvider({ children }: { children: React.ReactNode }) 
               }
             }
           } catch (e) {
-            console.error("Error parsing JWT:", e)
           }
         }
 
@@ -75,7 +74,6 @@ export function AuthStatusProvider({ children }: { children: React.ReactNode }) 
           })
         }
       } catch (error) {
-        console.error("Error checking auth status:", error)
         setAuthStatus({
           isAuthenticated: false,
           userId: null,

@@ -15,7 +15,6 @@ export async function POST() {
       message: `Successfully synced ${result.count} users`,
     })
   } catch (error) {
-    console.error("Error in sync API route:", error)
     return NextResponse.json(
       {
         success: false,

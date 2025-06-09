@@ -26,7 +26,6 @@ export function EnsureAdminAuditLogsTableButton() {
         })
       }
     } catch (error) {
-      console.error("Error creating admin audit logs table:", error)
       toast({
         title: "Error",
         description: "An unexpected error occurred",

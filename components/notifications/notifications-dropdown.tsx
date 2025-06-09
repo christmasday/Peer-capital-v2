@@ -48,10 +48,8 @@ export function NotificationsDropdown({ open, onOpenChange, onNotificationRead }
         setNotifications(result.notifications || [])
         setUnreadCount(result.unreadCount || 0)
       } else {
-        console.error("Error fetching notifications:", result.error)
       }
     } catch (error) {
-      console.error("Error fetching notifications:", error)
     } finally {
       setLoading(false)
     }
@@ -101,7 +99,6 @@ export function NotificationsDropdown({ open, onOpenChange, onNotificationRead }
         })
         fetchNotifications()
       } else {
-        console.error("Error marking all as read:", result.error)
         toast({
           title: "Error",
           description: "Failed to mark all notifications as read",
@@ -109,7 +106,6 @@ export function NotificationsDropdown({ open, onOpenChange, onNotificationRead }
         })
       }
     } catch (error) {
-      console.error("Error marking all notifications as read:", error)
       toast({
         title: "Error",
         description: "Failed to mark all notifications as read",

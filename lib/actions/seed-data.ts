@@ -76,13 +76,11 @@ export async function seedTransactionData(userId: string) {
     const { error } = await supabaseAdmin.from("transactions").insert(transactions)
 
     if (error) {
-      console.error("Error seeding transactions:", error)
       return { error: error.message }
     }
 
     return { success: true }
   } catch (error) {
-    console.error("Unexpected error seeding transactions:", error)
     return { error: "An unexpected error occurred. Please try again." }
   }
 }
@@ -141,13 +139,11 @@ export async function seedLoanRequestData(userId: string) {
     const { error } = await supabaseAdmin.from("loan_requests").insert(loanRequests)
 
     if (error) {
-      console.error("Error seeding loan requests:", error)
       return { error: error.message }
     }
 
     return { success: true }
   } catch (error) {
-    console.error("Unexpected error seeding loan requests:", error)
     return { error: "An unexpected error occurred. Please try again." }
   }
 }

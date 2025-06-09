@@ -24,7 +24,6 @@ export async function POST(request: NextRequest) {
       refreshed: result.refreshed,
     })
   } catch (error) {
-    console.error("Error in refresh token API:", error)
     return NextResponse.json({ error: "An unexpected error occurred" }, { status: 500 })
   }
 }

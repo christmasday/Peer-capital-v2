@@ -15,17 +15,13 @@ export function useJWTRefresh() {
         // Check if token is expired or about to expire (within 5 minutes)
         if (isJWTExpired(jwt, 300)) {
           // 300 seconds = 5 minutes
-          console.log("JWT is expired or about to expire, refreshing...")
           const result = await refreshJWT(jwt)
 
           if (result.error) {
-            console.error("Failed to refresh JWT:", result.error)
           } else if (result.success) {
-            console.log("JWT refreshed successfully")
           }
         }
       } catch (error) {
-        console.error("Error in JWT refresh check:", error)
       }
     }
 

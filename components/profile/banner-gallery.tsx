@@ -92,7 +92,6 @@ export function BannerGallery({ currentBannerId }: BannerGalleryProps) {
         router.refresh()
       }, 2000)
     } catch (err) {
-      console.error("Error selecting banner:", err)
       setError("An unexpected error occurred. Please try again.")
     } finally {
       setIsSubmitting(false)

@@ -42,7 +42,6 @@ export async function createActivityNotification({
 
     return result
   } catch (error) {
-    console.error("Error creating activity notification:", error)
     return { success: false, error }
   }
 }

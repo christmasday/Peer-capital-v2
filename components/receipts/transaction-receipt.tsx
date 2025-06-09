@@ -92,7 +92,6 @@ export function TransactionReceipt({ transaction, onDownload }: TransactionRecei
         onDownload()
       }
     } catch (error) {
-      console.error("Error generating PDF:", error)
       toast({
         title: "Error generating receipt",
         description: "There was an error generating your receipt. Please try again.",

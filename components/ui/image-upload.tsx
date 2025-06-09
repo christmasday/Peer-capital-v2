@@ -90,7 +90,6 @@ export function ImageUpload({
         onChange(data.url)
       }
     } catch (error) {
-      console.error("Error uploading image:", error)
       setPreview(null)
       onChange(null, null)
       alert("Failed to upload image. Please try again.")

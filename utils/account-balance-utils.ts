@@ -9,7 +9,6 @@ export async function getAccountBalance(userId: string) {
     const { data, error } = await adminClient.from("account_balances").select("*").eq("user_id", userId).single()
 
     if (error) {
-      console.error("Error fetching account balance:", error)
       return { balance: 0, loan_balance: 0 }
     }
 
@@ -18,7 +17,6 @@ export async function getAccountBalance(userId: string) {
       loan_balance: data.loan_balance || 0,
     }
   } catch (error) {
-    console.error("Unexpected error fetching account balance:", error)
     return { balance: 0, loan_balance: 0 }
   }
 }
@@ -38,7 +36,6 @@ export async function getCurrentUserAccountBalance() {
 
     return getAccountBalance(session.user.id)
   } catch (error) {
-    console.error("Unexpected error fetching current user account balance:", error)
     return { balance: 0, loan_balance: 0 }
   }
 }

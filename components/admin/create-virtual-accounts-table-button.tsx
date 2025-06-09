@@ -28,7 +28,6 @@ export function CreateVirtualAccountsTableButton() {
         })
       }
     } catch (error) {
-      console.error("Error creating virtual accounts table:", error)
       toast({
         title: "Error",
         description: "An unexpected error occurred",

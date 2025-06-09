@@ -53,7 +53,6 @@ export async function findLenders({ loanAmount, loanDuration }: LenderSearchPara
       .eq("follower_id", currentUserId)
       .eq("status", "active");
     if (followingError) {
-      console.error("Error fetching following connections:", followingError);
       return { lenders: [], error: "Failed to get your following list." };
     }
     const followingIds = (followingConnections || []).map((conn: { following_id: string }) => conn.following_id);
@@ -79,7 +78,6 @@ export async function findLenders({ loanAmount, loanDuration }: LenderSearchPara
     const { data: helpers, error } = await query;
 
     if (error) {
-      console.error("Error finding lenders:", error)
       return { lenders: [], error: "Failed to find lenders" }
     }
 
@@ -105,12 +103,10 @@ export async function findLenders({ loanAmount, loanDuration }: LenderSearchPara
         const { data: adminLenderSettings, error: adminError } = await adminQuery
 
         if (adminError) {
-          console.error("Admin error finding lenders:", adminError)
         } else if (adminLenderSettings) {
           finalHelpers = adminLenderSettings
         }
       } catch (adminErr) {
-        console.error("Error using admin client:", adminErr)
       }
     }
 
@@ -138,13 +134,11 @@ export async function findLenders({ loanAmount, loanDuration }: LenderSearchPara
           .eq("id", userId)
 
         if (profileError) {
-          console.error(`Error getting profile for user ${userId}:`, profileError)
           continue
         }
 
         // Skip if no profile found
         if (!profileDataArray || profileDataArray.length === 0) {
-          console.log(`No profile found for user ${userId}, skipping`)
           continue
         }
 
@@ -152,7 +146,6 @@ export async function findLenders({ loanAmount, loanDuration }: LenderSearchPara
 
         // Skip if no name information
         if (!profileData.first_name && !profileData.last_name) {
-          console.log(`No name information for user ${userId}, skipping`)
           continue
         }
 
@@ -165,7 +158,6 @@ export async function findLenders({ loanAmount, loanDuration }: LenderSearchPara
           .limit(1)
 
         if (maxLoanError) {
-          console.error(`Error getting max loan for user ${userId}:`, maxLoanError)
         }
 
         // Get loan count - total number of loans issued
@@ -176,7 +168,6 @@ export async function findLenders({ loanAmount, loanDuration }: LenderSearchPara
           .eq("status", "approved")
 
         if (countError) {
-          console.error(`Error getting loan count for user ${userId}:`, countError)
         }
 
         // Get total amount issued
@@ -187,7 +178,6 @@ export async function findLenders({ loanAmount, loanDuration }: LenderSearchPara
           .eq("status", "approved")
 
         if (totalAmountError) {
-          console.error(`Error getting total amount for user ${userId}:`, totalAmountError)
         }
 
         // Calculate total amount issued
@@ -205,7 +195,6 @@ export async function findLenders({ loanAmount, loanDuration }: LenderSearchPara
           .eq("user_id", userId)
 
         if (ratingError) {
-          console.error(`Error getting ratings for user ${userId}:`, ratingError)
         }
 
         // Calculate average rating
@@ -225,7 +214,6 @@ export async function findLenders({ loanAmount, loanDuration }: LenderSearchPara
           .eq("id", userId)
           .maybeSingle()
         if (lenderProfileError) {
-          console.error(`Error fetching lender profile for user ${userId}:`, lenderProfileError)
           continue
         }
         // Check if profile is complete (basic fields filled)
@@ -249,7 +237,6 @@ export async function findLenders({ loanAmount, loanDuration }: LenderSearchPara
           repayment_unit: repaymentUnit,
         })
       } catch (profileErr) {
-        console.error(`Error processing profile for user ${helper?.user_id || 'unknown'}:`, profileErr)
       }
     }
 
@@ -270,7 +257,6 @@ export async function findLenders({ loanAmount, loanDuration }: LenderSearchPara
 
     return { lenders: lenders, error: null }
   } catch (error) {
-    console.error("Unexpected error finding lenders:", error)
     return { lenders: [], error: "An unexpected error occurred" }
   }
 }

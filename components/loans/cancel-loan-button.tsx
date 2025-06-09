@@ -31,13 +31,11 @@ export function CancelLoanButton({ loanId }: CancelLoanButtonProps) {
       const result = await cancelLoanRequest(loanId)
 
       if (result.error) {
-        console.error("Error cancelling loan request:", result.error)
       }
 
       setIsOpen(false)
       router.refresh()
     } catch (error) {
-      console.error("Unexpected error cancelling loan request:", error)
     } finally {
       setIsLoading(false)
     }

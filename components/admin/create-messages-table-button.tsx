@@ -15,7 +15,6 @@ export function CreateMessagesTableButton() {
       const migrationResult = await executeMigrationFromFile("create-messages-table.sql")
       setResult(migrationResult)
     } catch (error) {
-      console.error("Error executing migration:", error)
       setResult({ error: "An unexpected error occurred" })
     } finally {
       setIsLoading(false)

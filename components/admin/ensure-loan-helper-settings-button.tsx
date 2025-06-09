@@ -28,7 +28,6 @@ export function EnsureLoanHelperSettingsButton() {
         })
       }
     } catch (error) {
-      console.error("Error creating loan helper settings table:", error)
       toast({
         title: "Error",
         description: "An unexpected error occurred.",

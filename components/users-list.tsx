@@ -33,7 +33,6 @@ export function UsersList() {
         setUsers(result.users || [])
       }
     } catch (err) {
-      console.error("Error loading users:", err)
       setError("An unexpected error occurred")
     } finally {
       setLoading(false)

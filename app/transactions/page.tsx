@@ -25,7 +25,6 @@ export default async function TransactionsPage() {
   const { transactions, error } = await getUserTransactions()
 
   if (error) {
-    console.error("Error fetching transactions:", error)
   }
 
   const formatCurrency = (amount: number) => {

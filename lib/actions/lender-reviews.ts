@@ -54,7 +54,6 @@ export async function submitLenderReview(formData: FormData) {
     .in("status", ["approved", "completed", "active", "repaid"])
 
   if (loansError) {
-    console.error("Error checking loans:", loansError)
     return { error: "Failed to verify loan history" }
   }
 
@@ -72,7 +71,6 @@ export async function submitLenderReview(formData: FormData) {
     .maybeSingle()
 
   if (reviewError) {
-    console.error("Error checking existing review:", reviewError)
     return { error: "Failed to check existing reviews" }
   }
 
@@ -104,7 +102,6 @@ export async function submitLenderReview(formData: FormData) {
   }
 
   if (result.error) {
-    console.error("Error submitting review:", result.error)
     return { error: "Failed to submit review" }
   }
 
@@ -136,7 +133,6 @@ export async function submitLenderReview(formData: FormData) {
       message: notificationMessage,
     })
   } catch (error) {
-    console.error("Error creating notification:", error)
     // Don't fail the review submission if notification fails
   }
 
@@ -163,7 +159,6 @@ export async function getLenderReviews(lenderId: string) {
     .order("created_at", { ascending: false })
 
   if (error) {
-    console.error("Error fetching lender reviews:", error)
     return { error: "Failed to fetch reviews" }
   }
 
@@ -188,7 +183,6 @@ export async function getUserReviewForLender(lenderId: string) {
     .maybeSingle()
 
   if (error) {
-    console.error("Error fetching user review:", error)
     return { error: "Failed to fetch review" }
   }
 
@@ -214,7 +208,6 @@ export async function getUserLoanHistory(lenderId: string) {
     .order("created_at", { ascending: false })
 
   if (error) {
-    console.error("Error fetching loan history:", error)
     return { error: "Failed to fetch loan history" }
   }
 

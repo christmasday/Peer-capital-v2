@@ -54,7 +54,6 @@ export default function PaymentCallbackPage() {
           setMessage(data.error || "Failed to verify payment. Please contact support.")
         }
       } catch (error) {
-        console.error("Error verifying payment:", error)
         setStatus("error")
         setMessage("An unexpected error occurred. Please check your transaction history or contact support.")
       }

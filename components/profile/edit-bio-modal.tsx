@@ -58,7 +58,6 @@ export function EditBioModal({ isOpen, onClose, currentBio, userId, onBioUpdated
       onBioUpdated(bio.trim())
       onClose()
     } catch (error) {
-      console.error("Error updating bio:", error)
       toast({
         title: "Error",
         description: "Failed to update bio. Please try again.",

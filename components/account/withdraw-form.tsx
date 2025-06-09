@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
@@ -12,54 +12,25 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { withdrawFromAccount } from "@/lib/actions/account"
+import { withdrawFromAccount, transferFromAccount } from "@/lib/actions/account"
 import { ReceiptModal } from "@/components/receipts/receipt-modal"
-
-// Nigerian banks for the dropdown
-const NIGERIAN_BANKS = [
-  { name: "Access Bank", code: "044" },
-  { name: "Citibank", code: "023" },
-  { name: "Diamond Bank", code: "063" },
-  { name: "Ecobank", code: "050" },
-  { name: "Fidelity Bank", code: "070" },
-  { name: "First Bank", code: "011" },
-  { name: "First City Monument Bank", code: "214" },
-  { name: "Guaranty Trust Bank", code: "058" },
-  { name: "Heritage Bank", code: "030" },
-  { name: "Keystone Bank", code: "082" },
-  { name: "Polaris Bank", code: "076" },
-  { name: "Stanbic IBTC Bank", code: "221" },
-  { name: "Standard Chartered Bank", code: "068" },
-  { name: "Sterling Bank", code: "232" },
-  { name: "Union Bank", code: "032" },
-  { name: "United Bank for Africa", code: "033" },
-  { name: "Unity Bank", code: "215" },
-  { name: "Wema Bank", code: "035" },
-  { name: "Zenith Bank", code: "057" },
-]
 
 // Form schema
 const formSchema = z.object({
   amount: z
     .number()
-    .min(1000, "Minimum withdrawal amount is ₦1,000")
-    .max(1000000, "Maximum withdrawal amount is ₦1,000,000"),
-  bankName: z.string().min(1, "Please select a bank"),
-  accountNumber: z
-    .string()
-    .min(10, "Account number must be 10 digits")
-    .max(10, "Account number must be 10 digits")
-    .regex(/^\d+$/, "Account number must contain only digits"),
-  accountName: z.string().min(3, "Please enter the account name"),
+    .min(1000, "Minimum transfer amount is ₦1,000")
+    .max(1000000, "Maximum transfer amount is ₦1,000,000"),
+  beneficiaryId: z.string().min(1, "Please select a beneficiary"),
 })
 
 type FormValues = z.infer<typeof formSchema>
 
-interface WithdrawFormProps {
+interface TransferFormProps {
   currentBalance: number
 }
 
-export function WithdrawForm({ currentBalance }: WithdrawFormProps) {
+export function TransferForm({ currentBalance }: TransferFormProps) {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -81,6 +52,30 @@ export function WithdrawForm({ currentBalance }: WithdrawFormProps) {
     fee?: number
   } | null>(null)
 
+  // State for beneficiaries
+  const [beneficiaries, setBeneficiaries] = useState<any[]>([])
+  const [beneficiariesLoading, setBeneficiariesLoading] = useState(true)
+  const [beneficiariesError, setBeneficiariesError] = useState<string | null>(null)
+
+  // Fetch beneficiaries from API
+  useEffect(() => {
+    async function fetchBeneficiaries() {
+      setBeneficiariesLoading(true)
+      setBeneficiariesError(null)
+      try {
+        const res = await fetch("/api/beneficiaries", { credentials: "include" })
+        if (!res.ok) throw new Error("Failed to fetch beneficiaries")
+        const data = await res.json()
+        setBeneficiaries(data.beneficiaries || [])
+      } catch (err) {
+        setBeneficiariesError("Could not load beneficiaries list")
+      } finally {
+        setBeneficiariesLoading(false)
+      }
+    }
+    fetchBeneficiaries()
+  }, [])
+
   // Format currency
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-NG", {
@@ -95,16 +90,14 @@ export function WithdrawForm({ currentBalance }: WithdrawFormProps) {
     resolver: zodResolver(formSchema),
     defaultValues: {
       amount: undefined,
-      bankName: "",
-      accountNumber: "",
-      accountName: "",
+      beneficiaryId: "",
     },
   })
 
   // Watch amount for fee calculation
   const amount = form.watch("amount")
 
-  // Calculate withdrawal fee (0.5% with a minimum of ₦100)
+  // Calculate transfer fee (0.5% with a minimum of ₦100)
   const calculateFee = () => {
     if (!amount) return 0
     const fee = Math.max(amount * 0.005, 100)
@@ -114,6 +107,10 @@ export function WithdrawForm({ currentBalance }: WithdrawFormProps) {
   const fee = calculateFee()
   const totalAmount = amount ? amount + fee : 0
 
+  // Find selected beneficiary
+  const beneficiaryId = form.watch("beneficiaryId")
+  const selectedBeneficiary = beneficiaries.find(b => b.id === beneficiaryId)
+
   // Handle form submission
   async function onSubmit(values: FormValues) {
     try {
@@ -122,16 +119,22 @@ export function WithdrawForm({ currentBalance }: WithdrawFormProps) {
 
       // Check if amount is greater than current balance
       if (values.amount > currentBalance) {
-        setError("Insufficient balance for this withdrawal")
+        setError("Insufficient balance for this transfer")
         return
       }
 
-      // Submit withdrawal request
-      const result = await withdrawFromAccount({
+      if (!selectedBeneficiary) {
+        setError("Please select a beneficiary")
+        return
+      }
+
+      // Submit transfer request
+      const result = await transferFromAccount({
         amount: values.amount,
-        bankName: values.bankName,
-        accountNumber: values.accountNumber,
-        accountName: values.accountName,
+        bankName: selectedBeneficiary.bank_name,
+        accountNumber: selectedBeneficiary.account_number,
+        accountName: selectedBeneficiary.account_name,
+        recipientCode: selectedBeneficiary.recipient_code,
       })
 
       if (result.error) {
@@ -145,15 +148,15 @@ export function WithdrawForm({ currentBalance }: WithdrawFormProps) {
         id: result.transactionId || "",
         reference: result.reference || "",
         amount: values.amount,
-        type: "withdrawal",
-        description: `Withdrawal to ${values.bankName} - ${values.accountNumber} (${values.accountName})`,
+        type: "transfer",
+        description: `Transfer to ${selectedBeneficiary.bank_name} - ${selectedBeneficiary.account_number} (${selectedBeneficiary.account_name})`,
         status: "pending",
         created_at: new Date().toISOString(),
         newBalance: result.newBalance || 0,
         recipient: {
-          bankName: values.bankName,
-          accountNumber: values.accountNumber,
-          accountName: values.accountName,
+          bankName: selectedBeneficiary.bank_name,
+          accountNumber: selectedBeneficiary.account_number,
+          accountName: selectedBeneficiary.account_name,
         },
         fee: fee,
       })
@@ -161,7 +164,6 @@ export function WithdrawForm({ currentBalance }: WithdrawFormProps) {
       // Reset form
       form.reset()
     } catch (err) {
-      console.error("Error submitting withdrawal:", err)
       setError("An unexpected error occurred. Please try again.")
     } finally {
       setIsSubmitting(false)
@@ -176,8 +178,8 @@ export function WithdrawForm({ currentBalance }: WithdrawFormProps) {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <CardTitle>Withdraw Funds</CardTitle>
-            <CardDescription>Withdraw money from your Peer Capital account</CardDescription>
+            <CardTitle>Transfer Funds</CardTitle>
+            <CardDescription>Transfer money from your Peer Capital account</CardDescription>
           </div>
         </div>
       </CardHeader>
@@ -194,9 +196,9 @@ export function WithdrawForm({ currentBalance }: WithdrawFormProps) {
           <div className="space-y-6">
             <Alert className="bg-green-50 border-green-200">
               <CheckCircle className="h-4 w-4 text-green-600" />
-              <AlertTitle className="text-green-800">Withdrawal Successful</AlertTitle>
+              <AlertTitle className="text-green-800">Transfer Successful</AlertTitle>
               <AlertDescription className="text-green-700">
-                Your withdrawal request has been submitted successfully. It will be processed within 24 hours.
+                Your transfer request has been submitted successfully. It will be processed within 24 hours.
               </AlertDescription>
             </Alert>
 
@@ -245,7 +247,7 @@ export function WithdrawForm({ currentBalance }: WithdrawFormProps) {
                 name="amount"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Amount to Withdraw</FormLabel>
+                    <FormLabel>Amount to Transfer</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
@@ -264,20 +266,20 @@ export function WithdrawForm({ currentBalance }: WithdrawFormProps) {
 
               <FormField
                 control={form.control}
-                name="bankName"
+                name="beneficiaryId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Bank</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormLabel>Beneficiary</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={beneficiariesLoading || !!beneficiariesError}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select your bank" />
+                          <SelectValue placeholder={beneficiariesLoading ? "Loading beneficiaries..." : beneficiariesError ? beneficiariesError : "Select a beneficiary"} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {NIGERIAN_BANKS.map((bank) => (
-                          <SelectItem key={bank.code} value={bank.name}>
-                            {bank.name}
+                        {beneficiaries.map((b) => (
+                          <SelectItem key={b.id} value={b.id}>
+                            {b.bank_name} - {b.account_number} ({b.account_name})
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -287,39 +289,11 @@ export function WithdrawForm({ currentBalance }: WithdrawFormProps) {
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="accountNumber"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Account Number</FormLabel>
-                    <FormControl>
-                      <Input type="text" placeholder="Enter 10-digit account number" {...field} maxLength={10} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="accountName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Account Name</FormLabel>
-                    <FormControl>
-                      <Input type="text" placeholder="Enter account name" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
               {amount > 0 && (
                 <div className="bg-gray-50 p-4 rounded-lg space-y-3">
                   <h3 className="font-medium text-gray-900">Transaction Summary</h3>
                   <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div className="text-gray-500">Withdrawal Amount:</div>
+                    <div className="text-gray-500">Transfer Amount:</div>
                     <div className="font-medium">{formatCurrency(amount)}</div>
 
                     <div className="text-gray-500">Processing Fee (0.5%):</div>
@@ -331,8 +305,14 @@ export function WithdrawForm({ currentBalance }: WithdrawFormProps) {
                 </div>
               )}
 
-              <Button type="submit" className="w-full" disabled={isSubmitting}>
-                {isSubmitting ? "Processing..." : "Withdraw Funds"}
+              <Button type="submit" className="w-full" 
+                disabled={
+                  isSubmitting ||
+                  beneficiariesLoading ||
+                  !form.getValues("beneficiaryId")
+                }
+              >
+                {isSubmitting ? "Processing..." : "Transfer Funds"}
               </Button>
             </form>
           </Form>
@@ -340,7 +320,7 @@ export function WithdrawForm({ currentBalance }: WithdrawFormProps) {
       </CardContent>
       <CardFooter className="flex justify-between border-t pt-6">
         <p className="text-xs text-gray-500">
-          Note: Withdrawals are processed within 24 hours. A 0.5% processing fee applies to all withdrawals.
+          Note: Transfers are processed within 24 hours. A 0.5% processing fee applies to all transfers.
         </p>
       </CardFooter>
     </Card>

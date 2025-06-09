@@ -11,7 +11,6 @@ let isOfflineModeEnabled = false
 export function isOfflineMode() {
   // Reset offline mode if it's been more than 5 minutes since the last failure
   if (isOfflineModeEnabled && Date.now() - lastFailureTime > 5 * 60 * 1000) {
-    console.log("Resetting offline mode after 5 minutes of no failures")
     isOfflineModeEnabled = false
     connectionFailures = 0
   }
@@ -20,7 +19,6 @@ export function isOfflineMode() {
 
 // Allow forcing offline mode from other modules
 export function forceOfflineMode(value: boolean) {
-  console.log(`Forcing offline mode: ${value}`)
   isOfflineModeEnabled = value
   if (value) {
     lastFailureTime = Date.now()
@@ -29,7 +27,6 @@ export function forceOfflineMode(value: boolean) {
 
 // Create a mock client for offline mode
 function createMockClient(): SupabaseClient<Database> {
-  console.log("Creating mock Supabase admin client for offline mode")
 
   // Create a basic mock that won't throw errors
   return {
@@ -93,7 +90,6 @@ export function createAdminClient() {
 
     // Validate environment variables
     if (!supabaseUrl || !supabaseServiceRoleKey) {
-      console.error("Missing Supabase environment variables for admin client")
       forceOfflineMode(true)
       return createMockClient()
     }
@@ -113,7 +109,6 @@ export function createAdminClient() {
           const controller = new AbortController()
           const timeoutId = setTimeout(() => {
             controller.abort()
-            console.log("Admin client request timed out:", url.toString())
             connectionFailures++
             if (connectionFailures >= MAX_FAILURES) {
               forceOfflineMode(true)
@@ -144,14 +139,12 @@ export function createAdminClient() {
             })
             .catch((error) => {
               clearTimeout(timeoutId)
-              console.error("Fetch error in admin client:", error.message || "Failed to fetch")
 
               // Track failure for circuit breaker
               connectionFailures++
 
               // If we've hit the failure threshold, force offline mode
               if (connectionFailures >= MAX_FAILURES) {
-                console.log(`Circuit breaker tripped after ${connectionFailures} failures - enabling offline mode`)
                 forceOfflineMode(true)
               }
 
@@ -173,7 +166,6 @@ export function createAdminClient() {
 
     return adminClient
   } catch (error) {
-    console.error("Error creating Supabase admin client:", error)
     forceOfflineMode(true)
     return createMockClient()
   }

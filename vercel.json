@@ -1,0 +1,11 @@
+{
+  "cron": [
+    {
+      "path": "/api/loans/process-repayments",
+      "schedule": "0 2 * * *",
+      "headers": {
+        "x-cron-secret": "@cron_secret"
+      }
+    }
+  ]
+}

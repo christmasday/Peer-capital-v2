@@ -19,7 +19,6 @@ export async function GET(request: Request) {
   const { data, error } = await supabase.from("account_balances").select("*").eq("user_id", user.id).single()
 
   if (error) {
-    console.error("Error fetching account balance:", error)
     return NextResponse.json({ error: "Failed to fetch account balance" }, { status: 500 })
   }
 
@@ -47,7 +46,6 @@ export async function POST(request: Request) {
     .maybeSingle()
 
   if (checkError) {
-    console.error("Error checking existing balance:", checkError)
     return NextResponse.json({ error: "Failed to check existing balance" }, { status: 500 })
   }
 
@@ -63,7 +61,6 @@ export async function POST(request: Request) {
     .single()
 
   if (error) {
-    console.error("Error creating account balance:", error)
     return NextResponse.json({ error: "Failed to create account balance" }, { status: 500 })
   }
 
@@ -104,7 +101,6 @@ export async function PATCH(request: Request) {
     .single()
 
   if (error) {
-    console.error("Error updating account balance:", error)
     return NextResponse.json({ error: "Failed to update account balance" }, { status: 500 })
   }
 

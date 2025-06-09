@@ -50,7 +50,6 @@ export function NotificationItem({ notification, onUpdate }: NotificationItemPro
       if (result.success) {
         onUpdate()
       } else {
-        console.error("Failed to mark notification as read:", result.error)
         // Don't show error toast for "not found" errors - just refresh the list
         if (result.error?.message?.includes("not found")) {
           onUpdate() // Refresh the list to remove the non-existent notification
@@ -64,7 +63,6 @@ export function NotificationItem({ notification, onUpdate }: NotificationItemPro
         }
       }
     } catch (error) {
-      console.error("Error marking notification as read:", error)
       setIsError(true)
       toast({
         title: "Error",
@@ -88,7 +86,6 @@ export function NotificationItem({ notification, onUpdate }: NotificationItemPro
       if (result.success) {
         onUpdate()
       } else {
-        console.error("Failed to delete notification:", result.error)
         // Don't show error toast for "not found" errors - just refresh the list
         if (result.error?.message?.includes("not found")) {
           onUpdate() // Refresh the list to remove the non-existent notification
@@ -102,7 +99,6 @@ export function NotificationItem({ notification, onUpdate }: NotificationItemPro
         }
       }
     } catch (error) {
-      console.error("Error deleting notification:", error)
       setIsError(true)
       toast({
         title: "Error",

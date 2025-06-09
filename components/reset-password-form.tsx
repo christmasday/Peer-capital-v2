@@ -50,7 +50,6 @@ export function ResetPasswordForm() {
         }
       } catch (err) {
         setError("An unexpected error occurred while verifying your reset token.")
-        console.error(err)
       } finally {
         setIsVerifying(false)
       }
@@ -142,7 +141,6 @@ export function ResetPasswordForm() {
         setError(result.error || "Failed to reset password")
       }
     } catch (error) {
-      console.error("Error resetting password:", error)
       setError("An unexpected error occurred")
     } finally {
       setIsSubmitting(false)

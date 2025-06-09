@@ -65,7 +65,6 @@ export function CreatePostCard({ userId, userName, userImage, onPostCreated }: C
       // Refresh the page to show the new post
       router.refresh()
     } catch (error) {
-      console.error("Error creating post:", error)
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to create post. Please try again.",

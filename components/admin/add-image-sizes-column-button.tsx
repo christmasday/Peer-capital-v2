@@ -22,7 +22,6 @@ export function AddImageSizesColumnButton() {
         setResult("Failed to add image_sizes column to posts table")
       }
     } catch (error) {
-      console.error("Error adding image_sizes column:", error)
       setResult(`Error: ${error instanceof Error ? error.message : "Unknown error"}`)
     } finally {
       setIsLoading(false)

@@ -44,7 +44,6 @@ export function SeedDataButton({ userId }: SeedDataButtonProps) {
         description: "Sample transactions and loan requests have been added to your account.",
       })
     } catch (error) {
-      console.error("Error seeding data:", error)
       toast({
         title: "Error",
         description: "An unexpected error occurred. Please try again.",

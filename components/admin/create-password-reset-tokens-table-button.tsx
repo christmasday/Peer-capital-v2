@@ -59,7 +59,6 @@ export function CreatePasswordResetTokensTableButton() {
         })
       }
     } catch (error) {
-      console.error("Error creating password reset tokens table:", error)
       toast({
         title: "Error",
         description: "An unexpected error occurred",

@@ -5,7 +5,6 @@ import { createAdminClient } from "@/lib/supabase/admin"
 // Alternative approach to add individual columns one by one
 export async function executeProfileMigrationAlternative() {
   try {
-    console.log("Executing alternative profile migration...")
     const adminClient = createAdminClient()
 
     // Execute individual ALTER TABLE statements one by one
@@ -30,17 +29,13 @@ export async function executeProfileMigrationAlternative() {
     for (const statement of alterTableStatements) {
       try {
         await adminClient.query(statement)
-        console.log(`Successfully executed: ${statement}`)
       } catch (statementError) {
-        console.warn(`Failed to execute statement: ${statement}`, statementError)
         // Continue with next statement
       }
     }
 
-    console.log("Alternative profile migration completed")
     return { success: true }
   } catch (error) {
-    console.error("Unexpected error executing alternative profile migration:", error)
     return { success: false, error: "Migration failed, but application will continue" }
   }
 }

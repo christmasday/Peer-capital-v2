@@ -25,7 +25,6 @@ export async function getUserProfileForMessaging(userId: string) {
 
     // If that fails due to RLS, try with admin client
     if (error) {
-      console.log("Error fetching profile with regular client:", error.message)
       const adminClient = createAdminClient()
 
       const { data: adminProfile, error: adminError } = await adminClient
@@ -39,14 +38,12 @@ export async function getUserProfileForMessaging(userId: string) {
       }
 
       if (adminError) {
-        console.error("Error fetching profile with admin client:", adminError.message)
         return { profile: null, error: "User profile not found" }
       }
     }
 
     return { profile: null, error: "User profile not found" }
   } catch (error) {
-    console.error("Unexpected error fetching user profile:", error)
     return {
       profile: null,
       error: error instanceof Error ? error.message : "Unknown error fetching user profile",

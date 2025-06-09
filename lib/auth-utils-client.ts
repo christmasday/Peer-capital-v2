@@ -23,7 +23,6 @@ export async function getCurrentUserIdClient(): Promise<string | null> {
           return userId
         }
       } catch (error) {
-        console.error("Error parsing JWT on client:", error)
       }
     }
 
@@ -39,7 +38,6 @@ export async function getCurrentUserIdClient(): Promise<string | null> {
         return session.user.id
       }
     } catch (error) {
-      console.error("Error getting Supabase session on client:", error)
     }
 
     // Check auth status with server
@@ -56,12 +54,10 @@ export async function getCurrentUserIdClient(): Promise<string | null> {
         }
       }
     } catch (error) {
-      console.error("Error checking auth status with server:", error)
     }
 
     return null
   } catch (error) {
-    console.error("Error getting current user ID on client:", error)
     return null
   }
 }

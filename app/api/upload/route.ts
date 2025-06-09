@@ -80,7 +80,6 @@ export async function POST(request: NextRequest) {
       })
 
       if (error) {
-        console.error("Error uploading GIF:", error)
         return NextResponse.json({ error: "Failed to upload image" }, { status: 500 })
       }
 
@@ -134,7 +133,6 @@ export async function POST(request: NextRequest) {
         })
 
         if (error) {
-          console.error(`Error uploading ${size} image:`, error)
           return NextResponse.json({ error: "Failed to upload image" }, { status: 500 })
         }
 
@@ -164,7 +162,6 @@ export async function POST(request: NextRequest) {
       urls: urls, // All size variants
     })
   } catch (error) {
-    console.error("Error in upload route:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

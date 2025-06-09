@@ -28,7 +28,6 @@ export function EnsureStorageBucketButton() {
         })
       }
     } catch (error) {
-      console.error("Error ensuring storage bucket:", error)
       toast({
         title: "Error",
         description: "Failed to ensure storage bucket. Please try again.",

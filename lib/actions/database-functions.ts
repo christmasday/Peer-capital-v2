@@ -12,12 +12,10 @@ import { createAdminClient } from "@/lib/supabase/admin"
  * // Check if the 'users' table exists
  * const exists = await checkTableExists('users');
  * if (exists) {
- *   console.log('Users table exists');
  * }
  */
 export async function checkTableExists(tableName: string): Promise<boolean> {
   try {
-    console.log(`Checking if table ${tableName} exists`)
     const adminClient = createAdminClient()
 
     // Method 1: Try to select from the table
@@ -25,11 +23,9 @@ export async function checkTableExists(tableName: string): Promise<boolean> {
       const { data, error } = await adminClient.from(tableName).select("*").limit(1)
 
       if (!error) {
-        console.log(`Table ${tableName} exists (method 1)`)
         return true
       }
     } catch (error) {
-      console.log(`Error checking table ${tableName} with method 1:`, error)
       // Continue to next method
     }
 
@@ -43,11 +39,9 @@ export async function checkTableExists(tableName: string): Promise<boolean> {
         .limit(1)
 
       if (!error && data && data.length > 0) {
-        console.log(`Table ${tableName} exists (method 2)`)
         return true
       }
     } catch (error) {
-      console.log(`Error checking table ${tableName} with method 2:`, error)
       // Continue to next method
     }
 
@@ -65,17 +59,13 @@ export async function checkTableExists(tableName: string): Promise<boolean> {
 
       if (success && result && result.length > 0) {
         const exists = result[0].exists
-        console.log(`Table ${tableName} exists: ${exists} (method 3)`)
         return exists
       }
     } catch (error) {
-      console.log(`Error checking table ${tableName} with method 3:`, error)
     }
 
-    console.log(`Table ${tableName} does not exist or could not be verified`)
     return false
   } catch (error) {
-    console.error(`Unexpected error checking if table ${tableName} exists:`, error)
     return false
   }
 }
@@ -94,14 +84,11 @@ export async function checkTableExists(tableName: string): Promise<boolean> {
  * // Execute a simple SELECT query
  * const { success, result, error } = await executeSQL('SELECT * FROM users LIMIT 10');
  * if (success) {
- *   console.log('Query results:', result);
  * } else {
- *   console.error('Query failed:', error);
  * }
  */
 export async function executeSQL(sql: string): Promise<{ success: boolean; result?: any[]; error?: string }> {
   try {
-    console.log("Executing SQL:", sql.substring(0, 100) + (sql.length > 100 ? "..." : ""))
     const adminClient = createAdminClient()
 
     // Method 1: Try using the execute_sql function if it exists
@@ -109,14 +96,11 @@ export async function executeSQL(sql: string): Promise<{ success: boolean; resul
       const { data: result, error } = await adminClient.rpc("execute_sql", { sql_query: sql })
 
       if (!error) {
-        console.log("SQL executed successfully using execute_sql function")
         return { success: true, result }
       } else {
-        console.log("Error executing SQL with execute_sql function:", error)
         // Continue to next method
       }
     } catch (error) {
-      console.log("Error calling execute_sql function:", error)
       // Continue to next method
     }
 
@@ -125,14 +109,11 @@ export async function executeSQL(sql: string): Promise<{ success: boolean; resul
       const { data: result, error } = await adminClient.rpc("sql", { query: sql })
 
       if (!error) {
-        console.log("SQL executed successfully using sql RPC")
         return { success: true, result }
       } else {
-        console.log("Error executing SQL with sql RPC:", error)
         // Continue to next method
       }
     } catch (error) {
-      console.log("Error calling sql RPC:", error)
       // Continue to next method
     }
 
@@ -141,14 +122,11 @@ export async function executeSQL(sql: string): Promise<{ success: boolean; resul
       const { data: result, error } = await adminClient.rpc("pgfunction", { query: sql })
 
       if (!error) {
-        console.log("SQL executed successfully using pgfunction RPC")
         return { success: true, result }
       } else {
-        console.log("Error executing SQL with pgfunction RPC:", error)
         // Continue to next method
       }
     } catch (error) {
-      console.log("Error calling pgfunction RPC:", error)
       // Continue to next method
     }
 
@@ -156,15 +134,12 @@ export async function executeSQL(sql: string): Promise<{ success: boolean; resul
     try {
       // This is a placeholder - Supabase JS client doesn't support raw SQL queries directly
       // In a real implementation, you might use a server-side PostgreSQL client
-      console.log("No more methods available to execute SQL")
       return { success: false, error: "No available method to execute SQL" }
     } catch (error) {
-      console.log("Error with raw SQL execution:", error)
     }
 
     return { success: false, error: "All SQL execution methods failed" }
   } catch (error) {
-    console.error("Unexpected error executing SQL:", error)
     return { success: false, error: String(error) }
   }
 }
@@ -185,20 +160,16 @@ export async function executeSQL(sql: string): Promise<{ success: boolean; resul
  */
 export async function checkFunctionExists(functionName: string): Promise<boolean> {
   try {
-    console.log(`Checking if function ${functionName} exists`)
 
     // Try to call the function with a simple query to see if it exists
     const testResult = await executeSQL(`SELECT ${functionName}('SELECT 1') AS result`)
 
     if (testResult.success) {
-      console.log(`Function ${functionName} exists`)
       return true
     }
 
-    console.log(`Function ${functionName} does not exist or could not be verified`)
     return false
   } catch (error) {
-    console.log(`Error checking if function ${functionName} exists:`, error)
     return false
   }
 }
@@ -216,9 +187,7 @@ export async function checkFunctionExists(functionName: string): Promise<boolean
  * // Create the check_table_exists function
  * const { success, message, error } = await createCheckTableExistsFunction();
  * if (success) {
- *   console.log(message);
  * } else {
- *   console.error(error);
  * }
  */
 export async function createCheckTableExistsFunction(): Promise<{
@@ -227,7 +196,6 @@ export async function createCheckTableExistsFunction(): Promise<{
   error?: string
 }> {
   try {
-    console.log("Creating check_table_exists function")
 
     // Check if the function already exists
     const functionExists = await checkFunctionExists("check_table_exists")
@@ -262,7 +230,6 @@ export async function createCheckTableExistsFunction(): Promise<{
       return { success: false, error: result.error || "Failed to create check_table_exists function" }
     }
   } catch (error) {
-    console.error("Unexpected error creating check_table_exists function:", error)
     return {
       success: false,
       error: `An unexpected error occurred: ${error instanceof Error ? error.message : String(error)}`,
@@ -283,10 +250,8 @@ export async function createCheckTableExistsFunction(): Promise<{
  * // Create the execute_sql function
  * const { success, message, error } = await createExecuteSqlFunction();
  * if (success) {
- *   console.log(message);
  *   // Now you can use the execute_sql function in your database
  * } else {
- *   console.error(error);
  * }
  *
  * @security This function creates a SECURITY DEFINER function that runs with elevated privileges.
@@ -298,7 +263,6 @@ export async function createExecuteSqlFunction(): Promise<{
   error?: string
 }> {
   try {
-    console.log("Creating execute_sql function")
 
     // Check if the function already exists
     const functionExists = await checkFunctionExists("execute_sql")
@@ -331,7 +295,6 @@ export async function createExecuteSqlFunction(): Promise<{
       return { success: false, error: result.error || "Failed to create execute_sql function" }
     }
   } catch (error) {
-    console.error("Unexpected error creating execute_sql function:", error)
     return {
       success: false,
       error: `An unexpected error occurred: ${error instanceof Error ? error.message : String(error)}`,
@@ -381,13 +344,11 @@ export async function checkColumnExists(tableName: string, columnName: string): 
     })
 
     if (error) {
-      console.error("Error checking if column exists:", error)
       return false
     }
 
     return !!columnExists
   } catch (error) {
-    console.error("Error in checkColumnExists:", error)
     return false
   }
 }
@@ -419,13 +380,11 @@ export async function addColumnIfNotExists(
     const { error } = await adminClient.rpc("execute_sql", { sql_query: sql })
 
     if (error) {
-      console.error(`Error adding column ${columnName} to ${tableName}:`, error)
       return false
     }
 
     return true
   } catch (error) {
-    console.error("Error in addColumnIfNotExists:", error)
     return false
   }
 }

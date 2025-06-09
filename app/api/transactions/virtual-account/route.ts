@@ -33,7 +33,6 @@ export async function GET(request: NextRequest) {
         // No virtual account found
         return NextResponse.json({ transactions: [] })
       }
-      console.error("Error fetching virtual account:", vaError)
       return NextResponse.json({ error: "Failed to fetch virtual account details" }, { status: 500 })
     }
 
@@ -48,13 +47,11 @@ export async function GET(request: NextRequest) {
       .limit(10)
 
     if (txError) {
-      console.error("Error fetching transactions:", txError)
       return NextResponse.json({ error: "Failed to fetch transactions" }, { status: 500 })
     }
 
     return NextResponse.json({ transactions })
   } catch (error) {
-    console.error("Error in virtual account transactions API:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

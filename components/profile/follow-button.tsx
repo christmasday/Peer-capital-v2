@@ -60,7 +60,6 @@ export function FollowButton({ userId, initialFollowingState, onFollowChange }: 
         onFollowChange(!isFollowing)
       }
     } catch (error) {
-      console.error("Error toggling follow:", error)
       toast({
         title: "Error",
         description: "An unexpected error occurred",

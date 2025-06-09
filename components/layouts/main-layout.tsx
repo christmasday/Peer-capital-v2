@@ -31,7 +31,6 @@ function parseJWT(token: string) {
 
     return JSON.parse(jsonPayload)
   } catch (error) {
-    console.error("Error parsing JWT:", error)
     return null
   }
 }
@@ -62,7 +61,6 @@ export function MainLayout({
       // Check URL parameters first (highest priority)
       const urlParams = new URLSearchParams(window.location.search)
       if (urlParams.get("auth") === "direct") {
-        console.log("Authentication confirmed via direct URL parameter")
         // Set localStorage flag for future checks
         localStorage.setItem("auth_bypass", "true")
         localStorage.setItem("auth_bypass_time", Date.now().toString())
@@ -86,14 +84,11 @@ export function MainLayout({
         try {
           // Simple client-side check without verification
           if (!isJWTExpired(jwt)) {
-            console.log("Valid JWT found in localStorage")
             jwtValid = true
           } else {
-            console.log("JWT found but expired")
             // Don't redirect yet, try other auth methods
           }
         } catch (error) {
-          console.error("Error parsing JWT:", error)
           // Continue checking other auth methods
         }
       }
@@ -113,7 +108,6 @@ export function MainLayout({
         document.cookie.includes("custom-auth-token=")
 
       if (hasAuthCookie) {
-        console.log("Authentication confirmed via cookies")
         setIsAuthenticated(true)
         setIsLoading(false)
         return true
@@ -129,7 +123,6 @@ export function MainLayout({
       const isAuthFlag = localStorage.getItem("is_authenticated") === "true"
 
       if ((hasAuthBypass && bypassValid) || isAuthFlag) {
-        console.log("Authentication confirmed via localStorage")
         setIsAuthenticated(true)
         setIsLoading(false)
         return true
@@ -155,7 +148,6 @@ export function MainLayout({
       // This gives other auth methods time to initialize
       const redirectTimer = setTimeout(() => {
         if (!authStatus && !jwtToken && !customAuthToken) {
-          console.log("No authentication found after delay, redirecting to login")
           // Store the current path for redirect after login
           localStorage.setItem("redirectAfterLogin", router.pathname)
           router.push("/?redirectedFrom=" + encodeURIComponent(router.pathname))

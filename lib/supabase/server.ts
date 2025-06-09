@@ -13,16 +13,13 @@ export const createServerClient = () => {
   try {
     // Check if we're in offline mode
     if (isOfflineMode()) {
-      console.log("Creating server client in offline mode")
       return createOfflineModeClient()
     }
 
     clientCount++
 
     if (serverClientCreated) {
-      console.log(`Reusing server client within request (count: ${clientCount})`)
     } else {
-      console.log(`Creating new server client (count: ${clientCount})`)
       serverClientCreated = true
     }
 
@@ -39,7 +36,6 @@ export const createServerClient = () => {
             const controller = new AbortController()
             const timeoutId = setTimeout(() => {
               controller.abort()
-              console.log("Server client request timed out:", url.toString())
               connectionFailures++
               if (connectionFailures >= MAX_FAILURES) {
                 forceOfflineMode(true)
@@ -70,14 +66,12 @@ export const createServerClient = () => {
               })
               .catch((error) => {
                 clearTimeout(timeoutId)
-                console.error("Fetch error in server client:", error.message || "Failed to fetch")
 
                 // Track failure for circuit breaker
                 connectionFailures++
 
                 // If we've hit the failure threshold, force offline mode
                 if (connectionFailures >= MAX_FAILURES) {
-                  console.log(`Circuit breaker tripped after ${connectionFailures} failures - enabling offline mode`)
                   forceOfflineMode(true)
                 }
 
@@ -98,7 +92,6 @@ export const createServerClient = () => {
       },
     })
   } catch (error) {
-    console.error("Error creating server client:", error)
     // Fallback to an offline mode client
     return createOfflineModeClient()
   }

@@ -16,7 +16,6 @@ export async function ensureAccountBalance(): Promise<AccountBalance | null> {
   const { data: existingBalance, error: checkError } = await supabase.from("account_balances").select("*").maybeSingle()
 
   if (checkError) {
-    console.error("Error checking account balance:", checkError)
     throw new Error("Failed to check account balance")
   }
 
@@ -42,7 +41,6 @@ export async function ensureAccountBalance(): Promise<AccountBalance | null> {
     const { data } = await response.json()
     return data
   } catch (error) {
-    console.error("Error creating account balance:", error)
     return null
   }
 }
@@ -65,7 +63,6 @@ export async function updateAccountBalance(balance?: number, loan_balance?: numb
     const { data } = await response.json()
     return data
   } catch (error) {
-    console.error("Error updating account balance:", error)
     return null
   }
 }

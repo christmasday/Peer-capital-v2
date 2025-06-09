@@ -26,7 +26,6 @@ export function CreateExecuteSqlFunctionButton() {
         })
       }
     } catch (error) {
-      console.error("Error creating execute_sql function:", error)
       toast({
         title: "Error",
         description: "An unexpected error occurred",

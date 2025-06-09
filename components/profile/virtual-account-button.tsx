@@ -37,9 +37,7 @@ export function VirtualAccountButton({ userId, existingAccount }: VirtualAccount
     setError(null)
 
     try {
-      console.log("Initiating virtual account creation for user ID:", userId)
       const result = await createVirtualAccount()
-      console.log("Virtual account creation result:", result)
 
       if (result.error) {
         setError(result.error)
@@ -74,7 +72,6 @@ export function VirtualAccountButton({ userId, existingAccount }: VirtualAccount
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Unknown error occurred"
-      console.error("Error creating virtual account:", errorMessage)
       setError(`An unexpected error occurred: ${errorMessage}`)
       toast({
         title: "Error",

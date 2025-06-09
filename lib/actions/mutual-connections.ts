@@ -15,7 +15,6 @@ async function checkTableExists() {
 
     return true
   } catch (error) {
-    console.error("Error checking if table exists:", error)
     return false
   }
 }
@@ -43,7 +42,6 @@ export async function getMutualConnections(userId: string, limit = 5) {
       .eq("status", "active")
 
     if (followingError) {
-      console.error("Error getting current user following:", followingError)
       return { connections: [], count: 0 }
     }
 
@@ -59,7 +57,6 @@ export async function getMutualConnections(userId: string, limit = 5) {
       .eq("status", "active")
 
     if (profileFollowingError) {
-      console.error("Error getting profile user following:", profileFollowingError)
       return { connections: [], count: 0 }
     }
 
@@ -87,7 +84,6 @@ export async function getMutualConnections(userId: string, limit = 5) {
       .limit(limit)
 
     if (profilesError) {
-      console.error("Error getting mutual connection profiles:", profilesError)
       return { connections: [], count }
     }
 
@@ -102,7 +98,6 @@ export async function getMutualConnections(userId: string, limit = 5) {
 
     return { connections, count }
   } catch (error) {
-    console.error("Error getting mutual connections:", error)
     return { connections: [], count: 0 }
   }
 }

@@ -26,7 +26,6 @@ export default async function UserConnectionsPage({
   const { data: profile, error } = await adminClient.from("profiles").select("*").eq("id", userId).single()
 
   if (error || !profile) {
-    console.error("Error fetching user profile:", error)
     notFound()
   }
 

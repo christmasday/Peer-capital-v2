@@ -34,19 +34,15 @@ export default async function HomeLayout({
         const { data: firstUser } = await adminClient.from("profiles").select("id").limit(1).single()
 
         if (firstUser?.id) {
-          console.log("Using fallback user ID:", firstUser.id)
           // Continue with this user ID
         } else {
-          console.error("No fallback user found, redirecting to login")
           redirect("/?from=home-no-fallback-user")
         }
       } catch (error) {
-        console.error("Error getting fallback user:", error)
         redirect("/?from=home-fallback-error")
       }
     } else {
       // No auth cookies and no user ID, redirect to login
-      console.error("No authentication found, redirecting to login")
       redirect("/?from=home-no-auth")
     }
   }
@@ -57,7 +53,6 @@ export default async function HomeLayout({
     const { data: user, error } = await adminClient.from("profiles").select("*").eq("id", userId).single()
 
     if (error || !user) {
-      console.error("Error getting user profile:", error)
       redirect("/?from=home-profile-error")
     }
 
@@ -70,7 +65,6 @@ export default async function HomeLayout({
       </MainLayout>
     )
   } catch (error) {
-    console.error("Error in home layout:", error)
     redirect("/?from=home-layout-error")
   }
 }

@@ -40,11 +40,14 @@ export async function verifyAuth(req: NextRequest) {
     if (token) {
       const { payload, error } = await verifyJWT(token)
 
-      if (!error && payload && payload.sub) {
+      // Accept either payload.userId or payload.sub as the userId
+      const userId = payload?.userId || payload?.sub || null;
+
+      if (!error && payload && userId) {
         // JWT is valid
         return {
           authenticated: true,
-          userId: payload.sub,
+          userId,
           method: "jwt",
         }
       }

@@ -52,7 +52,6 @@ export function SignoutButton({ variant = "ghost", className, children, onClick 
         window.location.href = result.redirectUrl || "/?signout=true"
       }, 100)
     } catch (error) {
-      console.error("Error during sign out:", error)
       // Fallback to direct navigation after a short delay
       setTimeout(() => {
         window.location.href = "/?signout=true"

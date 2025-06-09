@@ -5,7 +5,6 @@ import { cookies } from "next/headers"
 const getJWTSecret = () => {
   const secret = process.env.JWT_SECRET
   if (!secret) {
-    console.warn("JWT_SECRET environment variable not found, using fallback secret")
     return new TextEncoder().encode("fallback-secret-key-for-development-only")
   }
   return new TextEncoder().encode(secret)
@@ -32,7 +31,6 @@ export async function generateJWT(payload: any) {
 
     return { jwt }
   } catch (error) {
-    console.error("Error generating JWT:", error)
     return { error: "Failed to generate authentication token" }
   }
 }
@@ -47,7 +45,6 @@ export async function verifyJWT(token: string) {
     const { payload } = await jwtVerify(token, JWT_SECRET)
     return { payload }
   } catch (error) {
-    console.error("Error verifying JWT:", error)
     return { error: "Invalid or expired token" }
   }
 }
@@ -75,7 +72,6 @@ export function setJWTCookie(jwt: string) {
 
     return true
   } catch (error) {
-    console.error("Error setting JWT cookie:", error)
     return false
   }
 }
@@ -86,7 +82,6 @@ export function getJWTFromCookies() {
     const cookieStore = cookies()
     return cookieStore.get(JWT_COOKIE_NAME)?.value
   } catch (error) {
-    console.error("Error getting JWT from cookies:", error)
     return null
   }
 }
@@ -113,7 +108,6 @@ export function clearJWTCookies() {
 
     return true
   } catch (error) {
-    console.error("Error clearing JWT cookies:", error)
     return false
   }
 }

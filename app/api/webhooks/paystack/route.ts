@@ -16,27 +16,23 @@ export async function POST(request: NextRequest) {
     // Verify the webhook signature
     const signature = request.headers.get("x-paystack-signature")
     if (!signature) {
-      console.error("No Paystack signature found in webhook request")
       return NextResponse.json({ error: "Invalid request" }, { status: 401 })
     }
 
     const secretKey = process.env.PAYSTACK_SECRET_KEY
     if (!secretKey) {
-      console.error("Paystack secret key not configured")
       return NextResponse.json({ error: "Configuration error" }, { status: 500 })
     }
 
     // Verify the signature
     const hash = crypto.createHmac("sha512", secretKey).update(body).digest("hex")
     if (hash !== signature) {
-      console.error("Invalid Paystack signature")
       return NextResponse.json({ error: "Invalid signature" }, { status: 401 })
     }
 
     // Process the webhook based on event type
     const event = payload.event
 
-    console.log(`Processing Paystack webhook: ${event}`, payload)
 
     // Log the webhook event to the database
     const { data: eventData, error: eventError } = await adminClient
@@ -49,7 +45,6 @@ export async function POST(request: NextRequest) {
       .select()
 
     if (eventError) {
-      console.error("Error logging webhook event:", eventError)
     } else if (eventData && eventData.length > 0) {
       eventId = eventData[0].id
     }
@@ -79,7 +74,6 @@ export async function POST(request: NextRequest) {
           await handleDedicatedAccountAssignFailed(payload.data, adminClient)
           break
         default:
-          console.log(`Unhandled Paystack webhook event: ${event}`)
       }
 
       // Update the webhook event as processed
@@ -93,7 +87,6 @@ export async function POST(request: NextRequest) {
           .eq("id", eventId)
       }
     } catch (processingError) {
-      console.error(`Error processing webhook event ${event}:`, processingError)
 
       // Update the webhook event with the processing error
       if (eventId) {
@@ -109,7 +102,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ received: true })
   } catch (error) {
-    console.error("Error processing Paystack webhook:", error)
 
     // Update the webhook event with the processing error if we have an eventId
     if (eventId) {
@@ -140,7 +132,6 @@ async function handleChargeSuccess(data: any, adminClient: any) {
       // Handle virtual account payment (existing code)
       const accountNumber = data.authorization?.account_number
       if (!accountNumber) {
-        console.error("No account number found in dedicated_nuban payment", data)
         return
       }
 
@@ -152,7 +143,6 @@ async function handleChargeSuccess(data: any, adminClient: any) {
         .single()
 
       if (vaError || !virtualAccount) {
-        console.error("Could not find virtual account for payment:", accountNumber, vaError)
         return
       }
 
@@ -166,7 +156,6 @@ async function handleChargeSuccess(data: any, adminClient: any) {
         .single()
 
       if (userError || !userExists) {
-        console.error("User not found for virtual account payment:", userId, userError)
         return
       }
 
@@ -187,7 +176,6 @@ async function handleChargeSuccess(data: any, adminClient: any) {
         .single()
 
       if (userError || !userExists) {
-        console.error("User not found for payment:", userId, userError)
         return
       }
 
@@ -201,13 +189,11 @@ async function handleChargeSuccess(data: any, adminClient: any) {
         .single()
 
       if (transactionError) {
-        console.error("Error fetching transaction:", transactionError)
         return
       }
 
       if (!transaction) {
         // Transaction might have been already processed or doesn't exist
-        console.log(`Transaction ${transactionId} not found or already processed`)
         return
       }
 
@@ -222,7 +208,6 @@ async function handleChargeSuccess(data: any, adminClient: any) {
         .eq("id", transactionId)
 
       if (updateError) {
-        console.error("Error updating transaction:", updateError)
         return
       }
 
@@ -242,7 +227,6 @@ async function handleChargeSuccess(data: any, adminClient: any) {
           description: `Account funded with ₦${amountInNaira.toLocaleString()} via ${paymentMethod}`,
         })
       } catch (notificationError) {
-        console.error("Error creating activity notification:", notificationError)
       }
 
       // Revalidate relevant paths
@@ -251,12 +235,9 @@ async function handleChargeSuccess(data: any, adminClient: any) {
       revalidatePath("/profile")
       revalidatePath("/transactions")
 
-      console.log(`Successfully processed payment of ${amountInNaira} for user ${userId}`)
     } else {
-      console.log("Payment received but no user_id or transaction_id in metadata:", metadata)
     }
   } catch (error) {
-    console.error("Error handling charge.success webhook:", error)
     throw error
   }
 }
@@ -278,7 +259,6 @@ async function processPayment(
     .single()
 
   if (userError || !userExists) {
-    console.error("User not found for payment processing:", userId, userError)
     throw new Error("User not found")
   }
 
@@ -308,7 +288,6 @@ async function processPayment(
     const { error: transactionError } = await adminClient.from("transactions").insert(transactionData)
 
     if (transactionError) {
-      console.error("Error creating transaction record:", transactionError)
       return
     }
   }
@@ -329,7 +308,6 @@ async function processPayment(
       description: `Account funded with ₦${amount.toLocaleString()} via ${source}`,
     })
   } catch (notificationError) {
-    console.error("Error creating activity notification:", notificationError)
   }
 
   // Revalidate relevant paths
@@ -338,7 +316,6 @@ async function processPayment(
   revalidatePath("/profile")
   revalidatePath("/transactions")
 
-  console.log(`Successfully processed payment of ${amount} for user ${userId}`)
 }
 
 // Update account balance
@@ -351,7 +328,6 @@ async function updateAccountBalance(userId: string, amount: number, adminClient:
     .single()
 
   if (userError || !userExists) {
-    console.error("User not found for account balance update:", userId, userError)
     throw new Error("User not found")
   }
 
@@ -362,7 +338,6 @@ async function updateAccountBalance(userId: string, amount: number, adminClient:
     .single()
 
   if (balanceError) {
-    console.error("Error fetching account balance:", balanceError)
     return
   }
 
@@ -378,7 +353,6 @@ async function updateAccountBalance(userId: string, amount: number, adminClient:
     .eq("user_id", userId)
 
   if (updateError) {
-    console.error("Error updating account balance:", updateError)
   }
 }
 
@@ -392,7 +366,6 @@ async function createNotification(userId: string, amount: number, reference: str
     .single()
 
   if (userError || !userExists) {
-    console.error("User not found for notification creation:", userId, userError)
     throw new Error("User not found")
   }
 
@@ -424,7 +397,6 @@ async function handleTransferSuccess(data: any, adminClient: any) {
       .single()
 
     if (transactionError || !transaction) {
-      console.error("Could not find transaction for transfer:", reference, transactionError)
       return
     }
 
@@ -440,7 +412,6 @@ async function handleTransferSuccess(data: any, adminClient: any) {
       .eq("id", transaction.id)
 
     if (updateError) {
-      console.error("Error updating transaction:", updateError)
       return
     }
 
@@ -465,9 +436,7 @@ async function handleTransferSuccess(data: any, adminClient: any) {
     revalidatePath("/profile")
     revalidatePath("/transactions")
 
-    console.log(`Successfully processed withdrawal of ${transaction.amount} for user ${userId}`)
   } catch (error) {
-    console.error("Error handling transfer.success webhook:", error)
     throw error
   }
 }
@@ -485,7 +454,6 @@ async function handleTransferFailed(data: any, adminClient: any) {
       .single()
 
     if (transactionError || !transaction) {
-      console.error("Could not find transaction for failed transfer:", reference, transactionError)
       return
     }
 
@@ -501,7 +469,6 @@ async function handleTransferFailed(data: any, adminClient: any) {
       .eq("id", transaction.id)
 
     if (updateError) {
-      console.error("Error updating transaction:", updateError)
       return
     }
 
@@ -513,7 +480,6 @@ async function handleTransferFailed(data: any, adminClient: any) {
       .single()
 
     if (accountError) {
-      console.error("Error fetching account balance:", accountError)
       return
     }
 
@@ -529,7 +495,6 @@ async function handleTransferFailed(data: any, adminClient: any) {
       .eq("user_id", userId)
 
     if (balanceUpdateError) {
-      console.error("Error updating account balance:", balanceUpdateError)
       return
     }
 
@@ -555,9 +520,7 @@ async function handleTransferFailed(data: any, adminClient: any) {
     revalidatePath("/profile")
     revalidatePath("/transactions")
 
-    console.log(`Processed failed withdrawal of ${transaction.amount} for user ${userId}`)
   } catch (error) {
-    console.error("Error handling transfer.failed webhook:", error)
     throw error
   }
 }
@@ -593,7 +556,6 @@ async function handleDedicatedAccountAssignSuccess(data: any, adminClient: any) 
   const email = customer?.email || customerCode;
 
   if (!accountData.account_number || !email) {
-    console.error("Missing account_number or email in dedicatedaccount.assign.success event", data);
     return;
   }
 
@@ -617,7 +579,6 @@ async function handleDedicatedAccountAssignSuccess(data: any, adminClient: any) 
     .upsert([virtualAccountData], { onConflict: ["email"] });
 
   if (error) {
-    console.error("Error upserting virtual account on assign.success:", error);
     return;
   }
 
@@ -627,7 +588,6 @@ async function handleDedicatedAccountAssignSuccess(data: any, adminClient: any) 
     .update({ virtual_account_active: true })
     .eq("email", email);
 
-  console.log(`Virtual account assigned and upserted for email: ${email}`);
 }
 
 async function handleDedicatedAccountAssignFailed(data: any, adminClient: any) {
@@ -637,7 +597,6 @@ async function handleDedicatedAccountAssignFailed(data: any, adminClient: any) {
   const email = customer?.email || customerCode;
 
   // Log the failure
-  console.error("Paystack dedicatedaccount.assign.failed event:", data);
 
   // Optionally, update the user's profile or virtual account status to indicate the failure
   if (email) {

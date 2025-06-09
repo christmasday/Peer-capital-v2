@@ -55,11 +55,9 @@ export async function createVirtualAccount() {
     const userId = await getCurrentUserId()
 
     if (!userId) {
-      console.error("Authentication failed: No user ID found")
       return { error: "You must be logged in to create a virtual account" }
     }
 
-    console.log("Creating virtual account for user:", userId)
 
     // Get user profile data
     const { data: profile, error: profileError } = await adminClient
@@ -69,7 +67,6 @@ export async function createVirtualAccount() {
       .single()
 
     if (profileError || !profile) {
-      console.error("Error fetching profile:", profileError)
       return { error: "Could not fetch user profile" }
     }
 
@@ -77,7 +74,6 @@ export async function createVirtualAccount() {
     const userEmail = await getUserEmail(userId)
 
     if (!userEmail) {
-      console.error("Could not determine user email")
       return { error: "Could not determine your email address" }
     }
 
@@ -98,9 +94,7 @@ export async function createVirtualAccount() {
 
     // Make API call to Paystack
     const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY
-    console.log("Paystack Secret Key present:", !!PAYSTACK_SECRET_KEY)
     if (!PAYSTACK_SECRET_KEY) {
-      console.error("Paystack secret key not found")
       return { error: "Payment provider configuration error" }
     }
 
@@ -115,8 +109,6 @@ export async function createVirtualAccount() {
       country: "NG",
       bvn: profile.bvn || "",
     }
-    console.log("Paystack payload:", payload)
-    console.log(`Using preferred bank: ${process.env.PAYSTACK_PREFERRED_BANK || "providus-bank"}`)
 
     try {
       // Make the API call
@@ -128,19 +120,15 @@ export async function createVirtualAccount() {
         },
         body: JSON.stringify(payload),
       })
-      console.log("Paystack response status:", response.status)
       const responseText = await response.text()
-      console.log("Paystack response text:", responseText)
       let responseData
       try {
         responseData = JSON.parse(responseText)
       } catch (parseErr) {
-        console.error("Error parsing Paystack response as JSON:", parseErr)
         responseData = { raw: responseText }
       }
 
       if (!responseData.status) {
-        console.error("Paystack API error:", responseData.message)
         return { error: responseData.message || "Failed to create virtual account", raw: responseData }
       }
 
@@ -172,7 +160,6 @@ export async function createVirtualAccount() {
         const { error: insertError } = await adminClient.from("virtual_accounts").insert(virtualAccountData)
 
         if (insertError) {
-          console.error("Error storing virtual account:", insertError)
           return { error: "Failed to store virtual account details", raw: responseData }
         }
 
@@ -188,11 +175,9 @@ export async function createVirtualAccount() {
 
       return { error: "No data returned from payment provider", raw: responseData }
     } catch (fetchErr) {
-      console.error("Error during Paystack fetch:", fetchErr)
       return { error: "Error during Paystack fetch", fetchErr: fetchErr instanceof Error ? fetchErr.message : fetchErr }
     }
   } catch (error) {
-    console.error("Error creating virtual account:", error)
     return { error: `An unexpected error occurred: ${error instanceof Error ? error.message : "Unknown error"}` }
   }
 }
@@ -206,7 +191,6 @@ export async function getVirtualAccount(emailOrUserId?: string) {
     if (!emailOrUserId) {
       const userId = await getCurrentUserId()
       if (!userId) {
-        console.error("Authentication failed: No user ID found")
         return { error: "You must be logged in to view virtual account details" }
       }
       // Fetch email from profile
@@ -216,7 +200,6 @@ export async function getVirtualAccount(emailOrUserId?: string) {
         .eq("id", userId)
         .single()
       if (profileError || !profile?.email) {
-        console.error("Could not fetch user email for virtual account", profileError)
         return { error: "Could not determine your email address" }
       }
       email = profile.email
@@ -231,14 +214,12 @@ export async function getVirtualAccount(emailOrUserId?: string) {
         .eq("id", emailOrUserId)
         .single()
       if (profileError || !profile?.email) {
-        console.error("Could not fetch user email for virtual account", profileError)
         return { error: "Could not determine your email address" }
       }
       email = profile.email
     }
 
     if (!email || typeof email !== "string") {
-      console.error("Email is required and must be a string for Paystack virtual account fetch.");
       return { error: "Could not determine your email address" };
     }
 
@@ -254,7 +235,6 @@ export async function getVirtualAccount(emailOrUserId?: string) {
     }
     if (error && error.code !== "PGRST116") {
       // Only log/return if it's not a "not found" error
-      console.error("Error fetching virtual account:", error)
       return { error: "Failed to fetch virtual account details" }
     }
 
@@ -307,7 +287,6 @@ export async function getVirtualAccount(emailOrUserId?: string) {
     // If still not found, return not found
     return { success: false, message: "No virtual account found" }
   } catch (error) {
-    console.error("Error fetching virtual account:", error)
     return { error: "An unexpected error occurred. Please try again." }
   }
 }
@@ -385,7 +364,6 @@ export async function validateCustomerIdentification({
       first_name,
       last_name,
     };
-    console.log("Paystack customer identification payload:", payload);
     const response = await fetch(url, {
       method: "POST",
       headers: {
@@ -395,7 +373,6 @@ export async function validateCustomerIdentification({
       body: JSON.stringify(payload),
     });
     const responseText = await response.text();
-    console.log("Paystack customer identification response:", responseText);
     let responseData;
     try {
       responseData = JSON.parse(responseText);

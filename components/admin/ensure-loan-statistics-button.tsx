@@ -37,7 +37,6 @@ export function EnsureLoanStatisticsButton() {
         })
       }
     } catch (error) {
-      console.error("Error executing migration:", error)
       toast({
         title: "Error",
         description: "An unexpected error occurred while creating loan statistics tables.",

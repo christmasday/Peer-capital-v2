@@ -41,7 +41,6 @@ export function ReviewForm({ userId, onSubmit }: ReviewFormProps) {
       setComment("")
     } catch (err) {
       setError("Failed to submit review. Please try again.")
-      console.error(err)
     } finally {
       setIsSubmitting(false)
     }

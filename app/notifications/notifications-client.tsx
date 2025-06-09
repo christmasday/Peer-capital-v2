@@ -20,7 +20,6 @@ export function NotificationsClient() {
     try {
       const result = await getNotifications(1, 50, includeRead)
       if (result.error) {
-        console.error("Error fetching notifications:", result.error)
         toast({
           title: "Error",
           description: "Failed to load notifications. Please try again.",
@@ -33,7 +32,6 @@ export function NotificationsClient() {
         setUnreadCount(result.unreadCount || 0)
       }
     } catch (error) {
-      console.error("Unexpected error fetching notifications:", error)
       toast({
         title: "Error",
         description: "An unexpected error occurred. Please try again.",
@@ -60,7 +58,6 @@ export function NotificationsClient() {
         })
         fetchNotifications(activeTab === "all")
       } else {
-        console.error("Error marking all notifications as read:", result.error)
         toast({
           title: "Error",
           description: "Failed to mark all notifications as read. Please try again.",
@@ -68,7 +65,6 @@ export function NotificationsClient() {
         })
       }
     } catch (error) {
-      console.error("Unexpected error marking all notifications as read:", error)
       toast({
         title: "Error",
         description: "An unexpected error occurred. Please try again.",

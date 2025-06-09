@@ -13,14 +13,12 @@ async function isAdmin(userId: string) {
     const { data, error } = await adminClient.from("auth_users").select("raw_user_meta_data").eq("id", userId).single()
 
     if (error || !data) {
-      console.error("Error checking admin status:", error)
       return false
     }
 
     // Check if user has admin role in metadata
     return data.raw_user_meta_data?.role === "admin"
   } catch (error) {
-    console.error("Error checking admin status:", error)
     return false
   }
 }
@@ -38,7 +36,6 @@ export async function adminResetUserPassword(formData: FormData) {
     const adminCheck = await isAdmin(currentUserId)
 
     if (!adminCheck) {
-      console.error("Non-admin user attempted to reset password:", currentUserId)
       return { error: "You do not have permission to perform this action" }
     }
 
@@ -70,7 +67,6 @@ export async function adminResetUserPassword(formData: FormData) {
       })
       .catch((error) => {
         // Log but don't fail if audit logging fails
-        console.error("Error logging admin action:", error)
       })
 
     // Get user email for sending reset link
@@ -81,7 +77,6 @@ export async function adminResetUserPassword(formData: FormData) {
       .single()
 
     if (userError || !userData) {
-      console.error("Error fetching user data:", userError)
       return { error: "User not found" }
     }
 
@@ -110,7 +105,6 @@ export async function adminResetUserPassword(formData: FormData) {
         .eq("id", userId)
 
       if (updateError) {
-        console.error("Error updating password:", updateError)
         return { error: "Failed to update password" }
       }
 
@@ -126,7 +120,6 @@ export async function adminResetUserPassword(formData: FormData) {
       const tokenResult = await createPasswordResetToken(userId)
 
       if (!tokenResult.success || !tokenResult.token) {
-        console.error("Failed to create reset token:", tokenResult.error)
         return { error: "Failed to create password reset token" }
       }
 
@@ -134,7 +127,6 @@ export async function adminResetUserPassword(formData: FormData) {
       const emailResult = await sendPasswordResetEmail(userData.email, tokenResult.token)
 
       if (!emailResult.success) {
-        console.error("Failed to send reset email:", emailResult.error)
         return { error: "Failed to send password reset email" }
       }
 
@@ -146,7 +138,6 @@ export async function adminResetUserPassword(formData: FormData) {
       return { error: "Invalid reset method" }
     }
   } catch (error) {
-    console.error("Error in adminResetUserPassword:", error)
     return { error: "An unexpected error occurred" }
   }
 }
@@ -164,7 +155,6 @@ export async function getUsers(search?: string, page = 1, limit = 10) {
     const adminCheck = await isAdmin(currentUserId)
 
     if (!adminCheck) {
-      console.error("Non-admin user attempted to access user list:", currentUserId)
       return { error: "You do not have permission to perform this action" }
     }
 
@@ -189,7 +179,6 @@ export async function getUsers(search?: string, page = 1, limit = 10) {
       .range(offset, offset + limit - 1)
 
     if (error) {
-      console.error("Error fetching users:", error)
       return { error: "Failed to fetch users" }
     }
 
@@ -200,7 +189,6 @@ export async function getUsers(search?: string, page = 1, limit = 10) {
       totalPages: count ? Math.ceil(count / limit) : 0,
     }
   } catch (error) {
-    console.error("Error in getUsers:", error)
     return { error: "An unexpected error occurred" }
   }
 }
@@ -208,7 +196,6 @@ export async function getUsers(search?: string, page = 1, limit = 10) {
 // Ensure admin audit logs table exists
 export async function ensureAdminAuditLogsTable() {
   try {
-    console.log("Ensuring admin_audit_logs table exists")
     const adminClient = createAdminClient()
 
     // Check if the table exists directly using information_schema
@@ -220,12 +207,10 @@ export async function ensureAdminAuditLogsTable() {
       .maybeSingle()
 
     if (error) {
-      console.error("Error checking if admin_audit_logs table exists:", error)
       return false
     }
 
     if (!data) {
-      console.log("Creating admin_audit_logs table")
 
       // Create the table
       const createTableSQL = `
@@ -245,18 +230,14 @@ export async function ensureAdminAuditLogsTable() {
       const { error: createError } = await adminClient.rpc("execute_sql", { sql_query: createTableSQL })
 
       if (createError) {
-        console.error("Error creating admin_audit_logs table:", createError)
         return false
       }
 
-      console.log("admin_audit_logs table created successfully")
     } else {
-      console.log("admin_audit_logs table already exists")
     }
 
     return true
   } catch (error) {
-    console.error("Unexpected error in ensureAdminAuditLogsTable:", error)
     return false
   }
 }
@@ -274,7 +255,6 @@ export async function getAdminAuditLogs(page = 1, limit = 20) {
     const adminCheck = await isAdmin(currentUserId)
 
     if (!adminCheck) {
-      console.error("Non-admin user attempted to access audit logs:", currentUserId)
       return { error: "You do not have permission to perform this action" }
     }
 
@@ -304,7 +284,6 @@ export async function getAdminAuditLogs(page = 1, limit = 20) {
       .range(offset, offset + limit - 1)
 
     if (error) {
-      console.error("Error fetching audit logs:", error)
       return { error: "Failed to fetch audit logs" }
     }
 
@@ -315,7 +294,6 @@ export async function getAdminAuditLogs(page = 1, limit = 20) {
       totalPages: count ? Math.ceil(count / limit) : 0,
     }
   } catch (error) {
-    console.error("Error in getAdminAuditLogs:", error)
     return { error: "An unexpected error occurred" }
   }
 }

@@ -133,7 +133,6 @@ export function getPreferences(): CookiePreferences {
 
     return JSON.parse(savedPreferences) as CookiePreferences
   } catch (error) {
-    console.error("Error loading cookie preferences:", error)
     return DEFAULT_PREFERENCES
   }
 }
@@ -145,7 +144,6 @@ export function savePreferences(preferences: CookiePreferences): void {
     localStorage.setItem("cookiePreferences", JSON.stringify(preferences))
     applyPreferences(preferences)
   } catch (error) {
-    console.error("Error saving cookie preferences:", error)
   }
 }
 
@@ -164,7 +162,6 @@ export function hasConsent(): boolean {
     // Check if consent has expired
     return now - preferences.lastUpdated <= CONSENT_EXPIRATION
   } catch (error) {
-    console.error("Error checking cookie consent:", error)
     return false
   }
 }

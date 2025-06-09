@@ -35,7 +35,6 @@ export function AddReviewNotificationTypeButton() {
       })
 
       if (error) {
-        console.error("Error adding review notification type:", error)
         toast({
           title: "Error",
           description: "Failed to add review notification type: " + error.message,
@@ -48,7 +47,6 @@ export function AddReviewNotificationTypeButton() {
         })
       }
     } catch (error) {
-      console.error("Error adding review notification type:", error)
       toast({
         title: "Error",
         description: "An unexpected error occurred",

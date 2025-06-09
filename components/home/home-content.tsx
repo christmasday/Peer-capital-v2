@@ -75,7 +75,6 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
         })
       }
     } catch (error) {
-      console.error("Error finding lenders:", error)
       setSearchError("An unexpected error occurred")
       setSearchResults([])
       toast({
@@ -140,7 +139,7 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
                     <span className="text-xs">Fund</span>
                   </Link>
 
-                  <Link href="/account/withdraw" className="flex flex-col items-center">
+                  <Link href="/account/transfer" className="flex flex-col items-center">
                     <div className="bg-white p-2 rounded-lg mb-2">
                       <ArrowRightLeft className="h-12 w-12 text-blue-700" />
                     </div>

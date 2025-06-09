@@ -16,13 +16,11 @@ export async function executeNotificationsMigration() {
     const { error } = await adminClient.rpc("exec_sql", { sql })
 
     if (error) {
-      console.error("Error executing notifications migration:", error)
       return { error: `Failed to execute migration: ${error.message}` }
     }
 
     return { success: true }
   } catch (error) {
-    console.error("Unexpected error executing notifications migration:", error)
     return { error: `An unexpected error occurred: ${error instanceof Error ? error.message : String(error)}` }
   }
 }

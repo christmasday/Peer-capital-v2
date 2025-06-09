@@ -99,7 +99,6 @@ export function FundAccountForm({ userId: initialUserId }: { userId?: string }) 
       if (!response.ok) {
         // Handle authentication errors
         if (response.status === 401) {
-          console.error("Authentication error:", data.error)
           setError("Authentication required. Please log in and try again.")
 
           // Store the intended destination for after login
@@ -118,7 +117,6 @@ export function FundAccountForm({ userId: initialUserId }: { userId?: string }) 
       // Redirect to Paystack payment page
       window.location.href = data.authorizationUrl
     } catch (error) {
-      console.error("Error initializing payment:", error)
       setError("An unexpected error occurred. Please try again.")
       setIsSubmitting(false)
     }

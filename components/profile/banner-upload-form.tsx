@@ -86,7 +86,6 @@ export function BannerUploadForm({ userId, currentBannerUrl }: BannerUploadFormP
         router.refresh()
       }, 2000)
     } catch (error) {
-      console.error("Error uploading banner:", error)
       setError("An error occurred while uploading your banner. Please try again.")
       setIsUploading(false)
       return

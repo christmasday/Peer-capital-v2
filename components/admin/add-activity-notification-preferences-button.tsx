@@ -26,7 +26,6 @@ export function AddActivityNotificationPreferencesButton() {
         })
       }
     } catch (error) {
-      console.error("Error executing migration:", error)
       toast({
         title: "Error",
         description: "An unexpected error occurred",

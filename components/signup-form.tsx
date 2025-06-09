@@ -299,7 +299,6 @@ export function SignupForm() {
           // const checkPromise = checkUserExists(formData.email, formData.phoneNumber, formData.bvn)
           // const timeoutPromise = new Promise<{ exists: boolean; error?: string }>((resolve) => {
           //   setTimeout(() => {
-          //     console.log("User existence check timed out - continuing anyway")
           //     resolve({
           //       exists: false,
           //       error: "Connection is slow, but you can continue. We'll verify again before account creation.",
@@ -315,7 +314,6 @@ export function SignupForm() {
 
           // Show a non-blocking warning if there was a timeout or error
           if (existsCheck.error) {
-            console.warn("Existence check issue:", existsCheck.error)
             // Show a warning but still allow continuing
             setFormErrors([existsCheck.error])
 
@@ -339,7 +337,6 @@ export function SignupForm() {
 
           setExistingUserInfo(null)
         } catch (error) {
-          console.error("Error checking user existence:", error)
           // Continue anyway, the server will check again during signup
           setFormErrors(["Unable to verify if user exists. You can continue, but we'll check again during signup."])
 
@@ -376,7 +373,6 @@ export function SignupForm() {
     if (isValid) {
       try {
         setIsSubmitting(true)
-        console.log("Starting signup process...")
 
         // Check if user already exists before proceeding
         try {
@@ -390,7 +386,6 @@ export function SignupForm() {
 
           // If there was an error but we're continuing anyway
           if (existsCheck.error) {
-            console.warn("Existence check issue during submission:", existsCheck.error)
             // Show a warning but continue with signup
             setFormErrors([existsCheck.error])
             // Wait a moment to show the message
@@ -408,7 +403,6 @@ export function SignupForm() {
 
           setExistingUserInfo(null)
         } catch (error) {
-          console.error("Error checking user existence:", error)
           // Continue anyway, the server will check again during signup
           setFormErrors(["Unable to verify if user exists. Continuing with signup anyway."])
           await new Promise((resolve) => setTimeout(resolve, 1500))
@@ -420,14 +414,12 @@ export function SignupForm() {
         // Upload profile picture if exists using the server action
         let pictureUrl = null
         if (formData.profilePicture) {
-          console.log("Uploading profile picture...")
 
           try {
             // Use the server action for file upload with timeout
             const uploadPromise = uploadProfilePicture(formData.profilePicture)
             const uploadTimeoutPromise = new Promise<{ error: string }>((resolve) => {
               setTimeout(() => {
-                console.log("Profile picture upload timed out - continuing without picture")
                 resolve({ error: "Upload timed out" })
               }, 3000)
             })
@@ -436,19 +428,15 @@ export function SignupForm() {
 
             if (typeof uploadResult === "string") {
               pictureUrl = uploadResult
-              console.log("Profile picture uploaded:", pictureUrl)
             } else if (uploadResult && uploadResult.error) {
-              console.warn("Profile picture upload warning:", uploadResult.error)
               // Continue with signup without the profile picture
             }
           } catch (uploadError) {
-            console.error("Error uploading profile picture:", uploadError)
             // Continue with signup without the profile picture
           }
         }
 
         // Register user with Supabase
-        console.log("Registering user with Supabase...")
 
         try {
           // Add timeout to prevent hanging
@@ -473,7 +461,6 @@ export function SignupForm() {
 
           const signupTimeoutPromise = new Promise<{ error: string }>((resolve) => {
             setTimeout(() => {
-              console.log("Signup request timed out")
               resolve({ error: "Signup request timed out. Please try again later." })
             }, 15000)
           })
@@ -481,7 +468,6 @@ export function SignupForm() {
           const result = await Promise.race([signupResult, signupTimeoutPromise])
 
           if (result.error) {
-            console.error("Signup error:", result.error)
 
             // Check if it's an existing user error
             if (result.error.includes("already exists") || result.error.includes("already registered")) {
@@ -518,11 +504,9 @@ export function SignupForm() {
               router.push("/")
             }, 2000)
           } catch (signupError) {
-            console.error("Signup request error:", signupError)
             setFormErrors(["An error occurred during signup. Please try again later."])
           }
         } catch (error) {
-          console.error("Unexpected signup error:", error)
           setFormErrors(["An unexpected error occurred. Please try again."])
         } finally {
           setIsSubmitting(false)
@@ -553,13 +537,11 @@ export function SignupForm() {
     const init = async () => {
       if (!storageInitialized) {
         try {
-          console.log("Initializing storage...")
 
           // Add a shorter timeout to prevent hanging
           const timeoutPromise = new Promise(
             (_, reject) =>
               setTimeout(() => {
-                console.log("Storage initialization timed out - continuing anyway")
                 return { success: true, message: "Timed out but continuing" }
               }, 2000), // Reduced from 5000ms to 2000ms
           )
@@ -573,16 +555,12 @@ export function SignupForm() {
             }
 
             if (result && result.success) {
-              console.log("Storage initialized:", result.message || "Success")
             } else if (result && result.error) {
-              console.warn("Storage initialization failed:", result.error)
             }
           } catch (raceError) {
-            console.warn("Storage initialization race failed:", raceError)
             // Continue anyway
           }
         } catch (error) {
-          console.error("Failed to initialize storage from signup form:", error)
         } finally {
           // Mark as initialized regardless of success to prevent retries
           setStorageInitialized(true)
@@ -592,7 +570,6 @@ export function SignupForm() {
 
     // Initialize but don't wait for it to complete
     init().catch((error) => {
-      console.error("Unhandled storage initialization error:", error)
       setStorageInitialized(true) // Mark as initialized to prevent retries
     })
   }, [storageInitialized])
