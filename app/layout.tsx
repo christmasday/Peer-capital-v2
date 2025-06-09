@@ -8,9 +8,12 @@ import { SupabaseProvider } from "@/components/supabase/SupabaseProvider"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Auth Mirror - Peer Capital",
-  description: "Mirror of Supabase Auth in Public Schema",
-    generator: 'v0.dev'
+  title: "Peer Capital",
+  description: "Peer Capital is a platform for peer-to-peer lending",
+  generator: 'v0.dev',
+  icons: {
+    icon: '/public/favicon.ico',
+  },
 }
 
 export default function RootLayout({
