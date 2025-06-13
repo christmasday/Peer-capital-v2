@@ -22,6 +22,15 @@ export default function AccountBalanceDisplay() {
     }
 
     loadAccountBalance()
+
+    // Listen for custom refresh event
+    function handleRefresh() {
+      loadAccountBalance()
+    }
+    window.addEventListener("refresh-account-balance", handleRefresh)
+    return () => {
+      window.removeEventListener("refresh-account-balance", handleRefresh)
+    }
   }, [])
 
   if (loading) {

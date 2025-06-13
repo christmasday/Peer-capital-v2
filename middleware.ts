@@ -36,8 +36,7 @@ export async function middleware(req: NextRequest) {
     path.includes(".png") ||
     path.includes(".jpg") ||
     path.includes(".svg") ||
-    path.startsWith("/api/auth/") ||
-    path.startsWith("/api/paystack/")
+    path.startsWith("/api/")
   ) {
     return NextResponse.next()
   }

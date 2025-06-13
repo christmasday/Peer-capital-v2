@@ -3,89 +3,53 @@
 import { createServerClient } from "@/lib/supabase/server"
 import { getJWTFromCookies, verifyJWT } from "@/lib/jwt"
 import { createAdminClient } from "@/lib/supabase/admin"
+import type { SupabaseClient } from "@supabase/supabase-js"
+import type { Database } from "@/lib/supabase/database.types"
+import { checkAuth } from "@/lib/auth-utils"
+import { getUserProfile } from "@/lib/actions/auth"
 
-// Mock data for fallback
-const mockTransactions = [
-  {
-    id: "mock-tx-1",
-    user_id: "mock-user",
-    amount: 50000,
-    type: "deposit",
-    description: "Account funding",
-    reference: "DEP12345",
-    status: "completed",
-    created_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: "mock-tx-2",
-    user_id: "mock-user",
-    amount: 15000,
-    type: "withdrawal",
-    description: "ATM withdrawal",
-    reference: "WIT12345",
-    status: "completed",
-    created_at: new Date(Date.now() - 25 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: "mock-tx-3",
-    user_id: "mock-user",
-    amount: 20000,
-    type: "loan_request",
-    description: "Loan request from Ada Ada",
-    reference: "LOAN12345",
-    status: "pending",
-    created_at: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-]
 
-export async function getUserTransactions() {
+export async function getUserTransactions(supabase: SupabaseClient<Database>) {
   try {
-    // Check for JWT first
-    const jwt = getJWTFromCookies()
-    let userId = null
+    // Use checkAuth to ensure the user is authenticated
+    await checkAuth()
 
-    if (jwt) {
-      try {
-        const { payload, error } = await verifyJWT(jwt)
-        if (!error && payload && payload.userId) {
-          userId = payload.userId
-        }
-      } catch (error) {
-      }
-    }
+    // Get the user profile
+    const userProfile = await getUserProfile()
+    console.log('[getUserTransactions] userProfile:', userProfile)
 
-    // If no userId from JWT, try Supabase session
+    const userId = userProfile?.user?.id
     if (!userId) {
-      const supabase = createServerClient()
-      const { data: sessionData } = await supabase.auth.getSession()
-
-      if (sessionData.session?.user) {
-        userId = sessionData.session.user.id
-      }
+      console.log('[getUserTransactions] No userId found in userProfile')
+      return { transactions: [] }
     }
+    console.log('[getUserTransactions] userId:', userId)
 
-    // If still no userId, return mock data
-    if (!userId) {
-      return { transactions: mockTransactions }
+    // Log the Supabase session
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+    console.log('[getUserTransactions] Supabase session:', sessionData)
+    if (sessionError) {
+      console.log('[getUserTransactions] Supabase session error:', sessionError)
     }
 
     // Get all transactions for the user
-    const supabase = createServerClient()
     const { data, error } = await supabase
       .from("transactions")
       .select("*")
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
 
+    // Debug: Log the query result and error
+    console.log('[getUserTransactions] Query result:', data)
     if (error) {
-      // Return mock data as fallback
-      return { transactions: mockTransactions }
+      console.log('[getUserTransactions] Query error:', error)
     }
 
     return { success: true, transactions: data }
   } catch (error) {
-    // Return mock data as fallback
-    return { transactions: mockTransactions }
+    // Debug: Log unexpected error
+    console.log('[getUserTransactions] Unexpected error:', error)
+    return { transactions: [] }
   }
 }
 
@@ -115,12 +79,6 @@ export async function getTransactionById(id: string) {
       }
     }
 
-    // If still no userId, return mock data
-    if (!userId) {
-      // Find a mock transaction with the given ID or return the first one
-      const mockTransaction = mockTransactions.find((t) => t.id === id) || mockTransactions[0]
-      return { transaction: mockTransaction }
-    }
 
     // Get the transaction
     const adminClient = createAdminClient()

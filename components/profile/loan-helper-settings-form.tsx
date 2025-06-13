@@ -75,17 +75,17 @@ export function LoanHelperSettingsForm({ userId, onSave, onCancel }: LoanHelperS
 
     try {
       if (isHelperEnabled) {
-        const { success, error } = await updateLoanHelperSettings(
-          userId,
-          loanAmount,
-          interestRate,
-          repaymentTime,
-          repaymentUnit,
-          termsAndConditions,
-        )
+      const { success, error } = await updateLoanHelperSettings(
+        userId,
+        loanAmount,
+        interestRate,
+        repaymentTime,
+        repaymentUnit,
+        termsAndConditions,
+      )
         if (onSave) onSave()
-        if (error) {
-          setError(error)
+      if (error) {
+        setError(error)
         } else {
           toast({
             title: "Helper Settings Updated",

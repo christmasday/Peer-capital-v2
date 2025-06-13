@@ -415,6 +415,25 @@ async function handleTransferSuccess(data: any, adminClient: any) {
       return
     }
 
+    // Debit the user's account balance
+    const { data: accountData, error: accountError } = await adminClient
+      .from("account_balances")
+      .select("balance")
+      .eq("user_id", userId)
+      .single()
+
+    if (!accountError && accountData) {
+      const currentBalance = accountData.balance || 0
+      const newBalance = currentBalance - transaction.amount
+      await adminClient
+        .from("account_balances")
+        .update({
+          balance: newBalance,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", userId)
+    }
+
     // Create a notification for the user
     const notificationData = {
       user_id: userId,
