@@ -559,17 +559,21 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
         bankName,
         accountNumber,
         accountName,
-        country,
         bankCode,
-        accountType, // persist account type
-      });
+        accountType,
+      }, profile.id); // Pass the user ID here
       if (result.success) {
+        // Update local state or refetch profile
+        setBankName(result.data.bank_name || bankName);
+        setAccountNumber(result.data.account_number || accountNumber);
+        setAccountName(result.data.account_name || accountName);
         setIsEditingBank(false);
+        // Optionally, trigger a profile refetch here if needed
       } else {
-        setBankError(result.error || "Failed to update bank details");
+        setBankError(result.error || "Failed to update bank details.");
       }
-    } catch (err: any) {
-      setBankError(err?.message || "Failed to update bank details");
+    } catch (err) {
+      setBankError("An unexpected error occurred.");
     } finally {
       setIsSavingBank(false);
     }
@@ -1930,7 +1934,15 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
                     </select>
                     {/* Bank Dropdown */}
                     <label className="font-semibold">Bank Name</label>
-                    <select value={bankCode} onChange={e => setBankCode(e.target.value)} className="border-b-2 border-blue-600 focus:border-green-600 outline-none px-3 py-2 w-full">
+                    <select
+                      value={bankCode}
+                      onChange={e => {
+                        setBankCode(e.target.value);
+                        const selected = banks.find(b => b.code === e.target.value);
+                        setBankName(selected ? selected.name : "");
+                      }}
+                      className="border-b-2 border-blue-600 focus:border-green-600 outline-none px-3 py-2 w-full"
+                    >
                       {isLoadingBanks ? <option>Loading...</option> : banks.map(b => <option key={b.code} value={b.code}>{b.name}</option>)}
                     </select>
                     {/* Account Type Dropdown */}
@@ -2001,13 +2013,14 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
                       <p className="text-gray-600">Account Type: {profile.account_type ? profile.account_type.charAt(0).toUpperCase() + profile.account_type.slice(1) : "Personal"}</p>
                       <div className="flex items-center gap-2 mt-1">
                         <span className="text-gray-600">BVN: <span className="font-mono">{profile.bvn ? `******${profile.bvn.slice(-4)}` : "-"}</span></span>
-                        {isCurrentUser && (
-                          <Button size="sm" variant="ghost" onClick={() => setIsEditingBvn(true)}><Edit className="h-4 w-4" /></Button>
+                        {profile.bvn_verified && (
+                          <Badge className="bg-green-500 text-white ml-2">Verified</Badge>
                         )}
-                        {isCurrentUser && profile.bvn && (
-                          null
+                        {isCurrentUser && !profile.bvn_verified && (
+                          <Button size="sm" variant="ghost" onClick={() => setIsEditingBvn(true)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
                         )}
-                        {bvnVerificationMsg && <span className={`ml-2 text-sm ${bvnVerified ? "text-green-600" : "text-red-600"}`}>{bvnVerificationMsg}</span>}
                       </div>
                     </div>
                     {isCurrentUser && (
@@ -2043,6 +2056,13 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
                       });
                       if (res.success) {
                         setCustomerVerificationMsg("Verification initiated. You will be notified when verification is complete.");
+                      } else if (res.error && res.error.includes("Customer already validated using the same credentials")) {
+                        // If already validated, update bvn_verified and bvn_verified_at
+                        await updateProfile({
+                          bvn_verified: true,
+                          bvn_verified_at: new Date().toISOString(),
+                        }, profile.id);
+                        setCustomerVerificationMsg("BVN already verified.");
                       } else {
                         setCustomerVerificationMsg(res.error || "Verification failed.");
                       }
@@ -2061,7 +2081,7 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
                   }
                   variant="secondary"
                 >
-                  {isVerifyingCustomer ? "Verifying..." : "Verify Bank Account"}
+                  {isVerifyingCustomer ? "Verifying..." : "Verify BVN"}
                 </Button>
                 {customerVerificationMsg && <div className="text-sm mt-2 text-blue-700">{customerVerificationMsg}</div>}
               </div>
@@ -2070,10 +2090,10 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
         )}
 
         {activeSection === "loan-helper" && (
-          <div className="space-y-8">
+          <div className={`space-y-8 ${!profile.lending_license_url && loanAmount ? 'opacity-50 pointer-events-none select-none' : ''}`}>
             <h2 className="text-xl font-medium flex items-center justify-between">
               Loan Helper Settings
-              {isCurrentUser && !isEditingLoanHelper && (
+              {isCurrentUser && !isEditingLoanHelper && profile.lending_license_url && (
                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setIsEditingLoanHelper(true)}>
                   <Edit className="h-4 w-4" />
                 </Button>
@@ -2082,11 +2102,18 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
             {isEditingLoanHelper ? (
               <LoanHelperSettingsForm
                 userId={profile.id}
+                lendingLicenseUrl={profile.lending_license_url}
                 onSave={() => setIsEditingLoanHelper(false)}
                 onCancel={() => setIsEditingLoanHelper(false)}
               />
             ) : (
-              <LoanHelperSettingsDisplay userId={profile.id} />
+              profile.lending_license_url ? (
+                <LoanHelperSettingsDisplay userId={profile.id} lendingLicenseUrl={profile.lending_license_url} />
+              ) : (
+                <div className="text-center text-gray-500 py-12">
+                  <p>You must upload a valid lending license to offer loans.</p>
+                </div>
+              )
             )}
           </div>
         )}

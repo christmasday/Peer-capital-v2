@@ -193,9 +193,11 @@ type UpdateProfileInput = {
   accountType?: string;
   idExpirationDate?: string;
   idDateIssued?: string;
+  bvn_verified?: boolean;
+  bvn_verified_at?: string;
 };
 
-export async function updateProfile(input: UpdateProfileInput) {
+export async function updateProfile(input: UpdateProfileInput, userIdOverride?: string) {
   try {
     if (isOfflineMode()) {
       // Return a mock success response, adjust as needed based on expected behavior
@@ -204,53 +206,56 @@ export async function updateProfile(input: UpdateProfileInput) {
     const supabase = createServerClient()
     const adminClient = createAdminClient()
 
-    // Try multiple methods to get the user ID
-    let userId = null
+    // Use the override if provided
+    let userId = userIdOverride || null;
 
-    // Method 1: Try to get user from Supabase session
-    try {
-      const { data: sessionData } = await supabase.auth.getSession()
-      if (sessionData.session?.user) {
-        userId = sessionData.session.user.id
-      }
-    } catch (sessionError) {
-      // Continue to next method
-    }
-
-    // Method 2: Try to get user from JWT if session failed
+    // Only try to get userId from session/cookies if not provided
     if (!userId) {
+      // Method 1: Try to get user from Supabase session
       try {
-        const { getJWTFromCookies, verifyJWT } = await import("@/lib/jwt")
-        const jwt = getJWTFromCookies()
-        if (jwt) {
-          const { payload, error } = await verifyJWT(jwt)
-          if (!error && payload && (payload.userId || payload.sub)) {
-            userId = payload.userId || payload.sub
-          }
+        const { data: sessionData } = await supabase.auth.getSession()
+        if (sessionData.session?.user) {
+          userId = sessionData.session.user.id
         }
-      } catch (jwtError) {
+      } catch (sessionError) {
         // Continue to next method
       }
-    }
 
-    // Method 3: Try to get user from custom auth token if other methods failed
-    if (!userId) {
-      try {
-        const cookieStoreResolved = await cookies()
-        const customAuthToken = cookieStoreResolved.get("custom-auth-token")?.value
-        if (customAuthToken) {
-          const { data, error } = await adminClient
-            .from("auth_users")
-            .select("id")
-            .eq("access_token", customAuthToken)
-            .single()
-
-          if (!error && data) {
-            userId = data.id
+      // Method 2: Try to get user from JWT if session failed
+      if (!userId) {
+        try {
+          const { getJWTFromCookies, verifyJWT } = await import("@/lib/jwt")
+          const jwt = getJWTFromCookies()
+          if (jwt) {
+            const { payload, error } = await verifyJWT(jwt)
+            if (!error && payload && (payload.userId || payload.sub)) {
+              userId = payload.userId || payload.sub
+            }
           }
+        } catch (jwtError) {
+          // Continue to next method
         }
-      } catch (customAuthError) {
-        // Continue to next method
+      }
+
+      // Method 3: Try to get user from custom auth token if other methods failed
+      if (!userId) {
+        try {
+          const cookieStoreResolved = await cookies()
+          const customAuthToken = cookieStoreResolved.get("custom-auth-token")?.value
+          if (customAuthToken) {
+            const { data, error } = await adminClient
+              .from("auth_users")
+              .select("id")
+              .eq("access_token", customAuthToken)
+              .single()
+
+            if (!error && data) {
+              userId = data.id
+            }
+          }
+        } catch (customAuthError) {
+          // Continue to next method
+        }
       }
     }
 
@@ -301,6 +306,8 @@ export async function updateProfile(input: UpdateProfileInput) {
     if (input.accountType !== undefined) updateData.account_type = input.accountType;
     if (input.idExpirationDate !== undefined) updateData.id_expiration_date = input.idExpirationDate;
     if (input.idDateIssued !== undefined) updateData.id_date_issued = input.idDateIssued;
+    if (input.bvn_verified !== undefined) updateData.bvn_verified = input.bvn_verified;
+    if (input.bvn_verified_at !== undefined) updateData.bvn_verified_at = input.bvn_verified_at;
 
     if (Object.keys(updateData).length === 0) {
         return { success: false, error: "No fields to update." };

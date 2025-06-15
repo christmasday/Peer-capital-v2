@@ -186,7 +186,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
             </div>
 
             {/* Right side - Loan helper info */}
-            {loanHelperSettings && (
+            {loanHelperSettings && profile.lending_license_url && (
               <div className="flex items-center mt-1.5 md:mt-0">
                 <div className="flex flex-col items-end">
                   <Badge className="bg-green-500 hover:bg-green-600 mb-1">Loan Helper</Badge>

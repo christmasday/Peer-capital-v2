@@ -8,14 +8,16 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 
 interface LoanHelperSettingsDisplayProps {
   userId: string
+  lendingLicenseUrl?: string | null
 }
 
-export function LoanHelperSettingsDisplay({ userId }: LoanHelperSettingsDisplayProps) {
+export function LoanHelperSettingsDisplay({ userId, lendingLicenseUrl }: LoanHelperSettingsDisplayProps) {
   const [settings, setSettings] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    if (!lendingLicenseUrl) return;
     const fetchSettings = async () => {
       setIsLoading(true)
       setError(null)
@@ -32,9 +34,8 @@ export function LoanHelperSettingsDisplay({ userId }: LoanHelperSettingsDisplayP
         setIsLoading(false)
       }
     }
-
     fetchSettings()
-  }, [userId])
+  }, [userId, lendingLicenseUrl])
 
   // Format currency
   const formatCurrency = (amount: number) => {
@@ -44,6 +45,8 @@ export function LoanHelperSettingsDisplay({ userId }: LoanHelperSettingsDisplayP
       minimumFractionDigits: 2,
     }).format(amount)
   }
+
+  if (!lendingLicenseUrl) return null;
 
   if (isLoading) {
     return (

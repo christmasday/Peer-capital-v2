@@ -207,7 +207,7 @@ export default async function UserProfilePage({
           {/* <div className="mt-1">
             <span className="text-gray-500 text-base">Followed by {followersCount?.length || 0} {followersCount?.length === 1 ? "person" : "people"}</span>
           </div> */}
-          {loanHelperSettings && loanHelperSettings.loan_amount && loanHelperSettings.interest_rate && loanHelperSettings.repayment_time && (
+          {loanHelperSettings && profile.lending_license_url && loanHelperSettings.loan_amount && loanHelperSettings.interest_rate && loanHelperSettings.repayment_time && (
             <div className="flex items-center gap-4 mt-2">
               <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
                 Loan Helper

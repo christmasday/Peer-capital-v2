@@ -18,9 +18,10 @@ interface LoanHelperSettingsFormProps {
   userId: string
   onSave?: () => void
   onCancel?: () => void
+  lendingLicenseUrl?: string | null
 }
 
-export function LoanHelperSettingsForm({ userId, onSave, onCancel }: LoanHelperSettingsFormProps) {
+export function LoanHelperSettingsForm({ userId, onSave, onCancel, lendingLicenseUrl }: LoanHelperSettingsFormProps) {
   const [loanAmount, setLoanAmount] = useState<number>(0)
   const [interestRate, setInterestRate] = useState<number>(0)
   const [repaymentTime, setRepaymentTime] = useState<number>(12)
@@ -31,6 +32,7 @@ export function LoanHelperSettingsForm({ userId, onSave, onCancel }: LoanHelperS
   const [success, setSuccess] = useState(false)
   const { toast } = useToast()
   const [isHelperEnabled, setIsHelperEnabled] = useState(false)
+  const isDisabled = !lendingLicenseUrl;
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -115,8 +117,15 @@ export function LoanHelperSettingsForm({ userId, onSave, onCancel }: LoanHelperS
         <CardDescription>Configure the settings for your loan offering to other users.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {isDisabled && (
+          <Alert variant="default">
+            <AlertDescription>
+              You must upload a valid lending license to your profile before you can enable or edit loan helper settings.
+            </AlertDescription>
+          </Alert>
+        )}
         <div className="flex items-center gap-3 mb-2">
-          <Switch checked={isHelperEnabled} onCheckedChange={setIsHelperEnabled} id="helper-enabled-switch" />
+          <Switch checked={isHelperEnabled} onCheckedChange={setIsHelperEnabled} id="helper-enabled-switch" disabled={isDisabled} />
           <Label htmlFor="helper-enabled-switch">Enable Loan Helper</Label>
         </div>
         {error && (
@@ -136,6 +145,7 @@ export function LoanHelperSettingsForm({ userId, onSave, onCancel }: LoanHelperS
                 placeholder="Enter loan amount"
                 value={loanAmount}
                 onChange={(e) => setLoanAmount(Number(e.target.value))}
+                disabled={isDisabled}
               />
             </div>
             <div>
@@ -146,6 +156,7 @@ export function LoanHelperSettingsForm({ userId, onSave, onCancel }: LoanHelperS
                 placeholder="Enter interest rate"
                 value={interestRate}
                 onChange={(e) => setInterestRate(Number(e.target.value))}
+                disabled={isDisabled}
               />
             </div>
             <div>
@@ -158,8 +169,9 @@ export function LoanHelperSettingsForm({ userId, onSave, onCancel }: LoanHelperS
                   value={repaymentTime}
                   onChange={(e) => setRepaymentTime(Number(e.target.value))}
                   min={1}
+                  disabled={isDisabled}
                 />
-                <Select value={repaymentUnit} onValueChange={setRepaymentUnit}>
+                <Select value={repaymentUnit} onValueChange={setRepaymentUnit} disabled={isDisabled}>
                   <SelectTrigger className="w-28">
                     <SelectValue placeholder="Unit" />
                   </SelectTrigger>
@@ -178,13 +190,14 @@ export function LoanHelperSettingsForm({ userId, onSave, onCancel }: LoanHelperS
                 placeholder="Enter terms and conditions"
                 value={termsAndConditions}
                 onChange={(e) => setTermsAndConditions(e.target.value)}
+                disabled={isDisabled}
               />
             </div>
             <div className="flex gap-2 justify-end">
-              <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
+              <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading || isDisabled}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={isLoading}>
+              <Button type="submit" disabled={isLoading || isDisabled}>
                 {isLoading ? "Saving..." : "Save Settings"}
               </Button>
             </div>
