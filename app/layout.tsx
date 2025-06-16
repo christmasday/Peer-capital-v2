@@ -24,6 +24,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        {/* (other head content) */}
+      </head>
       <body className={inter.className}>
         <SupabaseProvider>
           {children}

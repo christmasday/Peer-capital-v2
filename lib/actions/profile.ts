@@ -195,6 +195,8 @@ type UpdateProfileInput = {
   idDateIssued?: string;
   bvn_verified?: boolean;
   bvn_verified_at?: string;
+  phoneVerified?: boolean;
+  phoneVerifiedAt?: string;
 };
 
 export async function updateProfile(input: UpdateProfileInput, userIdOverride?: string) {
@@ -308,6 +310,8 @@ export async function updateProfile(input: UpdateProfileInput, userIdOverride?: 
     if (input.idDateIssued !== undefined) updateData.id_date_issued = input.idDateIssued;
     if (input.bvn_verified !== undefined) updateData.bvn_verified = input.bvn_verified;
     if (input.bvn_verified_at !== undefined) updateData.bvn_verified_at = input.bvn_verified_at;
+    if (input.phoneVerified !== undefined) updateData.phone_verified = input.phoneVerified;
+    if (input.phoneVerifiedAt !== undefined) updateData.phone_verified_at = input.phoneVerifiedAt;
 
     if (Object.keys(updateData).length === 0) {
         return { success: false, error: "No fields to update." };

@@ -456,6 +456,7 @@ export function ProfileEditForm({ profile, initialTab = "personal" }: ProfileEdi
                             onChange={(e) => setPhoneNumber(e.target.value)}
                             className="pl-10"
                             required
+                            disabled={profile.phone_verified}
                           />
                         </div>
                       </div>

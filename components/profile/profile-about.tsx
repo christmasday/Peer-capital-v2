@@ -19,6 +19,20 @@ import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { LoanHelperSettingsForm } from "@/components/profile/loan-helper-settings-form"
 import { LoanHelperSettingsDisplay } from "@/components/profile/loan-helper-settings-display"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import Script from "next/script"
+// Fix for missing types for react-dojah
+// @ts-ignore
+// eslint-disable-next-line
+declare module 'react-dojah';
+import Dojah from 'react-dojah'
+
+// Add Dojah to window type
+declare global {
+  interface Window {
+    Dojah?: any;
+  }
+}
 
 interface ProfileAboutProps {
   profile: any
@@ -112,6 +126,38 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
   const { toast } = useToast();
   const [isVerifyingCustomer, setIsVerifyingCustomer] = useState(false);
   const [customerVerificationMsg, setCustomerVerificationMsg] = useState<string | null>(null);
+  // Add state and handlers at the top of the component
+  const [showPhoneVerify, setShowPhoneVerify] = useState(false);
+  const [otp, setOtp] = useState("");
+  const [otpError, setOtpError] = useState("");
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [showDojah, setShowDojah] = useState(false);
+
+  const handleVerifyPhoneOtp = async () => {
+    setIsVerifyingOtp(true);
+    setOtpError("");
+    try {
+      const res = await fetch("/api/phone/verify-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: profile.phone_number, otp }),
+      });
+      const data = await res.json();
+      if (res.ok && data.status === "success") {
+        await updateProfile({ phoneVerified: true, phoneVerifiedAt: new Date().toISOString() }, profile.id);
+        setShowPhoneVerify(false);
+        setOtp("");
+        // Optionally, trigger a profile refetch or reload
+        window.location.reload();
+      } else {
+        setOtpError(data.message || "Invalid OTP");
+      }
+    } catch (err) {
+      setOtpError("Verification failed. Please try again.");
+    } finally {
+      setIsVerifyingOtp(false);
+    }
+  };
 
   const sections = [
     { id: "overview", name: "Overview", icon: Info },
@@ -1205,7 +1251,6 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
       {/* Left sidebar with sections */}
       <div className="space-y-1">
         <h2 className="text-xl font-bold mb-4">About</h2>
-
         {sections.map((section) => (
           <button
             key={section.id}
@@ -1219,11 +1264,75 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
           </button>
         ))}
       </div>
-
       {/* Right content area */}
       <div className="md:col-span-2">
         {activeSection === "overview" && (
           <div className="space-y-6">
+            {/* Dojah Verification Button */}
+            {isCurrentUser && (
+              <div className="mb-4">
+                <Button color="primary" onClick={() => setShowDojah(true)}>
+                  Complete Profile Verification
+                </Button>
+              </div>
+            )}
+            {/* Dojah Widget Modal */}
+            {showDojah && (
+              <Dojah
+                appID={process.env.DOJAH_APP_ID}
+                publicKey={process.env.DOJAH_PUBLIC_KEY}
+                type="custom"
+                config={{
+                  widget_id: "684effd6cb141c071767fddc",
+                }}
+                userData={{
+                  first_name: profile.first_name,
+                  middle_name: profile.middle_name,
+                  last_name: profile.last_name,
+                  email: profile.email,
+                  residence_country: profile.country || 'NG',
+                }}
+                metadata={{
+                  user_id: profile.id,
+                }}
+                response={async (type: any, data: any) => {
+                  if (type === 'success') {
+                    const verified = data?.data || {};
+                    // Build the update object, omitting full name fields
+                    const updateFields: any = {
+                      dateOfBirth: verified.user_data?.data?.dob,
+                      bvn: verified.government_data?.data?.bvn?.entity?.bvn,
+                      address: verified.government_data?.data?.nin?.entity?.residence_AddressLine1,
+                      city: verified.government_data?.data?.nin?.entity?.residence_Town,
+                      state: verified.government_data?.data?.nin?.entity?.residence_state,
+                      country: verified.countries?.data?.country,
+                      id_url: verified.id?.data?.id_url,
+                      id_type: verified.id?.data?.id_data?.document_type,
+                      id_number: verified.id?.data?.id_data?.document_number
+                      // Add more fields as needed, but do NOT include firstName, lastName, middleName
+                    };
+                    Object.keys(updateFields).forEach(
+                      (key) => updateFields[key] === undefined && delete updateFields[key]
+                    );
+                    const result = await updateProfile(updateFields, profile.id);
+                    if (result.success) {
+                      toast({
+                        title: "Profile Verification Successful",
+                        description: "Your profile has been updated with your verified information.",
+                      });
+                    } else {
+                      toast({
+                        title: "Profile Update Failed",
+                        description: result.error || "An error occurred while updating your profile.",
+                      });
+                    }
+                    setShowDojah(false);
+                  } else if (type === 'close') {
+                    setShowDojah(false);
+                  }
+                }}
+              />
+            )}
             {/* Referral Code Display */}
             {profile.referral_code && (
               <div className="flex items-center gap-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
@@ -1380,6 +1489,7 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
                          onChange={(e) => setPhoneText(e.target.value)}
                          placeholder="Phone Number"
                          className="border-b-3 border-solid !important border-b-blue-600 !important focus-visible:border-b-green-600 !important rounded-none px-3 py-2 w-full"
+                         disabled={profile.phone_verified}
                        />
                        <div className="flex justify-end gap-2 mt-2">
                          <Button variant="outline" onClick={handleCancelEditPhone}>Cancel</Button>
@@ -1387,19 +1497,18 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
                        </div>
                      </div>
                    ) : (
-                     <div className="flex justify-between items-start w-full">
-                  <div>
-                    <h3 className="text-lg font-medium">{profile.phone_number || "No phone number added"}</h3>
-                    <p className="text-gray-600">Mobile</p>
-                  </div>
-                  {isCurrentUser && (
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setIsEditingPhone(true)}>
-                        <Edit className="h-4 w-4" />
-                    </Button>
+                     <div className="flex items-center gap-2">
+                      <h3 className="text-lg font-medium">{profile.phone_number || "No phone number added"}</h3>
+                      {profile.phone_verified && (
+                        <Badge className="bg-green-500 text-white ml-2">Verified</Badge>
+                      )}
+                      {isCurrentUser && !profile.phone_verified && profile.phone_number && (
+                        <Button size="sm" variant="outline" onClick={() => setShowPhoneVerify(true)}>Verify</Button>
+                      )}
+                    </div>
                   )}
+                  <p className="text-gray-600">Mobile</p>
                 </div>
-                    )}
-                  </div>
               </div>
             </div>
 
@@ -1426,13 +1535,13 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
                      </div>
                    ) : (
                      <div className="flex justify-between items-start w-full">
-                  <div>
-                    <h3 className="text-lg font-medium">{profile.email || "No email added"}</h3>
-                    <p className="text-gray-600">Email</p>
-                  </div>
+                <div>
+                  <h3 className="text-lg font-medium">{profile.email || "No email added"}</h3>
+                  <p className="text-gray-600">Email</p>
                 </div>
-                     )}
-                  </div>
+              </div>
+                   )}
+                </div>
               </div>
             </div>
           </div>
@@ -1495,7 +1604,7 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
                           ? profile.job_title
                           : profile.employer_name
                             ? `Works at ${profile.employer_name}`
-                               : "Work"}
+                             : "Work"}
                     </h3>
                     {profile.employer_address && <p className="text-gray-600">{profile.employer_address}</p>}
                     {profile.employment_status && <p className="text-gray-600">{profile.employment_status}</p>}
@@ -1730,7 +1839,7 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
                       onChange={e => setPhoneText(e.target.value)}
                       placeholder="Phone Number"
                       className="border-b-2 border-blue-600 focus:border-green-600 outline-none px-3 py-2 w-full"
-                      disabled={isSavingContact}
+                      disabled={profile.phone_verified || isSavingContact}
                     />
                     <div className="flex gap-2 mt-2 w-full">
                       <Button variant="outline" className="w-1/2" onClick={handleCancelEditPhone} type="button" disabled={isSavingContact}>Cancel</Button>
@@ -1741,7 +1850,15 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
                   </div>
                 ) : (
                   <>
-                    <span>{profile.phone_number || "No phone number added"}</span>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-lg font-medium">{profile.phone_number || "No phone number added"}</h3>
+                      {profile.phone_verified && (
+                        <Badge className="bg-green-500 text-white ml-2">Verified</Badge>
+                      )}
+                      {isCurrentUser && !profile.phone_verified && profile.phone_number && (
+                        <Button size="sm" variant="outline" onClick={() => setShowPhoneVerify(true)}>Verify</Button>
+                      )}
+                    </div>
                     {isCurrentUser && (
                       <Button size="sm" variant="ghost" className="ml-auto" onClick={() => { setIsEditingPhone(true); setIsEditingFullName(false); setIsEditingEmail(false); setIsEditingContact(false); }}><Edit className="h-4 w-4" /></Button>
                     )}
@@ -1901,11 +2018,11 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
                    </div>
                  ) : (
                    <div className="flex justify-between items-start">
-                <p className="text-gray-700">{profile.bio || "No details to show"}</p>
+              <p className="text-gray-700">{profile.bio || "No details to show"}</p>
                      {isCurrentUser && (
                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setIsEditingBio(true)}>
                          <Edit className="h-4 w-4" />
-                  </Button>
+                </Button>
                      )}
                    </div>
                 )}
@@ -2158,9 +2275,39 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
             </CardContent>
           </Card>
         )}
+
+        {/* Phone Verification Dialog */}
+        <Dialog open={showPhoneVerify} onOpenChange={setShowPhoneVerify}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Verify Your Phone Number</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <p>Enter the OTP sent to your phone number ({profile.phone_number})</p>
+              <input
+                type="text"
+                value={otp}
+                onChange={e => setOtp(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
+                placeholder="Enter OTP"
+                className="border px-3 py-2 w-full rounded"
+                maxLength={6}
+                disabled={isVerifyingOtp}
+              />
+              {otpError && <div className="text-red-500 text-sm">{otpError}</div>}
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowPhoneVerify(false)} disabled={isVerifyingOtp}>
+                  Cancel
+                </Button>
+                <Button onClick={handleVerifyPhoneOtp} disabled={otp.length !== 6 || isVerifyingOtp}>
+                  {isVerifyingOtp ? "Verifying..." : "Verify"}
+                </Button>
+              </DialogFooter>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
-  )
+  );
 }
 
 export default ProfileAbout

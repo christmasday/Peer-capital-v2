@@ -23,7 +23,7 @@ const formSchema = z.object({
     .positive("Amount must be positive")
     .min(100, "Minimum funding amount is ₦100")
     .max(10000000, "Maximum funding amount is ₦10,000,000"),
-  paymentMethod: z.enum(["card", "bank_transfer", "ussd", "mobile_money"], {
+  paymentMethod: z.enum(["card", "bank_transfer"], {
     required_error: "Please select a payment method",
   }),
 })
@@ -55,6 +55,17 @@ export function FundAccountForm({ userId: initialUserId }: { userId?: string }) 
     },
   })
 
+  // Calculate 2% fee, capped at 2100
+  const calculateFee = (amount: number) => {
+    const fee = amount * 0.02;
+    return fee > 2100 ? 2100 : Math.round(fee);
+  };
+
+  const amountValueRaw = form.watch("amount") || 0;
+  const amountValue = typeof amountValueRaw === 'string' ? Number(amountValueRaw) : amountValueRaw;
+  const fee = calculateFee(amountValue);
+  const total = amountValue + fee;
+
   async function onSubmit(values: FormValues) {
     setIsSubmitting(true)
     setError(null)
@@ -71,8 +82,8 @@ export function FundAccountForm({ userId: initialUserId }: { userId?: string }) 
         return
       }
 
-      // Convert amount to kobo (Paystack uses kobo)
-      const amountInKobo = Math.round(values.amount * 100)
+      // Convert total (amount + fee) to kobo (Paystack uses kobo)
+      const totalInKobo = Math.round((values.amount + calculateFee(values.amount)) * 100)
 
       // Get any stored JWT from localStorage to include in the request
       const storedJWT = getJWTFromStorage()
@@ -86,7 +97,7 @@ export function FundAccountForm({ userId: initialUserId }: { userId?: string }) 
           ...(storedJWT ? { Authorization: `Bearer ${storedJWT}` } : {}),
         },
         body: JSON.stringify({
-          amount: amountInKobo,
+          amount: totalInKobo,
           paymentMethod: values.paymentMethod,
           userId: currentUserId, // Include the user ID directly in the request
         }),
@@ -203,40 +214,6 @@ export function FundAccountForm({ userId: initialUserId }: { userId?: string }) 
                         </Label>
                       </CardContent>
                     </Card>
-
-                    <Card
-                      className={`cursor-pointer border-2 ${field.value === "ussd" ? "border-blue-600" : "border-gray-200"}`}
-                    >
-                      <CardContent className="p-4 flex flex-col items-center justify-center">
-                        <RadioGroupItem value="ussd" id="ussd" className="sr-only" />
-                        <Label htmlFor="ussd" className="cursor-pointer flex flex-col items-center">
-                          <Smartphone
-                            className={`h-8 w-8 mb-2 ${field.value === "ussd" ? "text-blue-600" : "text-gray-500"}`}
-                          />
-                          <span className={`font-medium ${field.value === "ussd" ? "text-blue-600" : "text-gray-700"}`}>
-                            USSD
-                          </span>
-                        </Label>
-                      </CardContent>
-                    </Card>
-
-                    <Card
-                      className={`cursor-pointer border-2 ${field.value === "mobile_money" ? "border-blue-600" : "border-gray-200"}`}
-                    >
-                      <CardContent className="p-4 flex flex-col items-center justify-center">
-                        <RadioGroupItem value="mobile_money" id="mobile_money" className="sr-only" />
-                        <Label htmlFor="mobile_money" className="cursor-pointer flex flex-col items-center">
-                          <Smartphone
-                            className={`h-8 w-8 mb-2 ${field.value === "mobile_money" ? "text-blue-600" : "text-gray-500"}`}
-                          />
-                          <span
-                            className={`font-medium ${field.value === "mobile_money" ? "text-blue-600" : "text-gray-700"}`}
-                          >
-                            Mobile Money
-                          </span>
-                        </Label>
-                      </CardContent>
-                    </Card>
                   </RadioGroup>
                 </FormControl>
                 <FormMessage />
@@ -248,13 +225,13 @@ export function FundAccountForm({ userId: initialUserId }: { userId?: string }) 
             <h3 className="font-medium text-blue-800 mb-2">Transaction Summary</h3>
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div className="text-gray-600">Amount:</div>
-              <div className="font-medium text-right">{formatCurrency(form.watch("amount") || 0)}</div>
+              <div className="font-medium text-right">{formatCurrency(amountValue)}</div>
 
-              <div className="text-gray-600">Fee:</div>
-              <div className="font-medium text-right">₦0.00</div>
+              <div className="text-gray-600">Fee (2%):</div>
+              <div className="font-medium text-right">{formatCurrency(fee)}</div>
 
               <div className="text-gray-600 font-medium pt-2 border-t">Total:</div>
-              <div className="font-bold text-right pt-2 border-t">{formatCurrency(form.watch("amount") || 0)}</div>
+              <div className="font-bold text-right pt-2 border-t">{formatCurrency(total)}</div>
             </div>
           </div>
 
