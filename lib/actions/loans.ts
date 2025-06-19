@@ -449,6 +449,24 @@ export async function approveLoanRequest({ loanRequestId, pin, approverId }: { l
   if (updateError) {
     return { success: false, error: "Failed to update loan status" }
   }
+
+  // Send email notification for loan disbursement
+  try {
+    const { getProfileById } = await import("@/lib/actions/profile")
+    const { sendTransactionEmail } = await import("@/lib/actions/email-notifications")
+    const borrowerProfile = await getProfileById(loanRequest.user_id)
+    if (borrowerProfile && borrowerProfile.email) {
+      await sendTransactionEmail({
+        email: borrowerProfile.email,
+        userName: borrowerProfile.first_name || "User",
+        transactionType: "Loan Disbursement",
+        amount: loanRequest.amount,
+        reference: loanRequestId,
+        status: "Completed",
+      })
+    }
+  } catch (e) { /* ignore email errors */ }
+
   // Insert into loan_history for approval
   await adminClient.from("loan_history").insert({
     loan_request_id: loanRequestId,

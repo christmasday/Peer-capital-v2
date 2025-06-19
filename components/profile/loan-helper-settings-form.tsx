@@ -13,6 +13,7 @@ import { getLoanHelperSettings, updateLoanHelperSettings } from "@/lib/actions/l
 import { useToast } from "@/hooks/use-toast"
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
+import { getAccountBalance } from "@/lib/actions/account"
 
 interface LoanHelperSettingsFormProps {
   userId: string
@@ -33,6 +34,7 @@ export function LoanHelperSettingsForm({ userId, onSave, onCancel, lendingLicens
   const { toast } = useToast()
   const [isHelperEnabled, setIsHelperEnabled] = useState(false)
   const isDisabled = !lendingLicenseUrl;
+  const [accountBalance, setAccountBalance] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -68,6 +70,24 @@ export function LoanHelperSettingsForm({ userId, onSave, onCancel, lendingLicens
     }
     fetchHelperStatus()
   }, [userId])
+
+  useEffect(() => {
+    // Fetch account balance
+    async function fetchBalance() {
+      const { data, error } = await getAccountBalance(userId);
+      if (!error && data && typeof data.balance === 'number') {
+        setAccountBalance(data.balance);
+      }
+    }
+    fetchBalance();
+  }, [userId]);
+
+  // Turn off helper if balance is 0
+  useEffect(() => {
+    if (accountBalance === 0 && isHelperEnabled) {
+      setIsHelperEnabled(false);
+    }
+  }, [accountBalance]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -110,6 +130,8 @@ export function LoanHelperSettingsForm({ userId, onSave, onCancel, lendingLicens
     }
   }
 
+  const loanAmountExceedsBalance = accountBalance !== null && loanAmount > accountBalance;
+
   return (
     <Card>
       <CardHeader>
@@ -125,12 +147,27 @@ export function LoanHelperSettingsForm({ userId, onSave, onCancel, lendingLicens
           </Alert>
         )}
         <div className="flex items-center gap-3 mb-2">
-          <Switch checked={isHelperEnabled} onCheckedChange={setIsHelperEnabled} id="helper-enabled-switch" disabled={isDisabled} />
+          <Switch checked={isHelperEnabled} onCheckedChange={setIsHelperEnabled} id="helper-enabled-switch" disabled={isDisabled || accountBalance === 0} />
           <Label htmlFor="helper-enabled-switch">Enable Loan Helper</Label>
         </div>
+        {accountBalance === 0 && (
+          <Alert variant="default">
+            <AlertDescription>
+              You too need help. You must have a positive account balance before you can offer loans.
+            </AlertDescription>
+          </Alert>
+        )}
         {error && (
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        {loanAmountExceedsBalance && (
+          <Alert variant="destructive">
+            <AlertDescription>
+              You no get money to lend. Who you wan impress?
+              Loan offer cannot exceed your account balance (₦{accountBalance?.toLocaleString()}).
+            </AlertDescription>
           </Alert>
         )}
         {isLoading ? (
@@ -197,7 +234,7 @@ export function LoanHelperSettingsForm({ userId, onSave, onCancel, lendingLicens
               <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading || isDisabled}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={isLoading || isDisabled}>
+              <Button type="submit" disabled={isLoading || isDisabled || loanAmountExceedsBalance}>
                 {isLoading ? "Saving..." : "Save Settings"}
               </Button>
             </div>

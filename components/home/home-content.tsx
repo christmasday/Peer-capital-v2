@@ -146,12 +146,12 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
                     <span className="text-xs">Transfer</span>
                   </Link>
 
-                  <div className="flex flex-col items-center">
+                  <Link href="/loans" className="flex flex-col items-center">
                     <div className="bg-white p-2 rounded-lg mb-2">
                       <TrendingUp className="h-12 w-12 text-blue-700" />
                     </div>
                     <span className="text-xs">Loans</span>
-                  </div>
+                  </Link>
                 </div>
               </div>
             </div>

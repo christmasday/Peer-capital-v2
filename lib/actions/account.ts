@@ -247,3 +247,17 @@ export async function transferFromAccount(data: TransferAccountData) {
     return { error: "An unexpected error occurred. Please try again." }
   }
 }
+
+// Fetch a user's account balance by userId
+export async function getAccountBalance(userId: string) {
+  const adminClient = createAdminClient();
+  const { data, error } = await adminClient
+    .from("account_balances")
+    .select("balance")
+    .eq("user_id", userId)
+    .single();
+  if (error || !data) {
+    return { error: error?.message || 'Failed to fetch account balance' };
+  }
+  return { data };
+}

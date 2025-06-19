@@ -10,6 +10,7 @@ import { updateBio } from "@/lib/actions/profile"
 import { updateProfile, uploadIdDocument, uploadLendingLicenseServer } from "@/lib/actions/profile"
 import { getLoanHelperSettings, updateLoanHelperSettings } from "@/lib/actions/loan-helper-settings"
 import { getVirtualAccount, createVirtualAccount, validateCustomerIdentification } from "@/lib/actions/paystack"
+import { getAccountBalance } from "@/lib/actions/account"
 import { Textarea } from "@/components/ui/textarea"
 import { createAdminClient } from "@/lib/supabase/admin"
 import imageCompression from 'browser-image-compression'
@@ -205,13 +206,41 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
   useEffect(() => {
     const fetchLoanHelper = async () => {
       if (activeSection === "loan-helper" && !loanHelperLoaded && profile.id) {
-        const { data, error } = await getLoanHelperSettings(profile.id);
-        if (data) {
-          setLoanAmount(data.loan_amount?.toString() || "");
-          setInterestRate(data.interest_rate?.toString() || "");
-          setPaybackPeriod(data.repayment_time?.toString() || "");
-          setLoanTerms(data.terms_and_conditions || "");
+        // First get the account balance
+        const { data: balanceData } = await getAccountBalance(profile.id);
+        
+        if (balanceData?.balance === 0) {
+          // Only update settings if balance is 0
+          const { success, error } = await updateLoanHelperSettings(
+            profile.id,
+            0, // loan amount
+            0, // interest rate
+            0, // repayment time
+            "months", // repayment unit
+            "", // terms and conditions
+          );
+
+          if (success) {
+            // Turn off the loan helper
+            await fetch(`/api/loan-helper-status?userId=${profile.id}`, { method: "DELETE" });
+            
+            // Update local state
+            setLoanAmount("0");
+            setInterestRate("0");
+            setPaybackPeriod("0");
+            setLoanTerms("");
+          }
+        } else {
+          // If balance is not 0, just fetch the current settings
+          const { data, error } = await getLoanHelperSettings(profile.id);
+          if (data) {
+            setLoanAmount(data.loan_amount?.toString() || "");
+            setInterestRate(data.interest_rate?.toString() || "");
+            setPaybackPeriod(data.repayment_time?.toString() || "");
+            setLoanTerms(data.terms_and_conditions || "");
+          }
         }
+
         setLoanHelperLoaded(true);
       }
     };

@@ -213,50 +213,50 @@ export async function updateProfile(input: UpdateProfileInput, userIdOverride?: 
 
     // Only try to get userId from session/cookies if not provided
     if (!userId) {
-      // Method 1: Try to get user from Supabase session
+    // Method 1: Try to get user from Supabase session
+    try {
+      const { data: sessionData } = await supabase.auth.getSession()
+      if (sessionData.session?.user) {
+        userId = sessionData.session.user.id
+      }
+    } catch (sessionError) {
+      // Continue to next method
+    }
+
+    // Method 2: Try to get user from JWT if session failed
+    if (!userId) {
       try {
-        const { data: sessionData } = await supabase.auth.getSession()
-        if (sessionData.session?.user) {
-          userId = sessionData.session.user.id
+        const { getJWTFromCookies, verifyJWT } = await import("@/lib/jwt")
+        const jwt = getJWTFromCookies()
+        if (jwt) {
+          const { payload, error } = await verifyJWT(jwt)
+          if (!error && payload && (payload.userId || payload.sub)) {
+            userId = payload.userId || payload.sub
+          }
         }
-      } catch (sessionError) {
+      } catch (jwtError) {
         // Continue to next method
       }
+    }
 
-      // Method 2: Try to get user from JWT if session failed
-      if (!userId) {
-        try {
-          const { getJWTFromCookies, verifyJWT } = await import("@/lib/jwt")
-          const jwt = getJWTFromCookies()
-          if (jwt) {
-            const { payload, error } = await verifyJWT(jwt)
-            if (!error && payload && (payload.userId || payload.sub)) {
-              userId = payload.userId || payload.sub
-            }
+    // Method 3: Try to get user from custom auth token if other methods failed
+    if (!userId) {
+      try {
+        const cookieStoreResolved = await cookies()
+        const customAuthToken = cookieStoreResolved.get("custom-auth-token")?.value
+        if (customAuthToken) {
+          const { data, error } = await adminClient
+            .from("auth_users")
+            .select("id")
+            .eq("access_token", customAuthToken)
+            .single()
+
+          if (!error && data) {
+            userId = data.id
           }
-        } catch (jwtError) {
-          // Continue to next method
         }
-      }
-
-      // Method 3: Try to get user from custom auth token if other methods failed
-      if (!userId) {
-        try {
-          const cookieStoreResolved = await cookies()
-          const customAuthToken = cookieStoreResolved.get("custom-auth-token")?.value
-          if (customAuthToken) {
-            const { data, error } = await adminClient
-              .from("auth_users")
-              .select("id")
-              .eq("access_token", customAuthToken)
-              .single()
-
-            if (!error && data) {
-              userId = data.id
-            }
-          }
-        } catch (customAuthError) {
-          // Continue to next method
+      } catch (customAuthError) {
+        // Continue to next method
         }
       }
     }
@@ -902,4 +902,18 @@ export async function uploadLendingLicenseServer(file: File) {
   } catch (error: any) {
     return { error: `An unexpected error occurred. Please try again. ${error instanceof Error ? error.message : String(error)}` };
   }
+}
+
+// Fetch a user's profile (email, first_name, last_name) by userId
+export async function getProfileById(userId: string) {
+  const adminClient = createAdminClient();
+  const { data, error } = await adminClient
+    .from("profiles")
+    .select("email, first_name, last_name")
+    .eq("id", userId)
+    .single();
+  if (error || !data) {
+    return null;
+  }
+  return data;
 }

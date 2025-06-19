@@ -211,6 +211,23 @@ async function handleChargeSuccess(data: any, adminClient: any) {
         return
       }
 
+      // Send email notification for completed funding
+      try {
+        const { getProfileById } = await import("@/lib/actions/profile")
+        const { sendTransactionEmail } = await import("@/lib/actions/email-notifications")
+        const userProfile = await getProfileById(userId)
+        if (userProfile && userProfile.email) {
+          await sendTransactionEmail({
+            email: userProfile.email,
+            userName: userProfile.first_name || "User",
+            transactionType: "Account Funding",
+            amount: amountInNaira,
+            reference,
+            status: "Completed",
+          })
+        }
+      } catch (e) { /* ignore email errors */ }
+
       // Update the user's account balance
       await updateAccountBalance(userId, amountInNaira, adminClient)
 
@@ -414,6 +431,23 @@ async function handleTransferSuccess(data: any, adminClient: any) {
     if (updateError) {
       return
     }
+
+    // Send email notification for completed withdrawal
+    try {
+      const { getProfileById } = await import("@/lib/actions/profile")
+      const { sendTransactionEmail } = await import("@/lib/actions/email-notifications")
+      const userProfile = await getProfileById(userId)
+      if (userProfile && userProfile.email) {
+        await sendTransactionEmail({
+          email: userProfile.email,
+          userName: userProfile.first_name || "User",
+          transactionType: "Withdrawal",
+          amount: transaction.amount,
+          reference,
+          status: "Completed",
+        })
+      }
+    } catch (e) { /* ignore email errors */ }
 
     // Debit the user's account balance
     const { data: accountData, error: accountError } = await adminClient

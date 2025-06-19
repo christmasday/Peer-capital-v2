@@ -31,9 +31,13 @@ export default async function HomePage() {
           .select("id, user_id, loan_amount, interest_rate, repayment_time, repayment_unit")
           .in("user_id", followingIds)
         if (offers && offers.length > 0) {
-          // For each offer, get profile info
+          // Filter out disabled helpers (loan_amount, interest_rate, or repayment_time are 0)
+          const enabledOffers = offers.filter((offer: any) =>
+            offer.loan_amount > 0 && offer.interest_rate > 0 && offer.repayment_time > 0
+          )
+          // For each enabled offer, get profile info
           loanHelpers = await Promise.all(
-            offers.map(async (offer: any) => {
+            enabledOffers.map(async (offer: any) => {
               const { data: profileArr } = await adminClient
                 .from("profiles")
                 .select("first_name, last_name, profile_picture_url")
