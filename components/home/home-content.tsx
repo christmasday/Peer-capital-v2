@@ -11,9 +11,10 @@ import { useToast } from "@/hooks/use-toast"
 interface HomeContentProps {
   userProfile: any
   loanHelpers: any[]
+  virtualAccount?: any
 }
 
-export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
+export function HomeContent({ userProfile, loanHelpers, virtualAccount }: HomeContentProps) {
   const { toast } = useToast()
   const [loanAmount, setLoanAmount] = useState<string>("")
   const [loanDuration, setLoanDuration] = useState<string>("")
@@ -118,13 +119,12 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
               <div className="absolute bottom-0 right-0 w-64 h-64 bg-blue-600 rounded-full -mr-20 -mb-20"></div>
 
               <div className="relative z-10">
-                <div className="flex justify-between items-center mb-3">
+                <div className="flex justify-between items-center mb-1.5">
                   <div className="text-base font-medium">Account Balance</div>
                   <button className="text-white">
                     <Eye className="h-4 w-4" />
                   </button>
                 </div>
-
                 <div className="text-2xl font-bold mb-2">{formatCurrency(userProfile.account?.balance || 0)}</div>
 
                 <div className="text-sm opacity-90 mb-6">
@@ -153,6 +153,19 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
                     <span className="text-xs">Loans</span>
                   </Link>
                 </div>
+
+                {/* Virtual Account Number and Bank Name Display - below icons */}
+                {virtualAccount ? (
+                  <div className="mt-8">
+                    <span className="text-xs text-blue-100 block">Your Virtual Account:</span>
+                    <span className="font-mono text-xl font-bold tracking-widest">{virtualAccount.account_number}</span>
+                    <span className="text-xs text-blue-100 ml-1">{virtualAccount.bank_name}</span>
+                  </div>
+                ) : (
+                  <Link href="/profile?tab=about">
+                    <Button variant="secondary" size="sm" className="mt-8">Create Virtual Account</Button>
+                  </Link>
+                )}
               </div>
             </div>
           </div>

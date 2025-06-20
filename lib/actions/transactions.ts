@@ -16,18 +16,15 @@ export async function getUserTransactions(supabase: SupabaseClient<Database>) {
 
     // Get the user profile
     const userProfile = await getUserProfile()
-    console.log('[getUserTransactions] userProfile:', userProfile)
 
     const userId = userProfile?.user?.id
     if (!userId) {
       console.log('[getUserTransactions] No userId found in userProfile')
       return { transactions: [] }
     }
-    console.log('[getUserTransactions] userId:', userId)
 
     // Log the Supabase session
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
-    console.log('[getUserTransactions] Supabase session:', sessionData)
     if (sessionError) {
       console.log('[getUserTransactions] Supabase session error:', sessionError)
     }
@@ -40,7 +37,6 @@ export async function getUserTransactions(supabase: SupabaseClient<Database>) {
       .order("created_at", { ascending: false })
 
     // Debug: Log the query result and error
-    console.log('[getUserTransactions] Query result:', data)
     if (error) {
       console.log('[getUserTransactions] Query error:', error)
     }

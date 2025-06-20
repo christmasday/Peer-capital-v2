@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Briefcase, GraduationCap, MapPin, Phone, Mail, Heart, Calendar, User, Info, Edit, Wallet } from "lucide-react"
+import { Briefcase, GraduationCap, MapPin, Phone, Mail, Heart, Calendar, User, Info, Edit, Wallet, Plus } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { updateSocialMedia } from "@/lib/actions/profile"
@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { LoanHelperSettingsForm } from "@/components/profile/loan-helper-settings-form"
 import { LoanHelperSettingsDisplay } from "@/components/profile/loan-helper-settings-display"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog"
 import Script from "next/script"
 // Fix for missing types for react-dojah
 // @ts-ignore
@@ -133,6 +133,19 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
   const [otpError, setOtpError] = useState("");
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
   const [showDojah, setShowDojah] = useState(false);
+  // Add state for beneficiaries (bank accounts)
+  const [accounts, setAccounts] = useState<any[]>([])
+  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false)
+  const [accountBank, setAccountBank] = useState("")
+  const [accountBanks, setAccountBanks] = useState<{ name: string; code: string }[]>([])
+  const [isResolvingAccount, setIsResolvingAccount] = useState(false)
+  const [resolveAccountError, setResolveAccountError] = useState("")
+  const [isAddingAccount, setIsAddingAccount] = useState(false)
+  const [addAccountError, setAddAccountError] = useState("")
+  const [isLoadingAccounts, setIsLoadingAccounts] = useState(false)
+  const [accountsError, setAccountsError] = useState("")
+  const [removingAccountId, setRemovingAccountId] = useState<string | null>(null)
+  const [removeAccountError, setRemoveAccountError] = useState("")
 
   const handleVerifyPhoneOtp = async () => {
     setIsVerifyingOtp(true);
@@ -232,13 +245,13 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
           }
         } else {
           // If balance is not 0, just fetch the current settings
-          const { data, error } = await getLoanHelperSettings(profile.id);
-          if (data) {
-            setLoanAmount(data.loan_amount?.toString() || "");
-            setInterestRate(data.interest_rate?.toString() || "");
-            setPaybackPeriod(data.repayment_time?.toString() || "");
-            setLoanTerms(data.terms_and_conditions || "");
-          }
+        const { data, error } = await getLoanHelperSettings(profile.id);
+        if (data) {
+          setLoanAmount(data.loan_amount?.toString() || "");
+          setInterestRate(data.interest_rate?.toString() || "");
+          setPaybackPeriod(data.repayment_time?.toString() || "");
+          setLoanTerms(data.terms_and_conditions || "");
+        }
         }
 
         setLoanHelperLoaded(true);
@@ -1275,6 +1288,164 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
     setFullNameError(null);
   };
 
+  // Fetch banks on mount
+  useEffect(() => {
+    async function fetchBanks() {
+      try {
+        const res = await fetch("https://api.paystack.co/bank", {
+          headers: { Authorization: `Bearer ${process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || ""}` },
+        })
+        const data = await res.json()
+        if (data.status && Array.isArray(data.data)) {
+          setAccountBanks(data.data.map((bank: any) => ({ name: bank.name, code: bank.code })))
+        }
+      } catch {}
+    }
+    fetchBanks()
+  }, [])
+
+  // Resolve account name
+  useEffect(() => {
+    async function resolveAccount() {
+      if (accountBank && accountNumber.length === 10) {
+        setIsResolvingAccount(true)
+        setResolveAccountError("")
+        try {
+          const bankCode = accountBanks.find(b => b.name === accountBank)?.code
+          const res = await fetch("/api/paystack/resolve-account", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ account_number: accountNumber, bank_code: bankCode }),
+          })
+          const data = await res.json()
+          if (data.status && data.data && data.data.account_name) {
+            setAccountName(data.data.account_name)
+          } else {
+            setResolveAccountError("Could not resolve account name")
+            setAccountName("")
+          }
+        } catch {
+          setResolveAccountError("Could not resolve account name")
+          setAccountName("")
+        } finally {
+          setIsResolvingAccount(false)
+        }
+      } else {
+        setAccountName("")
+        setResolveAccountError("")
+      }
+    }
+    resolveAccount()
+  }, [accountBank, accountNumber])
+
+  // Fetch accounts (beneficiaries) on mount and when modal closes
+  useEffect(() => {
+    setIsLoadingAccounts(true)
+    setAccountsError("")
+    fetch("/api/beneficiaries", { credentials: "include" })
+      .then(async (res) => {
+        if (!res.ok) throw new Error("Failed to fetch accounts")
+        const data = await res.json()
+        setAccounts(data.beneficiaries || [])
+      })
+      .catch((err) => {
+        setAccountsError(err.message || "Failed to fetch accounts")
+      })
+      .finally(() => setIsLoadingAccounts(false))
+  }, [isAccountModalOpen])
+
+  const handleAddAccount = async () => {
+    setIsAddingAccount(true)
+    setAddAccountError("")
+    try {
+      // Call Paystack transferrecipient API
+      const bankCode = accountBanks.find(b => b.name === accountBank)?.code
+      const res = await fetch("/api/paystack/transferrecipient", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "nuban",
+          name: accountName,
+          account_number: accountNumber,
+          bank_code: bankCode,
+          currency: "NGN",
+        }),
+      })
+      const data = await res.json()
+      if (!data.status || !data.data?.recipient_code) throw new Error(data.message || "Failed to add account")
+      // Save account in DB
+      const saveRes = await fetch("/api/beneficiaries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          account_name: accountName,
+          account_number: accountNumber,
+          bank_name: accountBank,
+          bank_code: bankCode,
+          recipient_code: data.data.recipient_code,
+        }),
+        credentials: "include",
+      })
+      if (!saveRes.ok) {
+        const errData = await saveRes.json()
+        throw new Error(errData.error || "Failed to save account")
+      }
+      setIsAccountModalOpen(false)
+      setAccountNumber("")
+      setAccountBank("")
+      setAccountName("")
+      // Refresh accounts list
+      setIsLoadingAccounts(true)
+      fetch("/api/beneficiaries", { credentials: "include" })
+        .then(async (res) => {
+          if (!res.ok) throw new Error("Failed to fetch accounts")
+          const data = await res.json()
+          setAccounts(data.beneficiaries || [])
+        })
+        .catch((err) => {
+          setAccountsError(err.message || "Failed to fetch accounts")
+        })
+        .finally(() => setIsLoadingAccounts(false))
+    } catch (err: any) {
+      setAddAccountError(err.message || "Failed to add account")
+    } finally {
+      setIsAddingAccount(false)
+    }
+  }
+
+  const handleRemoveAccount = async (id: string) => {
+    setRemovingAccountId(id)
+    setRemoveAccountError("")
+    try {
+      const res = await fetch("/api/beneficiaries", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+        credentials: "include",
+      })
+      if (!res.ok) {
+        const errData = await res.json()
+        throw new Error(errData.error || "Failed to remove account")
+      }
+      // Refresh accounts list
+      setIsLoadingAccounts(true)
+      fetch("/api/beneficiaries", { credentials: "include" })
+        .then(async (res) => {
+          if (!res.ok) throw new Error("Failed to fetch accounts")
+          const data = await res.json()
+          setAccounts(data.beneficiaries || [])
+        })
+        .catch((err) => {
+          setAccountsError(err.message || "Failed to fetch accounts")
+        })
+        .finally(() => setIsLoadingAccounts(false))
+    } catch (err: any) {
+      setRemoveAccountError(err.message || "Failed to remove account")
+    } finally {
+      setRemovingAccountId(null)
+    }
+  }
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
       {/* Left sidebar with sections */}
@@ -1509,34 +1680,38 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
                 <Phone className="h-10 w-10 p-2 bg-gray-100 text-gray-500 rounded-full" />
               </div>
               <div className="flex-grow">
-                <div className="flex justify-between items-start">
-                   {isEditingPhone ? (
-                     <div className="space-y-2 w-full">
-                       <input
-                         type="text"
-                         value={phoneText}
-                         onChange={(e) => setPhoneText(e.target.value)}
-                         placeholder="Phone Number"
-                         className="border-b-3 border-solid !important border-b-blue-600 !important focus-visible:border-b-green-600 !important rounded-none px-3 py-2 w-full"
-                         disabled={profile.phone_verified}
-                       />
-                       <div className="flex justify-end gap-2 mt-2">
-                         <Button variant="outline" onClick={handleCancelEditPhone}>Cancel</Button>
-                         <Button onClick={handleSavePhone} disabled={phoneText === (profile.phone_number || "")}>Save</Button>
-                       </div>
-                     </div>
-                   ) : (
-                     <div className="flex items-center gap-2">
-                      <h3 className="text-lg font-medium">{profile.phone_number || "No phone number added"}</h3>
+                <div className="flex flex-col">
+                  {isEditingPhone ? (
+                    <div className="space-y-2 w-full">
+                      <input
+                        type="text"
+                        value={phoneText}
+                        onChange={(e) => setPhoneText(e.target.value)}
+                        placeholder="Phone Number"
+                        className="border-b-3 border-solid !important border-b-blue-600 !important focus-visible:border-b-green-600 !important rounded-none px-3 py-2 w-full"
+                        disabled={profile.phone_verified}
+                      />
+                      <div className="flex justify-end gap-2 mt-2">
+                        <Button variant="outline" onClick={handleCancelEditPhone}>Cancel</Button>
+                        <Button onClick={handleSavePhone} disabled={phoneText === (profile.phone_number || "")}>Save</Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center w-full">
+                      <h3 className="text-lg font-medium mr-2">{profile.phone_number || "No phone number added"}</h3>
                       {profile.phone_verified && (
                         <Badge className="bg-green-500 text-white ml-2">Verified</Badge>
                       )}
                       {isCurrentUser && !profile.phone_verified && profile.phone_number && (
-                        <Button size="sm" variant="outline" onClick={() => setShowPhoneVerify(true)}>Verify</Button>
+                        <div className="ml-auto">
+                          <Button size="sm" variant="outline" style={{ transform: 'scale(0.75)' }} onClick={() => setShowPhoneVerify(true)}>
+                            Verify
+                          </Button>
+                        </div>
                       )}
                     </div>
                   )}
-                  <p className="text-gray-600">Mobile</p>
+                  <p className="text-gray-600 mt-1">Mobile</p>
                 </div>
               </div>
             </div>
@@ -1564,13 +1739,13 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
                      </div>
                    ) : (
                      <div className="flex justify-between items-start w-full">
-                <div>
-                  <h3 className="text-lg font-medium">{profile.email || "No email added"}</h3>
-                  <p className="text-gray-600">Email</p>
+                  <div>
+                    <h3 className="text-lg font-medium">{profile.email || "No email added"}</h3>
+                    <p className="text-gray-600">Email</p>
+                  </div>
                 </div>
-              </div>
-                   )}
-                </div>
+                     )}
+                  </div>
               </div>
             </div>
           </div>
@@ -1633,7 +1808,7 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
                           ? profile.job_title
                           : profile.employer_name
                             ? `Works at ${profile.employer_name}`
-                             : "Work"}
+                               : "Work"}
                     </h3>
                     {profile.employer_address && <p className="text-gray-600">{profile.employer_address}</p>}
                     {profile.employment_status && <p className="text-gray-600">{profile.employment_status}</p>}
@@ -2047,11 +2222,11 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
                    </div>
                  ) : (
                    <div className="flex justify-between items-start">
-              <p className="text-gray-700">{profile.bio || "No details to show"}</p>
+                <p className="text-gray-700">{profile.bio || "No details to show"}</p>
                      {isCurrentUser && (
                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setIsEditingBio(true)}>
                          <Edit className="h-4 w-4" />
-                </Button>
+                  </Button>
                      )}
                    </div>
                 )}
@@ -2069,169 +2244,73 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
         {activeSection === "bank" && (
           <div className="space-y-6">
             <h2 className="text-xl font-medium">Bank Account Details</h2>
-            <div className="flex items-start gap-4">
-              <div className="flex-grow">
-                {isEditingBank ? (
-                  <div className="space-y-2 w-full">
-                    {/* Country Dropdown */}
-                    <label className="font-semibold">Country</label>
-                    <select value={country} onChange={e => setCountry(e.target.value)} className="border-b-2 border-blue-600 focus:border-green-600 outline-none px-3 py-2 w-full">
-                      {isLoadingCountries ? <option>Loading...</option> : countries.map(c => <option key={c.iso_code} value={c.name}>{c.name}</option>)}
-                    </select>
-                    {/* Bank Dropdown */}
-                    <label className="font-semibold">Bank Name</label>
-                    <select
-                      value={bankCode}
-                      onChange={e => {
-                        setBankCode(e.target.value);
-                        const selected = banks.find(b => b.code === e.target.value);
-                        setBankName(selected ? selected.name : "");
-                      }}
-                      className="border-b-2 border-blue-600 focus:border-green-600 outline-none px-3 py-2 w-full"
-                    >
-                      {isLoadingBanks ? <option>Loading...</option> : banks.map(b => <option key={b.code} value={b.code}>{b.name}</option>)}
-                    </select>
-                    {/* Account Type Dropdown */}
-                    <label className="font-semibold">Account Type</label>
-                    <select value={accountType} onChange={e => setAccountType(e.target.value)} className="border-b-2 border-blue-600 focus:border-green-600 outline-none px-3 py-2 w-full">
-                      <option value="personal">Personal</option>
-                      <option value="business">Business</option>
-                    </select>
-                    <input
-                      type="text"
-                      value={accountNumber}
-                      onChange={e => setAccountNumber(e.target.value)}
-                      placeholder="Account Number"
-                      className="border-b-2 border-blue-600 focus:border-green-600 outline-none px-3 py-2 w-full"
-                    />
-                    <input
-                      type="text"
-                      value={accountName}
-                      onChange={e => setAccountName(e.target.value)}
-                      placeholder="Account Name"
-                      className="border-b-2 border-blue-600 focus:border-green-600 outline-none px-3 py-2 w-full"
-                    />
-                    {/* BVN Inline Edit */}
-                    <div className="flex items-center gap-2 mt-2">
-                      <label className="font-semibold">BVN:</label>
-                      {isEditingBvn ? (
-                        <>
-                          <input
-                            type="text"
-                            value={bvnText}
-                            onChange={e => setBvnText(e.target.value.replace(/[^0-9]/g, "").slice(0, 11))}
-                            placeholder="Enter your BVN"
-                            className="border-b-2 border-blue-600 focus:border-green-600 outline-none px-3 py-2 w-40"
-                            maxLength={11}
-                            disabled={profile.bvn_verified}
-                          />
-                          <Button size="sm" onClick={handleSaveBvn} disabled={isSavingBvn || bvnText === (profile.bvn || "") || profile.bvn_verified}>{isSavingBvn ? "Saving..." : "Save"}</Button>
-                          <Button size="sm" variant="outline" onClick={handleCancelBvn} disabled={isSavingBvn || profile.bvn_verified}>Cancel</Button>
-                        </>
-                      ) : (
-                        <>
-                          <span className="font-mono border-b-2 border-blue-200 px-3 py-2 bg-gray-50 rounded text-gray-800">{profile.bvn ? `******${profile.bvn.slice(-4)}` : "-"}</span>
-                          {profile.bvn_verified && <Badge className="bg-green-500 text-white ml-2">Verified</Badge>}
-                          {isCurrentUser && !profile.bvn_verified && (
-                            <Button size="sm" variant="ghost" onClick={() => setIsEditingBvn(true)}><Edit className="h-4 w-4" /></Button>
-                          )}
-                        </>
-                      )}
-                      {/* BVN Verification */}
-                      {bvnVerificationMsg && <span className={`ml-2 text-sm ${bvnVerified ? "text-green-600" : "text-red-600"}`}>{bvnVerificationMsg}</span>}
-                    </div>
-                    {bvnError && <div className="text-sm text-red-500 mt-1">{bvnError}</div>}
-                    {/* End BVN Inline Edit */}
-                    <div className="flex gap-2 mt-2 w-full">
-                      <Button variant="outline" className="w-1/2" onClick={handleCancelBank} type="button" disabled={isSavingBank}>Cancel</Button>
-                      <Button className="w-1/2" onClick={handleSaveBank} disabled={isSavingBank || !isBankDirty} type="button">
-                        {isSavingBank ? "Saving..." : "Save"}
+            <div className="flex justify-between items-center mb-4">
+              <span className="font-medium">Your Accounts</span>
+              {isCurrentUser && (
+                <Dialog open={isAccountModalOpen} onOpenChange={setIsAccountModalOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="icon" className="rounded-full h-10 w-10 flex items-center justify-center text-2xl" onClick={() => setIsAccountModalOpen(true)}>
+                      <Plus className="h-6 w-6" />
                       </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Add Account</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div>
+                        <label>Account Number</label>
+                        <input type="text" value={accountNumber} onChange={e => setAccountNumber(e.target.value)} maxLength={10} className="w-full border p-2 rounded" />
                     </div>
-                    {bankError && <div className="text-sm text-red-500 mt-2">{bankError}</div>}
+                      <div>
+                        <label>Bank</label>
+                        <select value={accountBank} onChange={e => setAccountBank(e.target.value)} className="w-full border p-2 rounded">
+                          <option value="">Select Bank</option>
+                          {accountBanks.map(bank => <option key={bank.code} value={bank.name}>{bank.name}</option>)}
+                        </select>
                   </div>
-                ) : (
-                  <div className="flex justify-between items-start w-full">
                     <div>
-                      <h3 className="text-lg font-medium">{profile.bank_name || "No bank name added"}</h3>
-                      <p className="text-gray-600">Account Number: {profile.account_number || "-"}</p>
-                      <p className="text-gray-600">Account Name: {profile.account_name || "-"}</p>
-                      <p className="text-gray-600">Account Type: {profile.account_type ? profile.account_type.charAt(0).toUpperCase() + profile.account_type.slice(1) : "Personal"}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-gray-600">BVN: <span className="font-mono">{profile.bvn ? `******${profile.bvn.slice(-4)}` : "-"}</span></span>
-                        {profile.bvn_verified && (
-                          <Badge className="bg-green-500 text-white ml-2">Verified</Badge>
-                        )}
-                        {isCurrentUser && !profile.bvn_verified && (
-                          <Button size="sm" variant="ghost" onClick={() => setIsEditingBvn(true)}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        )}
+                        <label>Account Name</label>
+                        <input type="text" value={accountName} disabled className="w-full border p-2 rounded bg-gray-100" />
+                        {isResolvingAccount && <div className="text-xs text-blue-500 mt-1">Resolving account name...</div>}
+                        {resolveAccountError && <div className="text-xs text-red-500 mt-1">{resolveAccountError}</div>}
                       </div>
-                    </div>
-                    {isCurrentUser && (
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setIsEditingBank(true)}>
-                        <Edit className="h-4 w-4" />
+                      <Button onClick={handleAddAccount} disabled={isAddingAccount || !accountName || isResolvingAccount} className="w-full">
+                        {isAddingAccount ? "Adding..." : "Add Account"}
                       </Button>
-                    )}
+                      {addAccountError && <div className="text-xs text-red-500 mt-1 text-red-600">{addAccountError}</div>}
                   </div>
+                  </DialogContent>
+                </Dialog>
                 )}
               </div>
+            <div className="space-y-2">
+              {isLoadingAccounts ? (
+                <div className="text-gray-500">Loading accounts...</div>
+              ) : accountsError ? (
+                <div className="text-red-500">{accountsError}</div>
+              ) : accounts.length === 0 ? (
+                <div className="text-gray-500">No accounts added yet.</div>
+              ) : accounts.map(a => (
+                <div key={a.id} className="border p-3 rounded flex items-center justify-between">
+                  <div>
+                    <div className="font-medium">{a.account_name}</div>
+                    <div className="text-sm text-gray-500">{a.account_number} - {a.bank_name}</div>
             </div>
-            {!profile.bvn_verified && isCurrentUser && (
-              <div className="mt-4">
+                  {isCurrentUser && (
                 <Button
-                  onClick={async () => {
-                    setIsVerifyingCustomer(true);
-                    setCustomerVerificationMsg(null);
-                    try {
-                      if (!profile.account_number || !profile.bvn || !profile.bank_code) {
-                        setCustomerVerificationMsg("Missing required details for verification.");
-                        setIsVerifyingCustomer(false);
-                        return;
-                      }
-                      const res = await validateCustomerIdentification({
-                        country: "NG",
-                        type: "bank_account",
-                        account_number: profile.account_number,
-                        bvn: profile.bvn,
-                        bank_code: profile.bank_code,
-                        first_name: profile.first_name,
-                        last_name: profile.last_name,
-                        email: profile.email,
-                      });
-                      if (res.success) {
-                        setCustomerVerificationMsg("Verification initiated. You will be notified when verification is complete.");
-                      } else if (res.error && res.error.includes("Customer already validated using the same credentials")) {
-                        // If already validated, update bvn_verified and bvn_verified_at
-                        await updateProfile({
-                          bvn_verified: true,
-                          bvn_verified_at: new Date().toISOString(),
-                        }, profile.id);
-                        setCustomerVerificationMsg("BVN already verified.");
-                      } else {
-                        setCustomerVerificationMsg(res.error || "Verification failed.");
-                      }
-                    } catch (err: any) {
-                      setCustomerVerificationMsg(err?.message || "Verification failed.");
-                    } finally {
-                      setIsVerifyingCustomer(false);
-                    }
-                  }}
-                  disabled={
-                    isVerifyingCustomer ||
-                    !profile.account_number ||
-                    !profile.bvn ||
-                    !profile.bank_code ||
-                    profile.bvn_verified
-                  }
-                  variant="secondary"
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => handleRemoveAccount(a.id)}
+                      disabled={removingAccountId === a.id}
                 >
-                  {isVerifyingCustomer ? "Verifying..." : "Verify BVN"}
+                      {removingAccountId === a.id ? "Removing..." : "Remove"}
                 </Button>
-                {customerVerificationMsg && <div className="text-sm mt-2 text-blue-700">{customerVerificationMsg}</div>}
-              </div>
             )}
+                </div>
+              ))}
+              {removeAccountError && <div className="text-xs text-red-500 mt-1">{removeAccountError}</div>}
+            </div>
           </div>
         )}
 
@@ -2331,10 +2410,10 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
                   {isVerifyingOtp ? "Verifying..." : "Verify"}
                 </Button>
               </DialogFooter>
-            </div>
+      </div>
           </DialogContent>
         </Dialog>
-      </div>
+    </div>
     </div>
   );
 }

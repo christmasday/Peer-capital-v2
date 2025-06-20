@@ -138,21 +138,18 @@ export type TransferAccountData = {
   accountName: string
   recipientCode: string // Add this to support Paystack transfer
   reason?: string // Optional transfer reason
+  userId: string // Required userId
 }
 
 export async function transferFromAccount(data: TransferAccountData) {
   try {
-    const supabase = createServerClient()
     const adminClient = createAdminClient()
 
-    // Get the current user
-    const { data: sessionData } = await supabase.auth.getSession()
-
-    if (!sessionData.session?.user) {
+    // Require userId
+    const userId = data.userId
+    if (!userId) {
       return { error: "You must be logged in to transfer from your account" }
     }
-
-    const userId = sessionData.session.user.id
 
     // Get the current account balance
     const { data: accountData, error: accountError } = await adminClient

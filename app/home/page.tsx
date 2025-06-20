@@ -3,6 +3,7 @@ import { getUserProfile } from "@/lib/actions/auth"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { checkAuth } from "@/lib/auth-utils"
 import { getMaxLoanAmountByLender, getTotalAmountGivenByLender } from "@/lib/actions/find-lenders"
+import { getVirtualAccount } from "@/lib/actions/paystack"
 
 export default async function HomePage() {
   // Check authentication
@@ -10,6 +11,13 @@ export default async function HomePage() {
 
   // Get user profile
   const userProfile = await getUserProfile()
+
+  // Fetch user's virtual account
+  let virtualAccount = null
+  if (userProfile?.profile?.id) {
+    const vaResult = await getVirtualAccount(userProfile.profile.id)
+    virtualAccount = vaResult.virtualAccount || null
+  }
 
   // Fetch loan offers from followed users
   let loanHelpers: any[] = []
@@ -69,6 +77,6 @@ export default async function HomePage() {
   }
 
   return (
-    <HomeContent userProfile={userProfile} loanHelpers={loanHelpers} />
+    <HomeContent userProfile={userProfile} loanHelpers={loanHelpers} virtualAccount={virtualAccount} />
   )
 }

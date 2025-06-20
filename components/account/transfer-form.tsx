@@ -99,11 +99,12 @@ export function TransferForm({ currentBalance }: TransferFormProps) {
   // Watch amount for fee calculation
   const amount = form.watch("amount")
 
-  // Calculate transfer fee (0.5% with a minimum of ₦100)
+  // Calculate transfer fee based on new pricing structure
   const calculateFee = () => {
     if (!amount) return 0
-    const fee = Math.max(amount * 0.005, 100)
-    return Math.min(fee, 1000) // Cap fee at ₦1,000
+    if (amount <= 5000) return 10
+    if (amount <= 50000) return 25
+    return 50
   }
 
   const fee = calculateFee()
@@ -136,11 +137,11 @@ export function TransferForm({ currentBalance }: TransferFormProps) {
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          amount: values.amount,
-          bankName: selectedBeneficiary.bank_name,
-          accountNumber: selectedBeneficiary.account_number,
-          accountName: selectedBeneficiary.account_name,
-          recipientCode: selectedBeneficiary.recipient_code,
+        amount: values.amount,
+        bankName: selectedBeneficiary.bank_name,
+        accountNumber: selectedBeneficiary.account_number,
+        accountName: selectedBeneficiary.account_name,
+        recipientCode: selectedBeneficiary.recipient_code,
           reason: values.reason,
         }),
       })
@@ -324,7 +325,7 @@ export function TransferForm({ currentBalance }: TransferFormProps) {
                     <div className="text-gray-500">Transfer Amount:</div>
                     <div className="font-medium">{formatCurrency(amount)}</div>
 
-                    <div className="text-gray-500">Processing Fee (0.5%):</div>
+                    <div className="text-gray-500">Processing Fee:</div>
                     <div className="font-medium">{formatCurrency(fee)}</div>
 
                     <div className="text-gray-500 font-medium">Total Amount:</div>

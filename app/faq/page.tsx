@@ -381,11 +381,34 @@ export default function FAQPage() {
           <AccordionItem value="payment-methods">
             <AccordionTrigger className="px-6">What payment methods are accepted?</AccordionTrigger>
             <AccordionContent className="px-6 pb-4">
-              Peer Capital accepts various payment methods including bank transfers, debit cards, and mobile money
-              services like Paystack. For bank transfers, we provide unique account details for each user to ensure
-              proper crediting. Debit card payments are processed instantly, while bank transfers typically reflect in
-              your account within 1-2 business days. All payment methods are secured with industry-standard encryption
-              and authentication protocols to protect your financial information.
+              Peer Capital accepts various payment methods including bank transfers, debit cards, and mobile money services like Paystack. For bank transfers, we provide unique account details for each user to ensure proper crediting. Debit card payments are processed instantly, while bank transfers typically reflect in your account within 1-2 business days. All payment methods are secured with industry-standard encryption and authentication protocols to protect your financial information.
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="transfer-fees">
+            <AccordionTrigger className="px-6">What are the transfer fees on Peer Capital?</AccordionTrigger>
+            <AccordionContent className="px-6 pb-4">
+              Our transfer fees are simple and transparent:
+              <ul className="list-disc ml-6 mt-2">
+                <li>Transfers of NGN 5,000 and below: <b>NGN 10 per transfer</b></li>
+                <li>Transfers between NGN 5,001 and NGN 50,000: <b>NGN 25 per transfer</b></li>
+                <li>Transfers above NGN 50,000: <b>NGN 50 per transfer</b></li>
+              </ul>
+              These fees apply to both withdrawals and peer-to-peer transfers. There are no hidden charges.
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="multiple-bank-accounts">
+            <AccordionTrigger className="px-6">Can I add multiple bank accounts?</AccordionTrigger>
+            <AccordionContent className="px-6 pb-4">
+              Yes! You can add and manage multiple bank accounts in your profile. Go to the "Bank Account Details" section and use the "Add Account" button to save additional accounts. You can also remove accounts you no longer use. This makes it easy to choose where to receive withdrawals or make transfers.
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="contact-support">
+            <AccordionTrigger className="px-6">How do I contact Peer Capital support?</AccordionTrigger>
+            <AccordionContent className="px-6 pb-4">
+              You can reach our support team by emailing <a href="mailto:peercapital911@gmail.com" className="text-blue-600 underline">peercapital911@gmail.com</a>. We aim to respond to all inquiries within 24 hours. For urgent issues, use the contact form on our website or call our helpline. Our team is here to help with any questions or concerns.
             </AccordionContent>
           </AccordionItem>
 
