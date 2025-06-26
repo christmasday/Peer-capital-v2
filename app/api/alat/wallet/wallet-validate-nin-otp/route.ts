@@ -9,10 +9,21 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
+    const { phoneNumber, otp, trackingId } = body;
+    if (
+      typeof phoneNumber !== "string" ||
+      typeof otp !== "string" ||
+      typeof trackingId !== "string" ||
+      !phoneNumber.trim() ||
+      !otp.trim() ||
+      !trackingId.trim()
+    ) {
+      return NextResponse.json({ error: "phoneNumber, otp, and trackingId are required and must be non-empty strings." }, { status: 400 });
+    }
 
-    // Forward request to Alat API (Partner Debit Restriction Management)
+    // Forward request to Alat API (Step 2)
     const response = await fetch(
-      "https://apiplayground.alat.ng/wallet-creation/api/CustomerAccount/PartnerDebitRestrictionManagement",
+      "https://apiplayground.alat.ng/wallet-creation/api/CustomerAccount/GenerateWalletAccountForPartnershipsV2/Otp",
       {
         method: "POST",
         headers: {
@@ -27,7 +38,7 @@ export async function POST(req: NextRequest) {
 
     if (!response.ok) {
       return NextResponse.json(
-        { status: "error", message: data.message || "Failed to manage debit restriction" },
+        { status: "error", message: data.message || "Failed to validate OTP and enqueue account creation" },
         { status: response.status }
       );
     }
