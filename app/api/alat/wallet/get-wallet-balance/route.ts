@@ -19,7 +19,9 @@ export async function GET(req: NextRequest) {
       method: "GET",
       headers: {
         "x-api-key": process.env.ALAT_API_KEY!,
+        "Ocp-Apim-Subscription-Key": process.env.PRIMARY_KEY!,
         "Content-Type": "application/json",
+        "Cache-Control": "no-cache",
       },
     });
 

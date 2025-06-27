@@ -1,27 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAuth } from "@/lib/auth-middleware";
 
-export async function POST(req: NextRequest) {
-  const authResult = await verifyAuth(req) as any;
+// This endpoint expects a query param ?accountNumber=... for simplicity
+export async function GET(req: NextRequest) {
+ const authResult = await verifyAuth(req) as any;
   if (!authResult.authenticated) {
     return NextResponse.json({ error: "Authentication required" }, { status: 401 });
   }
-
   try {
-    const body = await req.json();
+    const { searchParams } = new URL(req.url);
+    const accountNumber = searchParams.get("accountNumber");
+    if (!accountNumber) {
+      return NextResponse.json({ status: "error", message: "Missing accountNumber parameter" }, { status: 400 });
+    }
 
-    // Forward request to Alat API (Resend OTP)
+    // Forward request to Alat API (Account Name Enquiry)
     const response = await fetch(
-      "https://playground.alat.ng/wallet-creation/api/CustomerAccount/ResendOtpRequest/ResendOtp",
+      `https://apiplayground.alat.ng/debit-wallet/api/Shared/AccountNameEnquiry/Wallet/${encodeURIComponent(accountNumber)}`,
       {
-        method: "POST",
+        method: "GET",
         headers: {
-          "x-api-key": process.env.ALAT_API_KEY!,
+          access: process.env.ALAT_CHANNEL_ID!, // Channel Id
           "Ocp-Apim-Subscription-Key": process.env.PRIMARY_KEY!,
+          "Cache-Control": "no-cache", 
           "Content-Type": "application/json",
-          "Cache-Control": "no-cache",
         },
-        body: JSON.stringify(body),
       }
     );
 
@@ -29,7 +32,7 @@ export async function POST(req: NextRequest) {
 
     if (!response.ok) {
       return NextResponse.json(
-        { status: "error", message: data.message || "Failed to resend OTP" },
+        { status: "error", ...data },
         { status: response.status }
       );
     }
