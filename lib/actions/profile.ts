@@ -349,20 +349,12 @@ export async function updateProfile(input: UpdateProfileInput, userIdOverride?: 
       return { success: false, error: error.message };
     }
 
-
     // Create activity notification for profile update
-    // Check if relevant fields were updated before creating notification
-    // This is a basic check, you might want more granular checks
-    const relevantFieldsUpdated = [input.firstName, input.lastName, input.phoneNumber, input.address, input.city, input.state, input.zipCode].some(field => field !== undefined);
-    if (relevantFieldsUpdated) {
-       // Note: Currently only creating a generic profile update notification.
-       // Might need more specific notifications based on which fields are updated.
-       await createProfileActivityNotification({
-        userId,
-        type: "updated",
-        details: "Your profile has been updated.",
-       });
-    }
+    await createProfileActivityNotification({
+      userId,
+      type: "updated",
+      details: "Your profile has been updated.",
+    });
 
     revalidatePath("/profile"); // Revalidate profile page on successful update
 
