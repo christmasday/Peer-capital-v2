@@ -9,6 +9,7 @@ import fetch from 'node-fetch'
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/lib/supabase/database.types"
 import { createNotification } from "@/lib/actions/notifications"
+import { getBlockedUsers } from "@/lib/actions/connections"
 
 // Mock data for fallback
 const mockLoanRequests = [
@@ -304,7 +305,10 @@ export async function getAllLoanRequests() {
       console.error("Error fetching all loan requests:", error);
       return { loanRequests: [] };
     }
-    return { success: true, loanRequests: data };
+    // Filter out requests from blocked users
+    const { blocked } = await getBlockedUsers();
+    const filtered = data?.filter((req: any) => !blocked.includes(req.user_id)) || [];
+    return { success: true, loanRequests: filtered };
   } catch (error) {
     console.error("Unexpected error fetching all loan requests:", error);
     return { loanRequests: [] };

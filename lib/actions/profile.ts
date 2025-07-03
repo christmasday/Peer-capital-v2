@@ -208,6 +208,9 @@ type UpdateProfileInput = {
   additionalInformation?: string;
   fullAddress?: string;
   postalCode?: string;
+  id_verified?: boolean;
+  fraud_screened?: boolean;
+  fraud_screened_at?: string;
 };
 
 export async function updateProfile(input: UpdateProfileInput, userIdOverride?: string) {
@@ -276,6 +279,13 @@ export async function updateProfile(input: UpdateProfileInput, userIdOverride?: 
       return { success: false, error: "Authentication failed." };
     }
 
+    // Fetch current profile to check previous id_verified status
+    const { data: currentProfile } = await adminClient
+      .from("profiles")
+      .select("id_verified, fraud_screened, fraud_screened_at, first_name, last_name, middle_name, date_of_birth, email, phone_number")
+      .eq("id", userId)
+      .maybeSingle();
+
     // Build update object
     const updateData: any = {};
     if (input.firstName !== undefined) updateData.first_name = input.firstName;
@@ -333,6 +343,9 @@ export async function updateProfile(input: UpdateProfileInput, userIdOverride?: 
     if (input.additionalInformation !== undefined) updateData.additional_information = input.additionalInformation;
     if (input.fullAddress !== undefined) updateData.full_address = input.fullAddress;
     if (input.postalCode !== undefined) updateData.postal_code = input.postalCode;
+    if (input.id_verified !== undefined) updateData.id_verified = input.id_verified;
+    if (input.fraud_screened !== undefined) updateData.fraud_screened = input.fraud_screened;
+    if (input.fraud_screened_at !== undefined) updateData.fraud_screened_at = input.fraud_screened_at;
 
     if (Object.keys(updateData).length === 0) {
         return { success: false, error: "No fields to update." };
@@ -357,6 +370,36 @@ export async function updateProfile(input: UpdateProfileInput, userIdOverride?: 
     });
 
     revalidatePath("/profile"); // Revalidate profile page on successful update
+
+    if (input.id_verified === true && (!currentProfile?.id_verified)) {
+      // Build query string for Dojah API
+      const params = new URLSearchParams({
+        first_name: currentProfile?.first_name || "",
+        last_name: currentProfile?.last_name || "",
+        date_of_birth: currentProfile?.date_of_birth || "",
+      });
+      if (currentProfile?.middle_name) params.append("middle_name", currentProfile.middle_name);
+      if (currentProfile?.email) params.append("email", currentProfile.email);
+      if (currentProfile?.phone_number) params.append("phone", currentProfile.phone_number);
+      const dojahRes = await fetch(`https://api.dojah.io/api/v1/fraud/user?${params.toString()}`, {
+        method: "GET",
+        headers: {
+          "AppId": process.env.DOJAH_APP_ID!,
+          "Authorization": `Bearer ${process.env.DOJAH_API_KEY}`,
+        },
+      });
+      const fraudData = await dojahRes.json();
+      const riskScore = fraudData?.entity?.overall_risk_score;
+      const fraudScreenedAt = new Date().toISOString();
+      if (typeof riskScore === "number" && riskScore >= 65) {
+        // Mark as failed fraud screening
+        await adminClient.from("profiles").update({ fraud_screened: false, fraud_screened_at: fraudScreenedAt }).eq("id", userId);
+        return { success: false, error: "Fraud screening failed. Please contact support." };
+      } else {
+        // Mark as passed fraud screening
+        await adminClient.from("profiles").update({ fraud_screened: true, fraud_screened_at: fraudScreenedAt }).eq("id", userId);
+      }
+    }
 
     return { success: true, data: data };
   } catch (error: any) {

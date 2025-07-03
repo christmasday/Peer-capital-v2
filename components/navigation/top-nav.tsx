@@ -162,9 +162,20 @@ export function TopNav({ userName, userImage, hideSearch }: TopNavProps) {
             <DropdownMenuContent align="end" className="w-56">
               <Link href="/profile" className="block">
                 <DropdownMenuLabel className="cursor-pointer hover:bg-gray-50">
-                  <div className="flex flex-col">
-                    <span>{displayName}</span>
-                    <span className="text-xs text-gray-500">View profile</span>
+                  <div className="flex items-center gap-3">
+                    <div className="relative h-8 w-8 rounded-full overflow-hidden bg-blue-100">
+                      <Image
+                        src={userImage || "/vibrant-street-market.png"}
+                        alt="Profile"
+                        fill
+                        className="object-cover"
+                        priority
+                      />
+                    </div>
+                    <div className="flex flex-col">
+                      <span>{displayName}</span>
+                      <span className="text-xs text-gray-500">View profile</span>
+                    </div>
                   </div>
                 </DropdownMenuLabel>
               </Link>

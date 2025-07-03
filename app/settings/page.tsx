@@ -20,7 +20,7 @@ export default async function SettingsPage() {
         <aside className="w-64 flex-shrink-0">
           <nav className="flex flex-col gap-2">
             <Link href="/settings" className="px-4 py-2 rounded-lg bg-blue-50 text-blue-700 font-medium">Change Password</Link>
-            {/* Future menu items can go here */}
+            <Link href="/privacy-center" className="px-4 py-2 rounded-lg bg-gray-50 text-gray-700 font-medium">Privacy Center</Link>
           </nav>
         </aside>
         {/* Main Content */}

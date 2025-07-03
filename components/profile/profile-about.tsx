@@ -165,6 +165,8 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
   const [walletPhoneNumber, setWalletPhoneNumber] = useState<string | null>(null);
   const [showOtpDialog, setShowOtpDialog] = useState(false);
   const [isVerifyingWalletOtp, setIsVerifyingWalletOtp] = useState(false);
+  const [isBlocked, setIsBlocked] = useState(false);
+  const [blockLoading, setBlockLoading] = useState(false);
 
   const handleVerifyPhoneOtp = async () => {
     setIsVerifyingOtp(true);
@@ -359,6 +361,38 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
       if (pollInterval) clearInterval(pollInterval);
     };
   }, [paystackResponse, isCurrentUser, activeSection, toast]);
+
+  useEffect(() => {
+    if (!isCurrentUser && profile.id) {
+      fetch(`/api/blocked-users`)
+        .then(res => res.json())
+        .then(data => {
+          setIsBlocked(!!data.blocked.find((u: any) => u.id === profile.id));
+        });
+    }
+  }, [profile.id, isCurrentUser]);
+
+  const handleBlock = async () => {
+    setBlockLoading(true);
+    await fetch(`/api/block-user`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: profile.id }),
+    });
+    setIsBlocked(true);
+    setBlockLoading(false);
+  };
+
+  const handleUnblock = async () => {
+    setBlockLoading(true);
+    await fetch(`/api/unblock-user`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: profile.id }),
+    });
+    setIsBlocked(false);
+    setBlockLoading(false);
+  };
 
   const handleSocialMediaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSocialMediaData({
@@ -1486,6 +1520,15 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
     );
   }
 
+  if (isBlocked && !isCurrentUser) {
+    return (
+      <div className="text-center text-gray-500 py-12">
+        <p>You have blocked this user. Their profile, posts, and requests are hidden.</p>
+        <Button onClick={handleUnblock} disabled={blockLoading} className="mt-4">{blockLoading ? "Unblocking..." : "Unblock User"}</Button>
+      </div>
+    );
+  }
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
       {/* Left sidebar with sections */}
@@ -2548,11 +2591,9 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
                     if (res.ok && !data.error) {
                       setWalletCreated(true);
                       toast({ title: "Wallet Created!", description: "Your wallet has been created successfully." });
-                      // Check for trackingId and phoneNumber in response
                       if (data.trackingId && data.phoneNumber) {
                         setTrackingId(data.trackingId);
                         setWalletPhoneNumber(data.phoneNumber);
-                        // Do not call updateProfile with unknown fields
                         setShowOtpDialog(true);
                       }
                     } else {
@@ -2562,10 +2603,44 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
                     toast({ title: "Error", description: "Failed to create wallet", variant: "destructive" });
                   }
                 }}
-                className="w-full"
+                className="w-full mb-6"
               >
                 Create Wallet
               </Button>
+              {/* BVN Display and Inline Edit */}
+              <div className="mb-4">
+                <label className="block font-medium mb-1">BVN</label>
+                {isEditingBvn ? (
+                  <div className="flex flex-col gap-2">
+                    <input
+                      type="text"
+                      value={bvnText}
+                      onChange={e => setBvnText(e.target.value.replace(/[^0-9]/g, "").slice(0, 11))}
+                      placeholder="Enter your BVN"
+                      className="border px-3 py-2 rounded w-full"
+                      maxLength={11}
+                      disabled={isSavingBvn}
+                    />
+                    {bvnError && <div className="text-red-500 text-sm">{bvnError}</div>}
+                    <div className="flex gap-2 justify-end">
+                      <Button variant="outline" onClick={handleCancelBvn} disabled={isSavingBvn}>Cancel</Button>
+                      <Button onClick={handleSaveBvn} disabled={isSavingBvn || bvnText === (profile.bvn || "") || bvnText.length !== 11}>
+                        {isSavingBvn ? "Saving..." : "Save"}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-900 font-mono">{profile.bvn || "Not set"}</span>
+                    {/* Only show Edit button if wallet account details are NOT present */}
+                    {!(profile.account_number && profile.account_name) && (
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setIsEditingBvn(true)}>
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         )}
@@ -2699,6 +2774,11 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
       </div>
           </DialogContent>
         </Dialog>
+        {!isCurrentUser && (
+          <Button onClick={isBlocked ? handleUnblock : handleBlock} disabled={blockLoading} variant={isBlocked ? "outline" : "destructive"} className="ml-2">
+            {blockLoading ? (isBlocked ? "Unblocking..." : "Blocking...") : isBlocked ? "Unblock" : "Block"}
+          </Button>
+        )}
     </div>
     </div>
   );
