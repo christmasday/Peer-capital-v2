@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Briefcase, GraduationCap, MapPin, Phone, Mail, Heart, Calendar, User, Info, Edit, Wallet, Plus } from "lucide-react"
+import { Briefcase, GraduationCap, MapPin, Phone, Mail, Heart, Calendar, User, Info, Edit, Wallet, Plus, Wallet as WalletIcon } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { updateSocialMedia } from "@/lib/actions/profile"
@@ -160,6 +160,13 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
   const [additionalInformation, setAdditionalInformation] = useState(profile.additionalInformation || "");
   const [fullAddress, setFullAddress] = useState(profile.fullAddress || "");
   const [postalCode, setPostalCode] = useState(profile.postalCode || "");
+  const [walletCreated, setWalletCreated] = useState(false);
+  const [trackingId, setTrackingId] = useState<string | null>(null);
+  const [walletPhoneNumber, setWalletPhoneNumber] = useState<string | null>(null);
+  const [showOtpDialog, setShowOtpDialog] = useState(false);
+  const [isVerifyingWalletOtp, setIsVerifyingWalletOtp] = useState(false);
+  const [isBlocked, setIsBlocked] = useState(false);
+  const [blockLoading, setBlockLoading] = useState(false);
 
   const handleVerifyPhoneOtp = async () => {
     setIsVerifyingOtp(true);
@@ -196,7 +203,7 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
     { id: "lending-licence", name: "Lending Licence", icon: Briefcase },
     { id: "bank", name: "Bank Account details", icon: Briefcase },
     { id: "loan-helper", name: "Loan helper settings", icon: Briefcase },
-    ...(isCurrentUser ? [{ id: "virtual-account", name: "Virtual account", icon: Wallet }] : []),
+    ...(isCurrentUser ? [{ id: "wallet", name: "Wallet", icon: WalletIcon }] : []),
   ]
 
   useEffect(() => {
@@ -354,6 +361,38 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
       if (pollInterval) clearInterval(pollInterval);
     };
   }, [paystackResponse, isCurrentUser, activeSection, toast]);
+
+  useEffect(() => {
+    if (!isCurrentUser && profile.id) {
+      fetch(`/api/blocked-users`)
+        .then(res => res.json())
+        .then(data => {
+          setIsBlocked(!!data.blocked.find((u: any) => u.id === profile.id));
+        });
+    }
+  }, [profile.id, isCurrentUser]);
+
+  const handleBlock = async () => {
+    setBlockLoading(true);
+    await fetch(`/api/block-user`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: profile.id }),
+    });
+    setIsBlocked(true);
+    setBlockLoading(false);
+  };
+
+  const handleUnblock = async () => {
+    setBlockLoading(true);
+    await fetch(`/api/unblock-user`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: profile.id }),
+    });
+    setIsBlocked(false);
+    setBlockLoading(false);
+  };
 
   const handleSocialMediaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSocialMediaData({
@@ -1481,6 +1520,15 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
     );
   }
 
+  if (isBlocked && !isCurrentUser) {
+    return (
+      <div className="text-center text-gray-500 py-12">
+        <p>You have blocked this user. Their profile, posts, and requests are hidden.</p>
+        <Button onClick={handleUnblock} disabled={blockLoading} className="mt-4">{blockLoading ? "Unblocking..." : "Unblock User"}</Button>
+      </div>
+    );
+  }
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
       {/* Left sidebar with sections */}
@@ -1811,13 +1859,7 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
                       {profile.phone_verified && (
                         <Badge className="bg-green-500 text-white ml-2">Verified</Badge>
                       )}
-                      {isCurrentUser && !profile.phone_verified && profile.phone_number && (
-                        <div className="ml-auto">
-                          <Button size="sm" variant="outline" style={{ transform: 'scale(0.75)' }} onClick={() => setShowPhoneVerify(true)}>
-                            Verify
-                          </Button>
-                        </div>
-                      )}
+                      {isCurrentUser && !profile.phone_verified && profile.phone_number && null}
                     </div>
                   )}
                   <p className="text-gray-600 mt-1">Mobile</p>
@@ -2526,47 +2568,183 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
           </div>
         )}
 
-        {/* Virtual Account Section - Only show if selected and isCurrentUser */}
-        {activeSection === "virtual-account" && isCurrentUser && (
+        {/* Wallet Section - Always visible if selected and isCurrentUser */}
+        {activeSection === "wallet" && isCurrentUser && (
           <Card className="mt-6">
             <CardHeader>
-              <CardTitle className="text-lg">Virtual Account</CardTitle>
+              <CardTitle className="text-lg">Wallet</CardTitle>
             </CardHeader>
             <CardContent>
-              {isLoadingVA ? (
-                <div className="text-gray-500">Loading virtual account...</div>
-              ) : virtualAccount ? (
-                <div className="space-y-2">
-                  <div className="font-semibold">Account Number: <span className="font-mono">{virtualAccount.account_number}</span></div>
-                  <div>Account Name: {virtualAccount.account_name}</div>
-                  <div>Bank: {virtualAccount.bank_name}</div>
-                  <div>Currency: {virtualAccount.currency}</div>
-                  <div>Status: {virtualAccount.assigned ? <span className="inline-block bg-green-500 text-white px-2 py-1 rounded">Active</span> : <span className="inline-block bg-gray-400 text-white px-2 py-1 rounded">Inactive</span>}</div>
-                </div>
-              ) : (
-                <div>
-                  <Button onClick={handleCreateVirtualAccount} disabled={isCreatingVA}>
-                    {isCreatingVA ? "Creating..." : "Create Virtual Account"}
-                  </Button>
-                  {vaError && <div className="text-red-500 mt-2">{vaError}</div>}
-                  {paystackResponse && (
-                    <div className="mt-4 p-3 rounded bg-gray-50 border text-xs text-gray-700 whitespace-pre-wrap max-h-64 overflow-auto">
-                      <strong>Paystack Response:</strong>
-                      {paystackResponse.inProgress ? (
-                        <div className="text-blue-700 text-sm">
-                          {paystackResponse.message || "Your virtual account is being created. Please check back in a few minutes."}
-                        </div>
-                      ) : (
-                        <pre className="mt-1">{JSON.stringify(paystackResponse, null, 2)}</pre>
-                      )}
+              <Button
+                onClick={async () => {
+                  try {
+                    const res = await fetch("/api/alat/wallet/create-wallet", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        phoneNumber: profile.phone_number,
+                        email: profile.email,
+                        nin: profile.nin,
+                      }),
+                    });
+                    const data = await res.json();
+                    if (res.ok && !data.error) {
+                      setWalletCreated(true);
+                      toast({ title: "Wallet Created!", description: "Your wallet has been created successfully." });
+                      if (data.trackingId && data.phoneNumber) {
+                        setTrackingId(data.trackingId);
+                        setWalletPhoneNumber(data.phoneNumber);
+                        setShowOtpDialog(true);
+                      }
+                    } else {
+                      toast({ title: "Error", description: data.message || data.error || "Failed to create wallet", variant: "destructive" });
+                    }
+                  } catch (err) {
+                    toast({ title: "Error", description: "Failed to create wallet", variant: "destructive" });
+                  }
+                }}
+                className="w-full mb-6"
+              >
+                Create Wallet
+              </Button>
+              {/* BVN Display and Inline Edit */}
+              <div className="mb-4">
+                <label className="block font-medium mb-1">BVN</label>
+                {isEditingBvn ? (
+                  <div className="flex flex-col gap-2">
+                    <input
+                      type="text"
+                      value={bvnText}
+                      onChange={e => setBvnText(e.target.value.replace(/[^0-9]/g, "").slice(0, 11))}
+                      placeholder="Enter your BVN"
+                      className="border px-3 py-2 rounded w-full"
+                      maxLength={11}
+                      disabled={isSavingBvn}
+                    />
+                    {bvnError && <div className="text-red-500 text-sm">{bvnError}</div>}
+                    <div className="flex gap-2 justify-end">
+                      <Button variant="outline" onClick={handleCancelBvn} disabled={isSavingBvn}>Cancel</Button>
+                      <Button onClick={handleSaveBvn} disabled={isSavingBvn || bvnText === (profile.bvn || "") || bvnText.length !== 11}>
+                        {isSavingBvn ? "Saving..." : "Save"}
+                      </Button>
                     </div>
-                  )}
-                </div>
-              )}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-900 font-mono">{profile.bvn || "Not set"}</span>
+                    {/* Only show Edit button if wallet account details are NOT present */}
+                    {!(profile.account_number && profile.account_name) && (
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setIsEditingBvn(true)}>
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         )}
-
+        {/* OTP Dialog for Wallet Creation */}
+        <Dialog open={showOtpDialog} onOpenChange={setShowOtpDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Enter OTP to Complete Wallet Creation</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <p>Enter the OTP sent to your phone number ({walletPhoneNumber || profile.phone_number})</p>
+              <input
+                type="text"
+                value={otp}
+                onChange={e => setOtp(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
+                placeholder="Enter OTP"
+                className="border px-3 py-2 w-full rounded"
+                maxLength={6}
+                disabled={isVerifyingWalletOtp}
+              />
+              {otpError && <div className="text-red-500 text-sm">{otpError}</div>}
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowOtpDialog(false)} disabled={isVerifyingWalletOtp}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={async () => {
+                    setIsVerifyingWalletOtp(true);
+                    setOtpError("");
+                    try {
+                      const phoneToUse = walletPhoneNumber || profile.phone_number;
+                      const res = await fetch("/api/alat/wallet/validate-nin-otp", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          phoneNumber: phoneToUse,
+                          otp,
+                          trackingId: trackingId,
+                        }),
+                      });
+                      const data = await res.json();
+                      if (res.ok && !data.error) {
+                        // 1. Update user's phone number in profile
+                        await updateProfile({ phoneNumber: phoneToUse }, profile.id);
+                        // 2. Fetch wallet details
+                        const walletDetailsRes = await fetch(`/api/alat/wallet/get-wallet-details?phoneNumber=${encodeURIComponent(phoneToUse)}`);
+                        const walletDetails = await walletDetailsRes.json();
+                        if (walletDetails?.accountNumber || walletDetails?.account_number) {
+                          // 3. Update user's account number and full name
+                          await updateProfile({
+                            accountNumber: walletDetails.accountNumber || walletDetails.account_number,
+                            accountName: walletDetails.accountName || walletDetails.account_name,
+                            firstName: walletDetails.firstName || walletDetails.first_name || walletDetails.fullName || walletDetails.full_name,
+                          }, profile.id);
+                        }
+                        setShowOtpDialog(false);
+                        toast({ title: "OTP Verified!", description: "Your wallet has been created successfully." });
+                      } else {
+                        setOtpError(data.message || data.error || "Failed to verify OTP");
+                      }
+                    } catch (err) {
+                      setOtpError("Failed to verify OTP");
+                    } finally {
+                      setIsVerifyingWalletOtp(false);
+                    }
+                  }}
+                  disabled={otp.length !== 6 || isVerifyingWalletOtp}
+                >
+                  {isVerifyingWalletOtp ? "Verifying..." : "Verify OTP"}
+                </Button>
+              </DialogFooter>
+              <div className="flex justify-end mt-2">
+                <button
+                  type="button"
+                  className="text-xs text-blue-600 hover:underline disabled:opacity-50"
+                  disabled={isVerifyingWalletOtp}
+                  onClick={async () => {
+                    if (!trackingId || !(walletPhoneNumber || profile.phone_number)) return;
+                    try {
+                      const res = await fetch("/api/alat/wallet/resend-otp", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          trackingId,
+                          phoneNumber: walletPhoneNumber || profile.phone_number,
+                        }),
+                      });
+                      const data = await res.json();
+                      if (res.ok && !data.error) {
+                        toast({ title: "OTP Resent", description: "A new OTP has been sent to your phone." });
+                      } else {
+                        toast({ title: "Error", description: data.message || data.error || "Failed to resend OTP", variant: "destructive" });
+                      }
+                    } catch (err) {
+                      toast({ title: "Error", description: "Failed to resend OTP", variant: "destructive" });
+                    }
+                  }}
+                >
+                  Resend OTP
+                </button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
         {/* Phone Verification Dialog */}
         <Dialog open={showPhoneVerify} onOpenChange={setShowPhoneVerify}>
           <DialogContent>
@@ -2596,6 +2774,11 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
       </div>
           </DialogContent>
         </Dialog>
+        {!isCurrentUser && (
+          <Button onClick={isBlocked ? handleUnblock : handleBlock} disabled={blockLoading} variant={isBlocked ? "outline" : "destructive"} className="ml-2">
+            {blockLoading ? (isBlocked ? "Unblocking..." : "Blocking...") : isBlocked ? "Unblock" : "Block"}
+          </Button>
+        )}
     </div>
     </div>
   );

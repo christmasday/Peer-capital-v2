@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Menu, X, Home, Wallet, BarChart2, MessageCircle, Search } from "lucide-react"
+import { Menu, X, Home, Wallet, BarChart2, MessageCircle, Search, ChevronRight, Lock, Settings as SettingsIcon, List } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import {
@@ -162,13 +162,48 @@ export function TopNav({ userName, userImage, hideSearch }: TopNavProps) {
             <DropdownMenuContent align="end" className="w-56">
               <Link href="/profile" className="block">
                 <DropdownMenuLabel className="cursor-pointer hover:bg-gray-50">
-                  <div className="flex flex-col">
-                    <span>{displayName}</span>
-                    <span className="text-xs text-gray-500">View profile</span>
+                  <div className="flex items-center gap-3">
+                    <div className="relative h-8 w-8 rounded-full overflow-hidden bg-blue-100">
+                      <Image
+                        src={userImage || "/vibrant-street-market.png"}
+                        alt="Profile"
+                        fill
+                        className="object-cover"
+                        priority
+                      />
+                    </div>
+                    <div className="flex flex-col">
+                      <span>{displayName}</span>
+                      <span className="text-xs text-gray-500">View profile</span>
+                    </div>
                   </div>
                 </DropdownMenuLabel>
               </Link>
               <DropdownMenuSeparator />
+              {/* Settings & Privacy Nested Menu */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <div className="flex items-center cursor-pointer px-2 py-2 hover:bg-gray-100 rounded">
+                    <SettingsIcon className="h-4 w-4 mr-2" />
+                    <span>Settings & privacy</span>
+                    <ChevronRight className="h-4 w-4 ml-auto" />
+                  </div>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" side="right" className="w-56 ml-2">
+                  <Link href="/settings" className="flex items-center px-2 py-2 hover:bg-gray-100 rounded">
+                    <SettingsIcon className="h-4 w-4 mr-2" />
+                    <span>Settings</span>
+                  </Link>
+                  <Link href="/privacy-center" className="flex items-center px-2 py-2 hover:bg-gray-100 rounded">
+                    <Lock className="h-4 w-4 mr-2" />
+                    <span>Privacy Center</span>
+                  </Link>
+                  <Link href="/profile/activity-log" className="flex items-center px-2 py-2 hover:bg-gray-100 rounded">
+                    <List className="h-4 w-4 mr-2" />
+                    <span>Activity Log</span>
+                  </Link>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <DropdownMenuSeparator />
               <SignoutButton
                 variant="ghost"

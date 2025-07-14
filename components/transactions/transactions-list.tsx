@@ -28,10 +28,26 @@ export function TransactionsList() {
       setLoading(true)
       setError(null)
       try {
-        const res = await fetch("/api/transactions", { credentials: "include" })
-        if (!res.ok) throw new Error("Failed to fetch transactions")
+        // Get account number from localStorage (set by profile or home page)
+        let accountNumber = null
+        try {
+          const userProfile = JSON.parse(localStorage.getItem("userProfile") || "null")
+          accountNumber = userProfile?.profile?.account_number
+        } catch {}
+        if (!accountNumber) {
+          setError("No account number found")
+          setLoading(false)
+          return
+        }
+        const res = await fetch("/api/alat/wallet/wallet-transaction-history", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ accountNumber }),
+        })
         const data = await res.json()
-        setTransactions(data.transactions || [])
+        // Assume data.result is an array of transactions
+        setTransactions(data.result || [])
       } catch (err: any) {
         setError(err.message || "Failed to fetch transactions")
       } finally {
