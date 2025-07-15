@@ -99,6 +99,11 @@ export async function POST(req: NextRequest) {
       reference: data?.result?.transactionReference || body.transactionReference || transactionId,
       updated_at: new Date().toISOString(),
       // Optionally add more fields from the response if needed
+      original_txn_date: data?.result?.orinalTxnTransactionDate || "",
+      platform_transaction_reference: data?.result?.platformTransactionReference || "",
+      transaction_stan: data?.result?.transactionStan || "",
+      message: data?.result?.message || "",
+      narration: data?.result?.narration || ""
     };
     const { error: updateError } = await adminClient
       .from("transactions")
