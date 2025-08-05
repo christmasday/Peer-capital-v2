@@ -211,6 +211,7 @@ type UpdateProfileInput = {
   id_verified?: boolean;
   fraud_screened?: boolean;
   fraud_screened_at?: string;
+  correlationId?: string;
 };
 
 export async function updateProfile(input: UpdateProfileInput, userIdOverride?: string) {
@@ -346,6 +347,7 @@ export async function updateProfile(input: UpdateProfileInput, userIdOverride?: 
     if (input.id_verified !== undefined) updateData.id_verified = input.id_verified;
     if (input.fraud_screened !== undefined) updateData.fraud_screened = input.fraud_screened;
     if (input.fraud_screened_at !== undefined) updateData.fraud_screened_at = input.fraud_screened_at;
+    if (input.correlationId !== undefined) updateData.correlation_id = input.correlationId;
 
     if (Object.keys(updateData).length === 0) {
         return { success: false, error: "No fields to update." };

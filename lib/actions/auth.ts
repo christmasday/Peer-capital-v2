@@ -1467,6 +1467,7 @@ export async function getUserProfile() {
         ...profile,
         idExpirationDate: profile.id_expiration_date,
         idDateIssued: profile.id_date_issued,
+        correlationId: profile.correlation_id, // <-- Add this line
       },
       account: accountData || { balance: 120000, loan_balance: 50000 },
     }

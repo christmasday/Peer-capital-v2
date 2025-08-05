@@ -1,10 +1,10 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Briefcase, GraduationCap, MapPin, Phone, Mail, Heart, Calendar, User, Info, Edit, Wallet, Plus, Wallet as WalletIcon } from "lucide-react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { updateSocialMedia } from "@/lib/actions/profile"
 import { updateBio } from "@/lib/actions/profile"
 import { updateProfile, uploadIdDocument, uploadLendingLicenseServer } from "@/lib/actions/profile"
@@ -167,6 +167,16 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
   const [isVerifyingWalletOtp, setIsVerifyingWalletOtp] = useState(false);
   const [isBlocked, setIsBlocked] = useState(false);
   const [blockLoading, setBlockLoading] = useState(false);
+  // Add to component state:
+  const [correlationId, setCorrelationId] = useState<string | null>(null);
+  const [walletApiResponse, setWalletApiResponse] = useState<any>(null);
+  const [isCreatingWallet, setIsCreatingWallet] = useState(false);
+
+  const searchParams = useSearchParams();
+  const correlationIdFromUrl = searchParams.get("c_id") || searchParams.get("correlationID");
+  const success = searchParams.get("success");
+  const id = searchParams.get("id");
+  const idType = searchParams.get("id_type");
 
   const handleVerifyPhoneOtp = async () => {
     setIsVerifyingOtp(true);
@@ -1520,6 +1530,132 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
     );
   }
 
+  // Listen for postMessage from iframe
+  useEffect(() => {
+    function handleMessage(event: MessageEvent) {
+      // Optionally check event.origin for security
+      if (event.data && event.data.correlationId) {
+        setCorrelationId(event.data.correlationId);
+        // setShowFaceIframe(false); // Removed: not defined
+      }
+    }
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
+
+  // When correlationId is set, save to DB and call wallet API
+  useEffect(() => {
+    console.log("[Wallet] useEffect triggered", { correlationId, profileId: profile.id });
+    async function processCorrelationId() {
+      if (correlationId && profile.id) {
+        setIsCreatingWallet(true);
+        try {
+          // Debug log
+          console.log("[Wallet] Saving correlationId to DB", { correlationId, profileId: profile.id });
+          // Save correlationId to DB (update profile)
+          if (typeof correlationId === 'string') {
+            const result = await updateProfile({ correlationId }, profile.id);
+            console.log("[Wallet] updateProfile result", result);
+            if (!result.success) {
+              toast({ title: "Error", description: result.error || "Failed to update profile" });
+            }
+          }
+          // Call wallet API
+          const res = await fetch("/api/alat/wallet", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              phoneNumber: profile.phone_number,
+              email: profile.email,
+              bvn: profile.bvn,
+              correlationId,
+            }),
+          });
+          const data = await res.json();
+          setWalletApiResponse(data);
+          if (data.error || data.status === "error") {
+            // If error, delete correlationId from DB
+            const result = await updateProfile({ correlationId: null }, profile.id);
+            console.log("[Wallet] Deleted correlationId after error:", result);
+            // Optionally, refresh the profile or reload the page
+            // window.location.reload();
+          }
+        } catch (err) {
+          setWalletApiResponse({ error: err instanceof Error ? err.message : String(err) });
+        } finally {
+          setIsCreatingWallet(false);
+        }
+      }
+    }
+    processCorrelationId();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [correlationId]);
+
+  useEffect(() => {
+    if (success === "true" && correlationId && !walletApiResponse) {
+      (async () => {
+        setIsCreatingWallet(true);
+        try {
+          // Debug log
+          console.log("[Wallet Redirect] Saving correlationId to DB", { correlationId, profileId: profile.id });
+          // Save correlationId to DB (update profile)
+          const result = await updateProfile({ correlationId }, profile.id);
+          console.log("[Wallet Redirect] updateProfile result", result);
+          if (!result.success) {
+            toast({ title: "Error", description: result.error || "Failed to update profile" });
+          }
+          // Call wallet API
+          const reqBody: any = {
+            phoneNumber: profile.phone_number,
+            email: profile.email,
+            bvn: profile.bvn,
+            correlationId,
+          };
+          if (idType === "bvn") reqBody.bvn = id;
+          if (idType === "nin") reqBody.nin = id;
+          const res = await fetch("/api/alat/wallet/create-wallet", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(reqBody),
+          });
+          const data = await res.json();
+          setWalletApiResponse(data);
+          if (data.error || data.status === "error") {
+            // If error, delete correlationId from DB
+            const result = await updateProfile({ correlationId: null }, profile.id);
+            console.log("[Wallet] Deleted correlationId after error:", result);
+            // Optionally, refresh the profile or reload the page
+            // window.location.reload();
+          }
+        } catch (err) {
+          setWalletApiResponse({ error: err instanceof Error ? err.message : String(err) });
+        } finally {
+          setIsCreatingWallet(false);
+        }
+      })();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [success, correlationId, id, idType]);
+
+  // Set correlationId from URL if present
+  useEffect(() => {
+    if (correlationIdFromUrl) {
+      console.log("[Wallet] Setting correlationId from URL", correlationIdFromUrl);
+      setCorrelationId(correlationIdFromUrl);
+    }
+  }, [correlationIdFromUrl]);
+
+  useEffect(() => {
+    if (
+      correlationIdFromUrl &&
+      profile.id
+    ) {
+      console.log("[Wallet] Saving correlationId from URL to DB", correlationIdFromUrl);
+      setCorrelationId(correlationIdFromUrl);
+      updateProfile({ correlationId: correlationIdFromUrl }, profile.id);
+    }
+  }, [correlationIdFromUrl, profile.id, profile.correlationId]);
+
   if (isBlocked && !isCurrentUser) {
     return (
       <div className="text-center text-gray-500 py-12">
@@ -1838,32 +1974,32 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
               </div>
               <div className="flex-grow">
                 <div className="flex flex-col">
-                  {isEditingPhone ? (
-                    <div className="space-y-2 w-full">
-                      <input
-                        type="text"
-                        value={phoneText}
-                        onChange={(e) => setPhoneText(e.target.value)}
-                        placeholder="Phone Number"
-                        className="border-b-3 border-solid !important border-b-blue-600 !important focus-visible:border-b-green-600 !important rounded-none px-3 py-2 w-full"
+                   {isEditingPhone ? (
+                     <div className="space-y-2 w-full">
+                       <input
+                         type="text"
+                         value={phoneText}
+                         onChange={(e) => setPhoneText(e.target.value)}
+                         placeholder="Phone Number"
+                         className="border-b-3 border-solid !important border-b-blue-600 !important focus-visible:border-b-green-600 !important rounded-none px-3 py-2 w-full"
                         disabled={profile.phone_verified}
-                      />
-                      <div className="flex justify-end gap-2 mt-2">
-                        <Button variant="outline" onClick={handleCancelEditPhone}>Cancel</Button>
-                        <Button onClick={handleSavePhone} disabled={phoneText === (profile.phone_number || "")}>Save</Button>
-                      </div>
-                    </div>
-                  ) : (
+                       />
+                       <div className="flex justify-end gap-2 mt-2">
+                         <Button variant="outline" onClick={handleCancelEditPhone}>Cancel</Button>
+                         <Button onClick={handleSavePhone} disabled={phoneText === (profile.phone_number || "")}>Save</Button>
+                       </div>
+                     </div>
+                   ) : (
                     <div className="flex items-center w-full">
                       <h3 className="text-lg font-medium mr-2">{profile.phone_number || "No phone number added"}</h3>
                       {profile.phone_verified && (
                         <Badge className="bg-green-500 text-white ml-2">Verified</Badge>
                       )}
                       {isCurrentUser && !profile.phone_verified && profile.phone_number && null}
-                    </div>
-                  )}
-                  <p className="text-gray-600 mt-1">Mobile</p>
                 </div>
+                    )}
+                  <p className="text-gray-600 mt-1">Mobile</p>
+                  </div>
               </div>
             </div>
 
@@ -2577,36 +2713,66 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
             <CardContent>
               <Button
                 onClick={async () => {
-                  try {
-                    const res = await fetch("/api/alat/wallet/create-wallet", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({
-                        phoneNumber: profile.phone_number,
-                        email: profile.email,
-                        nin: profile.nin,
-                      }),
-                    });
-                    const data = await res.json();
-                    if (res.ok && !data.error) {
-                      setWalletCreated(true);
-                      toast({ title: "Wallet Created!", description: "Your wallet has been created successfully." });
-                      if (data.trackingId && data.phoneNumber) {
-                        setTrackingId(data.trackingId);
-                        setWalletPhoneNumber(data.phoneNumber);
-                        setShowOtpDialog(true);
+                  if (profile.correlationId) {
+                    // If correlationId exists, proceed to send API request to Alat
+                    setIsCreatingWallet(true);
+                    try {
+                      const res = await fetch("/api/alat/wallet/create-wallet", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          phoneNumber: profile.phone_number,
+                          email: profile.email,
+                          correlationId: profile.correlationId,
+                          bvn: profile.bvn,
+                        }),
+                      });
+                      const data = await res.json();
+                      setWalletApiResponse(data);
+                      if (data.error || data.status === "error") {
+                        // If error, delete correlationId from DB
+                        const result = await updateProfile({ correlationId: null }, profile.id);
+                        console.log("[Wallet] Deleted correlationId after error:", result);
+                        // Optionally, refresh the profile or reload the page
+                        // window.location.reload();
                       }
-                    } else {
-                      toast({ title: "Error", description: data.message || data.error || "Failed to create wallet", variant: "destructive" });
+                    } catch (err) {
+                      setWalletApiResponse({ error: err instanceof Error ? err.message : String(err) });
+                    } finally {
+                      setIsCreatingWallet(false);
                     }
-                  } catch (err) {
-                    toast({ title: "Error", description: "Failed to create wallet", variant: "destructive" });
+                  } else {
+                    // If not, open the face verification page
+                    const width = 400, height = 600;
+                    const left = window.screenX + (window.outerWidth - width) / 2;
+                    const top = window.screenY + (window.outerHeight - height) / 2;
+                    const x_tk = process.env.NEXT_PUBLIC_ALAT_API_KEY;
+                    const redirectUri = window.location.origin + window.location.pathname + window.location.search;
+                    window.open(
+                      `https://face-verification-dev.azurewebsites.net/?bvn=${profile.bvn}&x_tk=${x_tk}&rd_uri=${redirectUri}`,
+                      'FaceVerification',
+                      `width=${width},height=${height},left=${left},top=${top},resizable,scrollbars`
+                    );
                   }
                 }}
                 className="w-full mb-6"
               >
                 Create Wallet
               </Button>
+              {isCreatingWallet && <div className="text-blue-600">Creating wallet...</div>}
+              {walletApiResponse && (
+                <Dialog open={!!walletApiResponse} onOpenChange={() => setWalletApiResponse(null)}>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Wallet Creation Result</DialogTitle>
+                    </DialogHeader>
+                    <div className="text-sm bg-gray-100 p-4 rounded text-gray-800">
+                      {walletApiResponse.message || "Unknown error"}
+                </div>
+                    <Button onClick={() => setWalletApiResponse(null)} className="mt-4">Close</Button>
+                  </DialogContent>
+                </Dialog>
+              )}
               {/* BVN Display and Inline Edit */}
               <div className="mb-4">
                 <label className="block font-medium mb-1">BVN</label>
@@ -2626,10 +2792,10 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
                       <Button variant="outline" onClick={handleCancelBvn} disabled={isSavingBvn}>Cancel</Button>
                       <Button onClick={handleSaveBvn} disabled={isSavingBvn || bvnText === (profile.bvn || "") || bvnText.length !== 11}>
                         {isSavingBvn ? "Saving..." : "Save"}
-                      </Button>
+                  </Button>
                     </div>
-                  </div>
-                ) : (
+                        </div>
+                      ) : (
                   <div className="flex items-center gap-2">
                     <span className="text-gray-900 font-mono">{profile.bvn || "Not set"}</span>
                     {/* Only show Edit button if wallet account details are NOT present */}
@@ -2637,10 +2803,10 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
                       <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setIsEditingBvn(true)}>
                         <Edit className="h-4 w-4" />
                       </Button>
-                    )}
-                  </div>
-                )}
-              </div>
+                      )}
+                    </div>
+                  )}
+                </div>
             </CardContent>
           </Card>
         )}
@@ -2741,8 +2907,8 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
                 >
                   Resend OTP
                 </button>
-              </div>
-            </div>
+      </div>
+    </div>
           </DialogContent>
         </Dialog>
         {/* Phone Verification Dialog */}

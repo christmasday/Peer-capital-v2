@@ -2,17 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyAuth } from "@/lib/auth-middleware";
 
 export async function POST(req: NextRequest) {
- // const authResult = await verifyAuth(req) as any;
-//  if (!authResult.authenticated) {
-//    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
-//  }
+  const authResult = await verifyAuth(req) as any;
+  if (!authResult.authenticated) {
+    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+  }
 
   try {
     const body = await req.json();
 
     // Forward request to Alat API (Step 1)
     const response = await fetch(
-      "https://apiplayground.alat.ng/wallet-creation/api/CustomerAccount/GenerateWalletAccountForPartnerships/Request",
+      "https://apiplayground.alat.ng/create-account-face/api/partnership/tier1-bvn-withoutOtp-v2",
       {
         method: "POST",
         headers: {
