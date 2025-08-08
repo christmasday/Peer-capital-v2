@@ -160,6 +160,10 @@ export function NotificationItem({ notification, onUpdate }: NotificationItemPro
           ? `/messages/${notification.data?.senderId || notification.actor_id}`
           : "/messages"
       case "loan_request":
+        // Go to profile page, loan-requests tab, highlight the new request
+        return notification.reference_id
+          ? `/profile?tab=loan-requests&highlight=${notification.reference_id}`
+          : "/profile?tab=loan-requests"
       case "loan_approved":
       case "loan_rejected":
         return notification.reference_id ? `/loans/${notification.reference_id}` : "/loans"

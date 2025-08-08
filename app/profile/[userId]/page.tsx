@@ -122,9 +122,9 @@ export default async function UserProfilePage({
 
   const user = userProfile.user
 
-  // Fetch all loan requests for the 'More' tab
+  // Fetch all loan requests for the 'Loan Requests' tab
   let allLoanRequests: any[] = []
-  if (activeTab === "more") {
+  if (activeTab === "loan-requests") {
     const allLoanReqResult = await getAllLoanRequests()
     allLoanRequests = allLoanReqResult.loanRequests || []
   }
@@ -269,8 +269,8 @@ export default async function UserProfilePage({
 
           {/* Right content area (8/12) */}
           <div className="col-span-8">
-            {/* More tab: show all loan requests */}
-            {activeTab === "more" ? (
+            {/* Loan Requests tab */}
+            {activeTab === "loan-requests" ? (
               <>
                 <h2 className="text-xl font-bold mb-4">All Loan Requests</h2>
                 <LoanRequestsList loanRequests={allLoanRequests} currentUserId={currentUserId} />
