@@ -105,9 +105,9 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
   // Get active tab from search params or default to "posts"
   const activeTab = searchParams?.tab || "posts"
 
-  // Fetch all loan requests for the 'More' tab
+  // Fetch all loan requests for the 'Loan Requests' tab
   let allLoanRequests: any[] = []
-  if (activeTab === "more") {
+  if (activeTab === "loan-requests") {
     const allLoanReqResult = await getAllLoanRequests()
     allLoanRequests = allLoanReqResult.loanRequests || []
   }
@@ -210,7 +210,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
               { name: "About", href: "/profile?tab=about", active: activeTab === "about" },
               { name: "Friends", href: "/profile/?tab=friends", active: activeTab === "friends" },
               { name: "Transfer Beneficiaries", href: "/profile?tab=beneficiaries", active: activeTab === "beneficiaries" },
-              { name: "Loan Requests", href: "/profile?tab=more", active: activeTab === "more" },
+              { name: "Loan Requests", href: "/profile?tab=loan-requests", active: activeTab === "loan-requests" },
             ].map((tab) => (
               <Link
                 key={tab.name}
@@ -242,10 +242,10 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
           <BeneficiariesList userId={user.id} />
         ) : activeTab === "about" ? (
           <ProfileAbout profile={profile} isCurrentUser={true} virtualAccount={virtualAccount} initialSection="about" />
-        ) : activeTab === "more" ? (
+        ) : activeTab === "loan-requests" ? (
           <div className="lg:col-span-12">
             <h2 className="text-xl font-bold mb-4">All Loan Requests</h2>
-            <LoanRequestsList loanRequests={allLoanRequests} currentUserId={user.id} showAdminActions />
+            <LoanRequestsList loanRequests={allLoanRequests} currentUserId={user.id} showAdminActions highlight={searchParams?.highlight} />
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6" id="overview">

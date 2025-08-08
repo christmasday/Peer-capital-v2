@@ -298,13 +298,36 @@ export async function getAllLoanRequests() {
     const adminClient = createAdminClient() as SupabaseClient<Database>
     const { data, error } = await adminClient
       .from("loan_requests")
-      .select(`*, loan_helpers (name, profile_image_url)`)
+      .select(`*`)
       .order("created_at", { ascending: false });
     if (error) {
       console.error("Error fetching all loan requests:", error);
       return { loanRequests: [] };
     }
-    return { success: true, loanRequests: data };
+    const loanRequests = data || [];
+
+    // Fetch borrower profiles in one query and attach
+    const userIds = Array.from(new Set(loanRequests.map((r: any) => r.user_id).filter(Boolean)));
+    let profilesMap: Record<string, any> = {};
+    if (userIds.length > 0) {
+      const { data: profiles, error: profilesError } = await adminClient
+        .from("profiles")
+        .select("id, first_name, last_name, profile_picture_url")
+        .in("id", userIds);
+      if (!profilesError && profiles) {
+        profilesMap = profiles.reduce((acc: Record<string, any>, p: any) => {
+          acc[p.id] = p;
+          return acc;
+        }, {});
+      }
+    }
+
+    const enriched = loanRequests.map((r: any) => ({
+      ...r,
+      borrower: profilesMap[r.user_id] || null,
+    }));
+
+    return { success: true, loanRequests: enriched };
   } catch (error) {
     console.error("Unexpected error fetching all loan requests:", error);
     return { loanRequests: [] };
