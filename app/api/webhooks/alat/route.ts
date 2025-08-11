@@ -2,11 +2,38 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function POST(req: NextRequest) {
-  
   try {
     const payload = await req.json();
     const adminClient = createAdminClient();
 
+    // If payload is a callback request (transactionReference + securityInfo)
+    if (
+      typeof payload === "object" &&
+      payload.transactionReference &&
+      payload.securityInfo &&
+      Object.keys(payload).length === 2
+    ) {
+      // Find transaction with matching reference and hash
+      const { data: transaction } = await adminClient
+        .from("transactions")
+        .select("reference, transaction_hash")
+        .eq("reference", payload.transactionReference)
+        .eq("transaction_hash", payload.securityInfo)
+        .maybeSingle();
+      if (transaction) {
+        return NextResponse.json({
+          transactionReference: payload.transactionReference,
+          authorized: true,
+        });
+      } else {
+        return NextResponse.json({
+          transactionReference: "",
+          authorized: false,
+        });
+      }
+    }
+
+    // Otherwise, treat as regular ALAT webhook
     // Log the webhook event for auditing
     await adminClient.from("webhook_events").insert({
       event_type: "alat.debit_transaction_status",

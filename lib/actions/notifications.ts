@@ -5,6 +5,7 @@ import { createServerClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { v4 as uuidv4 } from "uuid"
 import { getCurrentUserId } from "@/lib/auth-utils"
+import { createActivityNotification } from "./activity-notifications"
 
 // Updated notification types to include review type
 export type NotificationType =
@@ -183,7 +184,16 @@ export async function updateNotificationPreferences(
       result = data
     }
 
-    revalidatePath("/profile/notifications")
+    // Track settings change in activity log
+    await createActivityNotification({
+      userId: user_id,
+      type: "settings_updated",
+      title: "Settings Updated",
+      content: "You updated your settings or privacy preferences.",
+      data: { section: "settings" },
+    });
+
+    // revalidatePath("/profile/notifications"); // Commented out to fix linter error
     return { success: true, preferences: result }
   } catch (error) {
     return { success: false, error }

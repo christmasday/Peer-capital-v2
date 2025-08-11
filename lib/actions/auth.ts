@@ -8,6 +8,7 @@ import { executeSQL } from "./database-functions"
 
 // Add the JWT imports at the top of the file
 import { generateJWT, setJWTCookie, clearJWTCookies, verifyJWT, getJWTFromCookies } from "@/lib/jwt"
+import { createActivityNotification } from "./activity-notifications"
 
 // Define offline mode variables
 let isOfflineModeEnabled = false
@@ -1466,6 +1467,7 @@ export async function getUserProfile() {
         ...profile,
         idExpirationDate: profile.id_expiration_date,
         idDateIssued: profile.id_date_issued,
+        correlationId: profile.correlation_id, // <-- Add this line
       },
       account: accountData || { balance: 120000, loan_balance: 50000 },
     }
@@ -1675,6 +1677,15 @@ export async function changePassword(currentPassword: string, newPassword: strin
     if (updateError) {
       return { error: "Failed to update password" }
     }
+
+    // Track password change in activity log
+    await createActivityNotification({
+      userId,
+      type: "password_changed",
+      title: "Password Changed",
+      content: "You changed your account password.",
+      data: { section: "security" },
+    });
 
     return { success: true }
   } catch (error) {

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Eye, Plus, ArrowRightLeft, TrendingUp, ArrowDown, Search, Loader2, AlertCircle, Info } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { HelperCard } from "@/components/helpers/helper-card"
@@ -22,6 +22,9 @@ export function HomeContent({ userProfile, loanHelpers, virtualAccount }: HomeCo
   const [searchResults, setSearchResults] = useState<any[] | null>(null)
   const [searchError, setSearchError] = useState<string | null>(null)
   const [hasSearched, setHasSearched] = useState(false)
+  const [walletInfo, setWalletInfo] = useState<{ walletNumber: string, availableBalance: string } | null>(null)
+  const [walletLoading, setWalletLoading] = useState(false)
+  const [walletError, setWalletError] = useState<string | null>(null)
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-NG", {
@@ -30,6 +33,37 @@ export function HomeContent({ userProfile, loanHelpers, virtualAccount }: HomeCo
       minimumFractionDigits: 2,
     }).format(amount)
   }
+
+  useEffect(() => {
+    async function fetchWallet() {
+      setWalletLoading(true)
+      setWalletError(null)
+      try {
+        // Use account number from userProfile
+        const accountNumber = userProfile?.profile?.account_number
+        if (!accountNumber) {
+          setWalletError("No account number found")
+          setWalletLoading(false)
+          return
+        }
+        const res = await fetch(`/api/alat/wallet/get-wallet-balance?accountNumber=${accountNumber}`, { credentials: "include" })
+        const data = await res.json()
+        if (data.result && data.result.walletNumber && data.result.availableBalance) {
+          setWalletInfo({
+            walletNumber: data.result.walletNumber,
+            availableBalance: data.result.availableBalance,
+          })
+        } else {
+          setWalletError("Could not fetch wallet info")
+        }
+      } catch (err) {
+        setWalletError("Could not fetch wallet info")
+      } finally {
+        setWalletLoading(false)
+      }
+    }
+    fetchWallet()
+  }, [userProfile?.profile?.account_number])
 
   const handleFindLenders = async () => {
     setIsSearching(true)
@@ -125,7 +159,17 @@ export function HomeContent({ userProfile, loanHelpers, virtualAccount }: HomeCo
                     <Eye className="h-4 w-4" />
                   </button>
                 </div>
-                <div className="text-2xl font-bold mb-2">{formatCurrency(userProfile.account?.balance || 0)}</div>
+                {walletLoading ? (
+                  <div className="text-sm text-blue-100">Loading wallet info...</div>
+                ) : walletInfo ? (
+                  <>
+                    <div className="text-2xl font-bold mb-2">₦{Number(walletInfo.availableBalance || 0).toLocaleString()}</div>
+                  </>
+                ) : walletError ? (
+                  <div className="text-sm text-red-200">{walletError}</div>
+                ) : (
+                  <div className="text-2xl font-bold mb-2">{formatCurrency(userProfile.account?.balance || 0)}</div>
+                )}
 
                 <div className="text-sm opacity-90 mb-6">
                   &amp; Loan Balance {formatCurrency(userProfile.account?.loan_balance || 0)}
@@ -155,15 +199,15 @@ export function HomeContent({ userProfile, loanHelpers, virtualAccount }: HomeCo
                 </div>
 
                 {/* Virtual Account Number and Bank Name Display - below icons */}
-                {virtualAccount ? (
+                {walletInfo ? (
                   <div className="mt-8">
-                    <span className="text-xs text-blue-100 block">Your Virtual Account:</span>
-                    <span className="font-mono text-xl font-bold tracking-widest">{virtualAccount.account_number}</span>
-                    <span className="text-xs text-blue-100 ml-1">{virtualAccount.bank_name}</span>
+                    <span className="text-xs text-blue-100 block">Your wallet account:</span>
+                    <span className="font-mono text-xl font-bold tracking-widest">{walletInfo.walletNumber}</span>
+                    <span className="text-xs text-blue-100 ml-1">Wema Bank</span>
                   </div>
                 ) : (
                   <Link href="/profile?tab=about">
-                    <Button variant="secondary" size="sm" className="mt-8">Create Virtual Account</Button>
+                    <Button variant="secondary" size="sm" className="mt-8">Create wallet</Button>
                   </Link>
                 )}
               </div>

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createNotification } from "@/lib/actions/notifications";
-import { verifyAuth } from "@/lib/auth-middleware";
 
 export async function POST(req: NextRequest) {
  
@@ -23,6 +22,36 @@ export async function POST(req: NextRequest) {
         .maybeSingle();
       if (profile) {
         userId = profile.id;
+      }
+    }
+
+    // Handle alat face verification response
+    if (
+      typeof payload === "object" &&
+      payload.success === true &&
+      payload.c_id &&
+      payload.id &&
+      payload.id_type &&
+      (payload.id_type === "bvn" || payload.id_type === "nin")
+    ) {
+      // Find user by bvn or nin
+      let userField = payload.id_type === "bvn" ? "bvn" : "nin";
+      const { data: profile } = await adminClient
+        .from("profiles")
+        .select("id")
+        .eq(userField, payload.id)
+        .maybeSingle();
+      if (profile && profile.id) {
+        await adminClient.from("profiles").update({
+          correlation_id: payload.c_id,
+          bvn: payload.id_type === "bvn" ? payload.id : undefined,
+          nin: payload.id_type === "nin" ? payload.id : undefined,
+          alat_face_verified: true,
+          alat_face_verified_at: new Date().toISOString(),
+        }).eq("id", profile.id);
+        return NextResponse.json({ status: "ok" });
+      } else {
+        return NextResponse.json({ status: "error", message: "User not found for provided id" }, { status: 404 });
       }
     }
 
