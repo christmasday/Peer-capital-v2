@@ -112,6 +112,11 @@ export function LandingFooter() {
                 </Link>
               </li>
               <li>
+                <Link href="/acceptable-use" className="hover:text-white">
+                  Acceptable Use Policy
+                </Link>
+              </li>
+              <li>
                 <ManageCookiesButton variant="default" />
               </li>
             </ul>
