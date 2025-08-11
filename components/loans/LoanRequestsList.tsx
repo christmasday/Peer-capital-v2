@@ -14,9 +14,10 @@ interface LoanRequestsListProps {
   loanRequests: any[]
   currentUserId?: string
   showAdminActions?: boolean
+  highlight?: string
 }
 
-export function LoanRequestsList({ loanRequests: initialLoanRequests, currentUserId, showAdminActions = false }: LoanRequestsListProps) {
+export function LoanRequestsList({ loanRequests: initialLoanRequests, currentUserId, showAdminActions = false, highlight }: LoanRequestsListProps) {
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedRequest, setSelectedRequest] = useState<any>(null)
   const [loanRequests, setLoanRequests] = useState(initialLoanRequests)
@@ -24,6 +25,20 @@ export function LoanRequestsList({ loanRequests: initialLoanRequests, currentUse
   const [rejectError, setRejectError] = useState<string | null>(null)
   const [rejectModalOpen, setRejectModalOpen] = useState(false)
   const [rejectingRequestId, setRejectingRequestId] = useState<string | null>(null)
+
+  // Scroll to and highlight the card if highlight is set
+  useEffect(() => {
+    if (highlight) {
+      const el = document.getElementById(`loan-request-${highlight}`)
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" })
+        el.classList.add("ring-2", "ring-blue-500", "ring-offset-2")
+        setTimeout(() => {
+          el.classList.remove("ring-2", "ring-blue-500", "ring-offset-2")
+        }, 3000)
+      }
+    }
+  }, [highlight])
 
   const fetchLoanRequests = async () => {
     const res = await getAllLoanRequests()
@@ -89,11 +104,11 @@ export function LoanRequestsList({ loanRequests: initialLoanRequests, currentUse
   return (
     <div className="space-y-4">
       {loanRequests.map((req) => (
-        <Card key={req.id} className="shadow-sm">
+        <Card key={req.id} id={`loan-request-${req.id}`} className={"shadow-sm " + (highlight === req.id ? "ring-2 ring-blue-500 ring-offset-2 animate-pulse" : "") }>
           <CardHeader className="flex flex-row items-center gap-4 pb-2">
             <Avatar className="h-10 w-10">
-              {req.loan_helpers?.profile_image_url ? (
-                <AvatarImage src={req.loan_helpers.profile_image_url} alt={req.loan_helpers.name} />
+              {req.borrower?.profile_picture_url ? (
+                <AvatarImage src={req.borrower.profile_picture_url} alt={`${req.borrower.first_name || ""} ${req.borrower.last_name || ""}`} />
               ) : (
                 <AvatarFallback className="bg-blue-100">
                   <UserRound className="h-5 w-5 text-blue-500" />
@@ -101,7 +116,7 @@ export function LoanRequestsList({ loanRequests: initialLoanRequests, currentUse
               )}
             </Avatar>
             <div>
-              <div className="font-semibold text-gray-900">{req.loan_helpers?.name || "Unknown Helper"}</div>
+              <div className="font-semibold text-gray-900">{`${req.borrower?.first_name || ""} ${req.borrower?.last_name || ""}`.trim() || "User"}</div>
               <div className="text-xs text-gray-500">Requested on {new Date(req.created_at).toLocaleDateString()}</div>
             </div>
             <div className="ml-auto text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-700">

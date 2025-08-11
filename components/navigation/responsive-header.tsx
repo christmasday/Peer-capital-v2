@@ -3,13 +3,14 @@
 import { Bell, Menu, Home, Wallet, BarChart2, User, LogOut, Search } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { usePathname } from "next/navigation"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { SignoutButton } from "@/components/auth/signout-button"
 import { Logo } from "@/components/logo"
 import { Button } from "@/components/ui/button"
 import { UserSearchDialog } from "@/components/search/user-search-dialog"
+import { getUnreadNotificationsCount } from "@/lib/actions/notifications"
 
 interface ResponsiveHeaderProps {
   userName?: string
@@ -19,7 +20,30 @@ interface ResponsiveHeaderProps {
 export function ResponsiveHeader({ userName, userImage }: ResponsiveHeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
+  const [unreadNotifications, setUnreadNotifications] = useState(0)
+  const [fetchError, setFetchError] = useState(false)
   const pathname = usePathname()
+
+  useEffect(() => {
+    const fetchUnreadCounts = async () => {
+      try {
+        setFetchError(false)
+        let notificationsCount = 0
+        try {
+          const notificationsResult = await getUnreadNotificationsCount()
+          notificationsCount = notificationsResult.count || 0
+        } catch (error) {}
+        setUnreadNotifications(notificationsCount)
+      } catch (error) {
+        setFetchError(true)
+      }
+    }
+    fetchUnreadCounts()
+    const interval = setInterval(() => {
+      if (!fetchError) fetchUnreadCounts()
+    }, 30000)
+    return () => clearInterval(interval)
+  }, [fetchError])
 
   const navItems = [
     { href: "/home", label: "Home", icon: Home },
@@ -111,7 +135,11 @@ export function ResponsiveHeader({ userName, userImage }: ResponsiveHeaderProps)
             </Button>
             <button className="p-2 relative">
               <Bell className="h-5 w-5 text-gray-700" />
-              <span className="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full"></span>
+              {unreadNotifications > 0 && (
+                <span className="absolute -top-1 -right-1 h-5 min-w-[20px] px-1 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center">
+                  {unreadNotifications > 99 ? "99+" : unreadNotifications}
+                </span>
+              )}
             </button>
             <Link href="/profile" className="relative h-8 w-8 rounded-full overflow-hidden">
               <Image
