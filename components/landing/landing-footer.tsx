@@ -117,6 +117,11 @@ export function LandingFooter() {
                 </Link>
               </li>
               <li>
+                <Link href="/aml-policy" className="hover:text-white">
+                  AML Policy
+                </Link>
+              </li>
+              <li>
                 <ManageCookiesButton variant="default" />
               </li>
             </ul>
