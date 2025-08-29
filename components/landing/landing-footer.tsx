@@ -107,6 +107,21 @@ export function LandingFooter() {
                 </Link>
               </li>
               <li>
+                <Link href="/risk-disclosure" className="hover:text-white">
+                  Risk Disclosure
+                </Link>
+              </li>
+              <li>
+                <Link href="/acceptable-use" className="hover:text-white">
+                  Acceptable Use Policy
+                </Link>
+              </li>
+              <li>
+                <Link href="/aml-policy" className="hover:text-white">
+                  AML Policy
+                </Link>
+              </li>
+              <li>
                 <ManageCookiesButton variant="footer" />
               </li>
             </ul>

@@ -191,9 +191,9 @@ export function MainLayout({
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50">
+    <div className="flex flex-col min-h-screen bg-gray-50 overflow-hidden">
       <TopNav userName={userName} userImage={userImage} unreadNotificationsCount={unreadNotificationsCount} />
-      <main className={`flex-1 w-full mx-auto ${className}`}>{children}</main>
+      <main className={`flex-1 w-full mx-auto ${className} overflow-hidden`}>{children}</main>
     </div>
   )
 }

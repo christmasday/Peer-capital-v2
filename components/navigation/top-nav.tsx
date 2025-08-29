@@ -2,15 +2,19 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Menu, X, Home, Wallet, BarChart2, MessageCircle, Search } from "lucide-react"
+import { Menu, X, Home, Wallet, BarChart2, MessageCircle, Search, Settings, Shield, Activity } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
 } from "@/components/ui/dropdown-menu"
 import { SignoutButton } from "@/components/auth/signout-button"
 import { Logo } from "@/components/logo"
@@ -210,16 +214,47 @@ export function TopNav({ userName, userImage, hideSearch }: TopNavProps) {
                 </div>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuContent align="end" className="w-64">
               <Link href="/profile" className="block">
                 <DropdownMenuLabel className="cursor-pointer hover:bg-gray-50">
-                  <div className="flex flex-col">
-                    <span>{displayName}</span>
-                    <span className="text-xs text-gray-500">View profile</span>
+                  <div className="flex items-center gap-3">
+                    <div className="relative h-8 w-8 rounded-full overflow-hidden bg-blue-100 flex-shrink-0">
+                      <Image src={userImage || "/vibrant-street-market.png"} alt="Profile" fill className="object-cover" />
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="truncate">{displayName}</span>
+                      <span className="text-xs text-gray-500">View profile</span>
+                    </div>
                   </div>
                 </DropdownMenuLabel>
               </Link>
               <DropdownMenuSeparator />
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <Settings className="h-4 w-4 mr-2" />
+                  <span>Settings & privacy</span>
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  <Link href="/settings">
+                    <DropdownMenuItem className="cursor-pointer">
+                      <Settings className="h-4 w-4 mr-2" />
+                      <span>Settings</span>
+                    </DropdownMenuItem>
+                  </Link>
+                  <Link href="/privacy">
+                    <DropdownMenuItem className="cursor-pointer">
+                      <Shield className="h-4 w-4 mr-2" />
+                      <span>Privacy Center</span>
+                    </DropdownMenuItem>
+                  </Link>
+                  <Link href="/profile/activity-log">
+                    <DropdownMenuItem className="cursor-pointer">
+                      <Activity className="h-4 w-4 mr-2" />
+                      <span>Activity Log</span>
+                    </DropdownMenuItem>
+                  </Link>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
               <DropdownMenuSeparator />
               <SignoutButton
                 variant="ghost"
