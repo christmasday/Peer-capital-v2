@@ -197,21 +197,6 @@ type UpdateProfileInput = {
   bvn_verified_at?: string;
   phoneVerified?: boolean;
   phoneVerifiedAt?: string;
-  // New address fields
-  buildingNumber?: string;
-  apartment?: string;
-  street?: string;
-  town?: string;
-  lga?: string;
-  lcda?: string;
-  landmark?: string;
-  additionalInformation?: string;
-  fullAddress?: string;
-  postalCode?: string;
-  id_verified?: boolean;
-  fraud_screened?: boolean;
-  fraud_screened_at?: string;
-  correlationId?: string;
 };
 
 export async function updateProfile(input: UpdateProfileInput, userIdOverride?: string) {
@@ -334,20 +319,6 @@ export async function updateProfile(input: UpdateProfileInput, userIdOverride?: 
     if (input.bvn_verified_at !== undefined) updateData.bvn_verified_at = input.bvn_verified_at;
     if (input.phoneVerified !== undefined) updateData.phone_verified = input.phoneVerified;
     if (input.phoneVerifiedAt !== undefined) updateData.phone_verified_at = input.phoneVerifiedAt;
-    if (input.buildingNumber !== undefined) updateData.building_number = input.buildingNumber;
-    if (input.apartment !== undefined) updateData.apartment = input.apartment;
-    if (input.street !== undefined) updateData.street = input.street;
-    if (input.town !== undefined) updateData.town = input.town;
-    if (input.lga !== undefined) updateData.lga = input.lga;
-    if (input.lcda !== undefined) updateData.lcda = input.lcda;
-    if (input.landmark !== undefined) updateData.landmark = input.landmark;
-    if (input.additionalInformation !== undefined) updateData.additional_information = input.additionalInformation;
-    if (input.fullAddress !== undefined) updateData.full_address = input.fullAddress;
-    if (input.postalCode !== undefined) updateData.postal_code = input.postalCode;
-    if (input.id_verified !== undefined) updateData.id_verified = input.id_verified;
-    if (input.fraud_screened !== undefined) updateData.fraud_screened = input.fraud_screened;
-    if (input.fraud_screened_at !== undefined) updateData.fraud_screened_at = input.fraud_screened_at;
-    if (input.correlationId !== undefined) updateData.correlation_id = input.correlationId;
 
     if (Object.keys(updateData).length === 0) {
         return { success: false, error: "No fields to update." };

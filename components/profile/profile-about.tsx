@@ -27,7 +27,6 @@ import Script from "next/script"
 // eslint-disable-next-line
 declare module 'react-dojah';
 import Dojah from 'react-dojah'
-import { ErrorBoundary } from "@/components/ui/ErrorBoundary"
 
 // Add Dojah to window type
 declare global {
@@ -147,36 +146,6 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
   const [accountsError, setAccountsError] = useState("")
   const [removingAccountId, setRemovingAccountId] = useState<string | null>(null)
   const [removeAccountError, setRemoveAccountError] = useState("")
-  // Add state for all address fields
-  const [buildingNumber, setBuildingNumber] = useState(profile.buildingNumber || "");
-  const [apartment, setApartment] = useState(profile.apartment || "");
-  const [street, setStreet] = useState(profile.street || "");
-  const [city, setCity] = useState(profile.city || "");
-  const [town, setTown] = useState(profile.town || "");
-  const [stateValue, setStateValue] = useState(profile.state || "");
-  const [lga, setLga] = useState(profile.lga || "");
-  const [lcda, setLcda] = useState(profile.lcda || "");
-  const [landmark, setLandmark] = useState(profile.landmark || "");
-  const [additionalInformation, setAdditionalInformation] = useState(profile.additionalInformation || "");
-  const [fullAddress, setFullAddress] = useState(profile.fullAddress || "");
-  const [postalCode, setPostalCode] = useState(profile.postalCode || "");
-  const [walletCreated, setWalletCreated] = useState(false);
-  const [trackingId, setTrackingId] = useState<string | null>(null);
-  const [walletPhoneNumber, setWalletPhoneNumber] = useState<string | null>(null);
-  const [showOtpDialog, setShowOtpDialog] = useState(false);
-  const [isVerifyingWalletOtp, setIsVerifyingWalletOtp] = useState(false);
-  const [isBlocked, setIsBlocked] = useState(false);
-  const [blockLoading, setBlockLoading] = useState(false);
-  // Add to component state:
-  const [correlationId, setCorrelationId] = useState<string | null>(null);
-  const [walletApiResponse, setWalletApiResponse] = useState<any>(null);
-  const [isCreatingWallet, setIsCreatingWallet] = useState(false);
-
-  const searchParams = useSearchParams();
-  const correlationIdFromUrl = searchParams.get("c_id") || searchParams.get("correlationID");
-  const success = searchParams.get("success");
-  const id = searchParams.get("id");
-  const idType = searchParams.get("id_type");
 
   const handleVerifyPhoneOtp = async () => {
     setIsVerifyingOtp(true);
@@ -210,7 +179,6 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
     { id: "places", name: "Places lived", icon: MapPin },
     { id: "contact", name: "Contact and basic info", icon: Phone },
     { id: "details", name: "Details about you", icon: User },
-    { id: "lending-licence", name: "Lending Licence", icon: Briefcase },
     { id: "bank", name: "Bank Account details", icon: Briefcase },
     { id: "loan-helper", name: "Loan helper settings", icon: Briefcase },
     ...(isCurrentUser ? [{ id: "wallet", name: "Wallet", icon: WalletIcon }] : []),
@@ -245,20 +213,6 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
     setAccountNumber(profile.account_number || "")
     setAccountName(profile.account_name || "")
     setLoanHelperLoaded(false);
-    // Add state for all address fields
-    setBuildingNumber(profile.buildingNumber || "");
-    setApartment(profile.apartment || "");
-    setStreet(profile.street || "");
-    setCity(profile.city || "");
-    setTown(profile.town || "");
-    setStateValue(profile.state || "");
-    setLga(profile.lga || "");
-    setLcda(profile.lcda || "");
-    setLandmark(profile.landmark || "");
-    setAdditionalInformation(profile.additionalInformation || "");
-    setCountry(profile.country || "Nigeria");
-    setFullAddress(profile.fullAddress || "");
-    setPostalCode(profile.postalCode || "");
   }, [profile])
 
   // Fetch loan helper settings when section is active and not loaded
@@ -476,44 +430,51 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
       console.error("User ID not available for saving location.");
       return;
     }
-    // Call the server action to update all address fields
+
+    // Call the server action to update location fields
     const result = await updateProfile({
-      buildingNumber,
-      apartment,
-      street,
-      city,
-      town,
-      state: stateValue,
-      lga,
-      lcda,
-      landmark,
-      additionalInformation,
-      country,
-      fullAddress,
-      postalCode,
+      firstName: profile.first_name || "",
+      lastName: profile.last_name || "",
+      phoneNumber: profile.phone_number || "",
+      address: locationAddress,
+      city: locationCity,
+      state: locationState,
+      zipCode: profile.zip_code,
+      profilePictureUrl: profile.profile_picture_url,
+      bvn: profile.bvn,
+      dateOfBirth: profile.date_of_birth,
+      idType: profile.id_type,
+      idNumber: profile.id_number,
+      idDocumentUrl: profile.id_document_url,
+      employmentStatus: profile.employment_status,
+      employerName: profile.employer_name,
+      employerAddress: profile.employer_address,
+      workPhone: profile.work_phone,
+      jobTitle: profile.job_title,
+      monthlyIncome: profile.monthly_income,
+      employmentStartDate: profile.employment_start_date,
+      employmentEndDate: profile.employment_end_date,
+      bankName: profile.bank_name,
+      accountNumber: profile.account_number,
+      accountName: profile.account_name,
     });
+
     if (result.success) {
+      console.log("Location updated successfully!");
       setIsEditingLocation(false);
+      // Revalidation should handle UI update
     } else {
       console.error("Failed to update location:", result.error);
+      // TODO: Show error message
     }
   };
 
   const handleCancelEditLocation = () => {
+    // Revert location fields to original values if you add state for them later
     setIsEditingLocation(false);
-    setBuildingNumber(profile.buildingNumber || "");
-    setApartment(profile.apartment || "");
-    setStreet(profile.street || "");
-    setCity(profile.city || "");
-    setTown(profile.town || "");
-    setStateValue(profile.state || "");
-    setLga(profile.lga || "");
-    setLcda(profile.lcda || "");
-    setLandmark(profile.landmark || "");
-    setAdditionalInformation(profile.additionalInformation || "");
-    setCountry(profile.country || "Nigeria");
-    setFullAddress(profile.fullAddress || "");
-    setPostalCode(profile.postalCode || "");
+    setLocationAddress(profile.address || "");
+    setLocationCity(profile.city || "");
+    setLocationState(profile.state || "");
   };
 
   const handleSaveWorkOverview = async () => {
@@ -846,14 +807,15 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
         ? String(profile.number_of_dependants)
         : ""
     );
+    const [licenseUrl, setLicenseUrl] = useState(profile.lending_license_url || "");
+    const [licenseFile, setLicenseFile] = useState<File | null>(null);
+    const [uploading, setUploading] = useState(false);
     const [savingMarital, setSavingMarital] = useState(false);
+    const [savingLicense, setSavingLicense] = useState(false);
     const [messageMarital, setMessageMarital] = useState<string | null>(null);
+    const [messageLicense, setMessageLicense] = useState<string | null>(null);
     const [editMarital, setEditMarital] = useState(false);
-    const isDirtyMarital =
-      maritalStatus !== (profile.marital_status || "") ||
-      (maritalStatus === "married" && dependants !== (profile.number_of_dependants !== undefined && profile.number_of_dependants !== null ? String(profile.number_of_dependants) : ""));
-
-    // Valid Means of Identification state/handlers remain unchanged
+    const [editLicense, setEditLicense] = useState(false);
     const [idDocUrl, setIdDocUrl] = useState(profile.id_document_url || "");
     const [idDocFile, setIdDocFile] = useState<File | null>(null);
     const [savingIdDoc, setSavingIdDoc] = useState(false);
@@ -872,19 +834,23 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
     ];
     const [idDocFileError, setIdDocFileError] = useState<string | null>(null);
     const MAX_ID_DOC_SIZE_MB = 5;
+    const [licenseFileError, setLicenseFileError] = useState<string | null>(null);
 
-    // Remove all lending licence state, handlers, and UI from this section
+    const isDirtyMarital =
+      maritalStatus !== (profile.marital_status || "") ||
+      (maritalStatus === "married" && dependants !== (profile.number_of_dependants !== undefined && profile.number_of_dependants !== null ? String(profile.number_of_dependants) : ""));
+    const isDirtyLicense = editLicense && licenseFile !== null;
 
     const handleLicenseFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (file) {
         if (file.size > MAX_ID_DOC_SIZE_MB * 1024 * 1024) {
-          setIdDocFileError(`File size exceeds ${MAX_ID_DOC_SIZE_MB}MB. Please upload a smaller file.`);
-          setIdDocFile(null);
-          setIdDocUrl("");
+          setLicenseFileError(`File size exceeds ${MAX_ID_DOC_SIZE_MB}MB. Please upload a smaller file.`);
+          setLicenseFile(null);
+          setLicenseUrl("");
           return;
         }
-        setIdDocFileError(null);
+        setLicenseFileError(null);
         if (file.type.startsWith('image/')) {
           try {
             const compressedFile = await imageCompression(file, {
@@ -892,16 +858,16 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
               maxWidthOrHeight: 1920, // Optional: resize large images
               useWebWorker: true,
             });
-            setIdDocFile(compressedFile);
+            setLicenseFile(compressedFile);
           } catch (err) {
-            setIdDocFileError('Image compression failed. Please try another image.');
-            setIdDocFile(null);
+            setLicenseFileError('Image compression failed. Please try another image.');
+            setLicenseFile(null);
             return;
           }
         } else {
-          setIdDocFile(file); // For PDFs, no compression
+          setLicenseFile(file); // For PDFs, no compression
         }
-        setIdDocUrl("");
+        setLicenseUrl("");
       }
     };
 
@@ -937,6 +903,65 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
       setMessageMarital(null);
     };
 
+    const handleSaveLicense = async () => {
+      setSavingLicense(true);
+      setMessageLicense(null);
+      let url = licenseUrl;
+      try {
+        if (licenseFile) {
+          setUploading(true);
+          setMessageLicense("Uploading license...");
+          url = await uploadLendingLicense(licenseFile);
+          setLicenseUrl(url);
+          setUploading(false);
+        }
+        await onUpdate({ lendingLicenseUrl: url });
+        setMessageLicense("Saved!");
+        setLicenseFile(null);
+        setEditLicense(false);
+      } catch (err: any) {
+        setMessageLicense(err?.message || "Save failed");
+      } finally {
+        setSavingLicense(false);
+        setUploading(false);
+      }
+    };
+    const handleCancelLicense = () => {
+      setLicenseUrl(profile.lending_license_url || "");
+      setLicenseFile(null);
+      setEditLicense(false);
+      setMessageLicense(null);
+    };
+
+    const handleIdDocFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        if (file.size > MAX_ID_DOC_SIZE_MB * 1024 * 1024) {
+          setIdDocFileError(`File size exceeds ${MAX_ID_DOC_SIZE_MB}MB. Please upload a smaller file.`);
+          setIdDocFile(null);
+          setIdDocUrl("");
+          return;
+        }
+        setIdDocFileError(null);
+        if (file.type.startsWith('image/')) {
+          try {
+            const compressedFile = await imageCompression(file, {
+              maxSizeMB: 1, // Target max size in MB
+              maxWidthOrHeight: 1920, // Optional: resize large images
+              useWebWorker: true,
+            });
+            setIdDocFile(compressedFile);
+          } catch (err) {
+            setIdDocFileError('Image compression failed. Please try another image.');
+            setIdDocFile(null);
+            return;
+          }
+        } else {
+          setIdDocFile(file); // For PDFs, no compression
+        }
+        setIdDocUrl("");
+      }
+    };
     const handleSaveIdDoc = async () => {
       setSavingIdDoc(true);
       setMessageIdDoc(null);
@@ -1030,6 +1055,64 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
             </div>
           )}
         </div>
+        {/* Lending License */}
+        <div>
+          <div className="flex items-center justify-between">
+            <label className="font-semibold block mb-2">Lending License</label>
+            {!editLicense && (
+              <button
+                className="text-blue-600 flex items-center gap-1 text-sm"
+                onClick={() => setEditLicense(true)}
+                type="button"
+              >
+                <Edit className="h-4 w-4"/>
+              </button>
+            )}
+          </div>
+          {!editLicense ? (
+            <div>
+              {profile.lending_license_url ? (
+                <img
+                  src={profile.lending_license_url}
+                  alt="Lending License"
+                  className="w-40 h-40 object-cover mb-2 rounded border"
+                />
+              ) : (
+                <span className="text-gray-800">No license uploaded</span>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {licenseUrl && (
+                <img
+                  src={licenseUrl}
+                  alt="Lending License Preview"
+                  className="w-40 h-40 object-cover mb-2 rounded border"
+                />
+              )}
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleLicenseFileChange}
+                disabled={uploading || savingLicense}
+                className="w-full"
+              />
+              {licenseFileError && <div className="text-sm text-red-500 mt-1">{licenseFileError}</div>}
+              <div className="flex gap-2 mt-2 w-full">
+                <Button variant="outline" className="w-1/2" onClick={handleCancelLicense} type="button" disabled={savingLicense}>Cancel</Button>
+                <Button
+                  className="w-1/2"
+                  onClick={handleSaveLicense}
+                  disabled={savingLicense || uploading || !isDirtyLicense}
+                  type="button"
+                >
+                  {savingLicense || uploading ? "Saving..." : "Save"}
+                </Button>
+              </div>
+              {messageLicense && <div className="text-sm text-gray-500 mt-2">{messageLicense}</div>}
+            </div>
+          )}
+        </div>
         {/* Valid Means of Identification */}
         <div>
           <div className="flex items-center justify-between">
@@ -1109,7 +1192,7 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
               <input
                 type="file"
                 accept="image/*,application/pdf"
-                onChange={handleLicenseFileChange}
+                onChange={handleIdDocFileChange}
                 disabled={savingIdDoc}
                 className="w-full"
               />
@@ -1395,276 +1478,6 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
     }
   }
 
-  // Add LendingLicenceSection component
-  function LendingLicenceSection({ profile, onUpdate, uploadLendingLicense }: { profile: any, onUpdate: (fields: any) => Promise<void>, uploadLendingLicense: (file: File) => Promise<string> }) {
-    const [licenseUrl, setLicenseUrl] = useState(profile.lending_license_url || "");
-    const [licenseFile, setLicenseFile] = useState<File | null>(null);
-    const [uploading, setUploading] = useState(false);
-    const [savingLicense, setSavingLicense] = useState(false);
-    const [messageLicense, setMessageLicense] = useState<string | null>(null);
-    const [editLicense, setEditLicense] = useState(false);
-    const [licenseFileError, setLicenseFileError] = useState<string | null>(null);
-    const MAX_ID_DOC_SIZE_MB = 5;
-    const isDirtyLicense = editLicense && licenseFile !== null;
-
-    const handleLicenseFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (file) {
-        if (file.size > MAX_ID_DOC_SIZE_MB * 1024 * 1024) {
-          setLicenseFileError(`File size exceeds ${MAX_ID_DOC_SIZE_MB}MB. Please upload a smaller file.`);
-          setLicenseFile(null);
-          setLicenseUrl("");
-          return;
-        }
-        setLicenseFileError(null);
-        if (file.type.startsWith('image/')) {
-          try {
-            const compressedFile = await imageCompression(file, {
-              maxSizeMB: 1, // Target max size in MB
-              maxWidthOrHeight: 1920, // Optional: resize large images
-              useWebWorker: true,
-            });
-            setLicenseFile(compressedFile);
-          } catch (err) {
-            setLicenseFileError('Image compression failed. Please try another image.');
-            setLicenseFile(null);
-            return;
-          }
-        } else {
-          setLicenseFile(file); // For PDFs, no compression
-        }
-        setLicenseUrl("");
-      }
-    };
-
-    const handleSaveLicense = async () => {
-      setSavingLicense(true);
-      setMessageLicense(null);
-      let url = licenseUrl;
-      try {
-        if (licenseFile) {
-          setUploading(true);
-          setMessageLicense("Uploading license...");
-          url = await uploadLendingLicense(licenseFile);
-          setLicenseUrl(url);
-          setUploading(false);
-        }
-        await onUpdate({ lendingLicenseUrl: url });
-        setMessageLicense("Saved!");
-        setLicenseFile(null);
-        setEditLicense(false);
-      } catch (err: any) {
-        setMessageLicense(err?.message || "Save failed");
-      } finally {
-        setSavingLicense(false);
-        setUploading(false);
-      }
-    };
-    const handleCancelLicense = () => {
-      setLicenseUrl(profile.lending_license_url || "");
-      setLicenseFile(null);
-      setEditLicense(false);
-      setMessageLicense(null);
-    };
-
-    return (
-      <div className="space-y-6 w-full">
-        <div>
-          <div className="flex items-center justify-between">
-            <label className="font-semibold block mb-2">Lending License</label>
-            {!editLicense && (
-              <button
-                className="text-blue-600 flex items-center gap-1 text-sm"
-                onClick={() => setEditLicense(true)}
-                type="button"
-              >
-                <Edit className="h-4 w-4"/>
-              </button>
-            )}
-          </div>
-          {!editLicense ? (
-            <div>
-              {profile.lending_license_url ? (
-                <img
-                  src={profile.lending_license_url}
-                  alt="Lending License"
-                  className="w-40 h-40 object-cover mb-2 rounded border"
-                />
-              ) : (
-                <span className="text-gray-800">No license uploaded</span>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {licenseUrl && (
-                <img
-                  src={licenseUrl}
-                  alt="Lending License Preview"
-                  className="w-40 h-40 object-cover mb-2 rounded border"
-                />
-              )}
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleLicenseFileChange}
-                disabled={uploading || savingLicense}
-                className="w-full"
-              />
-              {licenseFileError && <div className="text-sm text-red-500 mt-1">{licenseFileError}</div>}
-              <div className="flex gap-2 mt-2 w-full">
-                <Button variant="outline" className="w-1/2" onClick={handleCancelLicense} type="button" disabled={savingLicense}>Cancel</Button>
-                <Button
-                  className="w-1/2"
-                  onClick={handleSaveLicense}
-                  disabled={savingLicense || uploading || !isDirtyLicense}
-                  type="button"
-                >
-                  {savingLicense || uploading ? "Saving..." : "Save"}
-                </Button>
-              </div>
-              {messageLicense && <div className="text-sm text-gray-500 mt-2">{messageLicense}</div>}
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // Listen for postMessage from iframe
-  useEffect(() => {
-    function handleMessage(event: MessageEvent) {
-      // Optionally check event.origin for security
-      if (event.data && event.data.correlationId) {
-        setCorrelationId(event.data.correlationId);
-        // setShowFaceIframe(false); // Removed: not defined
-      }
-    }
-    window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
-  }, []);
-
-  // When correlationId is set, save to DB and call wallet API
-  useEffect(() => {
-    console.log("[Wallet] useEffect triggered", { correlationId, profileId: profile.id });
-    async function processCorrelationId() {
-      if (correlationId && profile.id) {
-        setIsCreatingWallet(true);
-        try {
-          // Debug log
-          console.log("[Wallet] Saving correlationId to DB", { correlationId, profileId: profile.id });
-          // Save correlationId to DB (update profile)
-          if (typeof correlationId === 'string') {
-            const result = await updateProfile({ correlationId }, profile.id);
-            console.log("[Wallet] updateProfile result", result);
-            if (!result.success) {
-              toast({ title: "Error", description: result.error || "Failed to update profile" });
-            }
-          }
-          // Call wallet API
-          const res = await fetch("/api/alat/wallet", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              phoneNumber: profile.phone_number,
-              email: profile.email,
-              bvn: profile.bvn,
-              correlationId,
-            }),
-          });
-          const data = await res.json();
-          setWalletApiResponse(data);
-          if (data.error || data.status === "error") {
-            // If error, delete correlationId from DB
-            const result = await updateProfile({ correlationId: null }, profile.id);
-            console.log("[Wallet] Deleted correlationId after error:", result);
-            // Optionally, refresh the profile or reload the page
-            // window.location.reload();
-          }
-        } catch (err) {
-          setWalletApiResponse({ error: err instanceof Error ? err.message : String(err) });
-        } finally {
-          setIsCreatingWallet(false);
-        }
-      }
-    }
-    processCorrelationId();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [correlationId]);
-
-  useEffect(() => {
-    if (success === "true" && correlationId && !walletApiResponse) {
-      (async () => {
-        setIsCreatingWallet(true);
-        try {
-          // Debug log
-          console.log("[Wallet Redirect] Saving correlationId to DB", { correlationId, profileId: profile.id });
-          // Save correlationId to DB (update profile)
-          const result = await updateProfile({ correlationId }, profile.id);
-          console.log("[Wallet Redirect] updateProfile result", result);
-          if (!result.success) {
-            toast({ title: "Error", description: result.error || "Failed to update profile" });
-          }
-          // Call wallet API
-          const reqBody: any = {
-            phoneNumber: profile.phone_number,
-            email: profile.email,
-            bvn: profile.bvn,
-            correlationId,
-          };
-          if (idType === "bvn") reqBody.bvn = id;
-          if (idType === "nin") reqBody.nin = id;
-          const res = await fetch("/api/alat/wallet/create-wallet", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(reqBody),
-          });
-          const data = await res.json();
-          setWalletApiResponse(data);
-          if (data.error || data.status === "error") {
-            // If error, delete correlationId from DB
-            const result = await updateProfile({ correlationId: null }, profile.id);
-            console.log("[Wallet] Deleted correlationId after error:", result);
-            // Optionally, refresh the profile or reload the page
-            // window.location.reload();
-          }
-        } catch (err) {
-          setWalletApiResponse({ error: err instanceof Error ? err.message : String(err) });
-        } finally {
-          setIsCreatingWallet(false);
-        }
-      })();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [success, correlationId, id, idType]);
-
-  // Set correlationId from URL if present
-  useEffect(() => {
-    if (correlationIdFromUrl) {
-      console.log("[Wallet] Setting correlationId from URL", correlationIdFromUrl);
-      setCorrelationId(correlationIdFromUrl);
-    }
-  }, [correlationIdFromUrl]);
-
-  useEffect(() => {
-    if (
-      correlationIdFromUrl &&
-      profile.id
-    ) {
-      console.log("[Wallet] Saving correlationId from URL to DB", correlationIdFromUrl);
-      setCorrelationId(correlationIdFromUrl);
-      updateProfile({ correlationId: correlationIdFromUrl }, profile.id);
-    }
-  }, [correlationIdFromUrl, profile.id, profile.correlationId]);
-
-  if (isBlocked && !isCurrentUser) {
-    return (
-      <div className="text-center text-gray-500 py-12">
-        <p>You have blocked this user. Their profile, posts, and requests are hidden.</p>
-        <Button onClick={handleUnblock} disabled={blockLoading} className="mt-4">{blockLoading ? "Unblocking..." : "Unblock User"}</Button>
-      </div>
-    );
-  }
-
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
       {/* Left sidebar with sections */}
@@ -1697,64 +1510,60 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
             )}
             {/* Dojah Widget Modal */}
             {showDojah && (
-              <ErrorBoundary>
-                <div id="dojah-widget-container">
-                  <Dojah
-                    appID={process.env.DOJAH_APP_ID}
-                    publicKey={process.env.DOJAH_PUBLIC_KEY}
-                    type="custom"
-                    config={{
-                      widget_id: "684effd6cb141c071767fddc",
-                    }}
-                    userData={{
-                      first_name: profile.first_name,
-                      middle_name: profile.middle_name,
-                      last_name: profile.last_name,
-                      email: profile.email,
-                      residence_country: profile.country || 'NG',
-                    }}
-                    metadata={{
-                      user_id: profile.id,
-                    }}
-                    response={async (type: any, data: any) => {
-                      if (type === 'success') {
-                        const verified = data?.data || {};
-                        // Build the update object, omitting full name fields
-                        const updateFields: any = {
-                          dateOfBirth: verified.user_data?.data?.dob,
-                          bvn: verified.government_data?.data?.bvn?.entity?.bvn,
-                          address: verified.government_data?.data?.nin?.entity?.residence_AddressLine1,
-                          city: verified.government_data?.data?.nin?.entity?.residence_Town,
-                          state: verified.government_data?.data?.nin?.entity?.residence_state,
-                          country: verified.countries?.data?.country,
-                          id_url: verified.id?.data?.id_url,
-                          id_type: verified.id?.data?.id_data?.document_type,
-                          id_number: verified.id?.data?.id_data?.document_number
-                          // Add more fields as needed, but do NOT include firstName, lastName, middleName
-                        };
-                        Object.keys(updateFields).forEach(
-                          (key) => updateFields[key] === undefined && delete updateFields[key]
-                        );
-                        const result = await updateProfile(updateFields, profile.id);
-                        if (result.success) {
-                          toast({
-                            title: "Profile Verification Successful",
-                            description: "Your profile has been updated with your verified information.",
-                          });
-                        } else {
-                          toast({
-                            title: "Profile Update Failed",
-                            description: result.error || "An error occurred while updating your profile.",
-                          });
-                        }
-                        setTimeout(() => setShowDojah(false), 300); // Delay unmount
-                      } else if (type === 'close') {
-                        setTimeout(() => setShowDojah(false), 300); // Delay unmount
-                      }
-                    }}
-                  />
-                </div>
-              </ErrorBoundary>
+              <Dojah
+                appID={process.env.DOJAH_APP_ID}
+                publicKey={process.env.DOJAH_PUBLIC_KEY}
+                type="custom"
+                config={{
+                  widget_id: "684effd6cb141c071767fddc",
+                }}
+                userData={{
+                  first_name: profile.first_name,
+                  middle_name: profile.middle_name,
+                  last_name: profile.last_name,
+                  email: profile.email,
+                  residence_country: profile.country || 'NG',
+                }}
+                metadata={{
+                  user_id: profile.id,
+                }}
+                response={async (type: any, data: any) => {
+                  if (type === 'success') {
+                    const verified = data?.data || {};
+                    // Build the update object, omitting full name fields
+                    const updateFields: any = {
+                      dateOfBirth: verified.user_data?.data?.dob,
+                      bvn: verified.government_data?.data?.bvn?.entity?.bvn,
+                      address: verified.government_data?.data?.nin?.entity?.residence_AddressLine1,
+                      city: verified.government_data?.data?.nin?.entity?.residence_Town,
+                      state: verified.government_data?.data?.nin?.entity?.residence_state,
+                      country: verified.countries?.data?.country,
+                      id_url: verified.id?.data?.id_url,
+                      id_type: verified.id?.data?.id_data?.document_type,
+                      id_number: verified.id?.data?.id_data?.document_number
+                      // Add more fields as needed, but do NOT include firstName, lastName, middleName
+                    };
+                    Object.keys(updateFields).forEach(
+                      (key) => updateFields[key] === undefined && delete updateFields[key]
+                    );
+                    const result = await updateProfile(updateFields, profile.id);
+                    if (result.success) {
+                      toast({
+                        title: "Profile Verification Successful",
+                        description: "Your profile has been updated with your verified information.",
+                      });
+                    } else {
+                      toast({
+                        title: "Profile Update Failed",
+                        description: result.error || "An error occurred while updating your profile.",
+                      });
+                    }
+                    setShowDojah(false);
+                  } else if (type === 'close') {
+                    setShowDojah(false);
+                  }
+                }}
+              />
             )}
             {/* Referral Code Display */}
             {profile.referral_code && (
@@ -1855,107 +1664,37 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
                      <div className="space-y-2 w-full">
                        <input
                          type="text"
-                         value={buildingNumber}
-                         onChange={e => setBuildingNumber(e.target.value)}
-                         placeholder="Building Number"
-                         className="border-b-3 border-solid border-b-blue-600 focus-visible:border-b-green-600 rounded-none px-3 py-2 w-full"
+                         value={locationAddress}
+                         onChange={(e) => setLocationAddress(e.target.value)}
+                         placeholder="Address"
+                         className="border-b-3 border-solid !important border-b-blue-600 !important focus-visible:border-b-green-600 !important rounded-none px-3 py-2 w-full"
                        />
                        <input
                          type="text"
-                         value={apartment}
-                         onChange={e => setApartment(e.target.value)}
-                         placeholder="Apartment"
-                         className="border-b-3 border-solid border-b-blue-600 focus-visible:border-b-green-600 rounded-none px-3 py-2 w-full"
-                       />
-                       <input
-                         type="text"
-                         value={street}
-                         onChange={e => setStreet(e.target.value)}
-                         placeholder="Street"
-                         className="border-b-3 border-solid border-b-blue-600 focus-visible:border-b-green-600 rounded-none px-3 py-2 w-full"
-                       />
-                       <input
-                         type="text"
-                         value={city}
-                         onChange={e => setCity(e.target.value)}
+                         value={locationCity}
+                         onChange={(e) => setLocationCity(e.target.value)}
                          placeholder="City"
-                         className="border-b-3 border-solid border-b-blue-600 focus-visible:border-b-green-600 rounded-none px-3 py-2 w-full"
+                         className="border-b-3 border-solid !important border-b-blue-600 !important focus-visible:border-b-green-600 !important rounded-none px-3 py-2 w-full"
                        />
-                       <input
-                         type="text"
-                         value={town}
-                         onChange={e => setTown(e.target.value)}
-                         placeholder="Town"
-                         className="border-b-3 border-solid border-b-blue-600 focus-visible:border-b-green-600 rounded-none px-3 py-2 w-full"
-                       />
-                       <input
-                         type="text"
-                         value={stateValue}
-                         onChange={e => setStateValue(e.target.value)}
-                         placeholder="State"
-                         className="border-b-3 border-solid border-b-blue-600 focus-visible:border-b-green-600 rounded-none px-3 py-2 w-full"
-                       />
-                       <input
-                         type="text"
-                         value={lga}
-                         onChange={e => setLga(e.target.value)}
-                         placeholder="LGA"
-                         className="border-b-3 border-solid border-b-blue-600 focus-visible:border-b-green-600 rounded-none px-3 py-2 w-full"
-                       />
-                       <input
-                         type="text"
-                         value={lcda}
-                         onChange={e => setLcda(e.target.value)}
-                         placeholder="LCDA"
-                         className="border-b-3 border-solid border-b-blue-600 focus-visible:border-b-green-600 rounded-none px-3 py-2 w-full"
-                       />
-                       <input
-                         type="text"
-                         value={landmark}
-                         onChange={e => setLandmark(e.target.value)}
-                         placeholder="Landmark"
-                         className="border-b-3 border-solid border-b-blue-600 focus-visible:border-b-green-600 rounded-none px-3 py-2 w-full"
-                       />
-                       <input
-                         type="text"
-                         value={additionalInformation}
-                         onChange={e => setAdditionalInformation(e.target.value)}
-                         placeholder="Additional Information"
-                         className="border-b-3 border-solid border-b-blue-600 focus-visible:border-b-green-600 rounded-none px-3 py-2 w-full"
-                       />
-                       <input
-                         type="text"
-                         value={country}
-                         onChange={e => setCountry(e.target.value)}
-                         placeholder="Country"
-                         className="border-b-3 border-solid border-b-blue-600 focus-visible:border-b-green-600 rounded-none px-3 py-2 w-full"
-                       />
-                       <input
-                         type="text"
-                         value={fullAddress}
-                         onChange={e => setFullAddress(e.target.value)}
-                         placeholder="Full Address"
-                         className="border-b-3 border-solid border-b-blue-600 focus-visible:border-b-green-600 rounded-none px-3 py-2 w-full"
-                       />
-                       <input
-                         type="text"
-                         value={postalCode}
-                         onChange={e => setPostalCode(e.target.value)}
-                         placeholder="Postal Code"
-                         className="border-b-3 border-solid border-b-blue-600 focus-visible:border-b-green-600 rounded-none px-3 py-2 w-full"
-                       />
+                       <select
+                         value={(locationState ?? '') + ''}
+                         onChange={(e) => setLocationState(e.target.value)}
+                         className="border-b-3 border-solid !important border-b-blue-600 !important focus-visible:border-b-green-600 !important rounded-none px-3 py-2 w-full"
+                       >
+                         <option value="">Select State</option>
+                         {NIGERIAN_STATES.map(state => <option key={state} value={state}>{state}</option>)}
+                       </select>
                        <div className="flex justify-end gap-2 mt-2">
                          <Button variant="outline" onClick={handleCancelEditLocation}>Cancel</Button>
-                         <Button onClick={handleSaveLocation}>Save</Button>
+                         <Button onClick={handleSaveLocation} disabled={locationAddress === (profile.address || "") && locationCity === (profile.city || "") && locationState === (profile.state || "")}>Save</Button>
                        </div>
                      </div>
                    ) : (
                   <div>
-                    <h3 className="text-lg font-medium">Address</h3>
-                    <div className="text-gray-600">
-                      {profile.fullAddress && <div>{profile.fullAddress}</div>}
-                      <div>{[profile.buildingNumber, profile.apartment, profile.street, profile.city, profile.town, profile.state, profile.lga, profile.lcda, profile.landmark, profile.additionalInformation, profile.country, profile.postalCode].filter(Boolean).join(", ")}</div>
-                    </div>
+                    <h3 className="text-lg font-medium">
+                      Lives in {profile.city || "Not specified"}, {profile.state || "Not specified"}
+                    </h3>
+                    <p className="text-gray-600">{profile.address}</p>
                   </div>
                    )}
                   {isCurrentUser && (
@@ -2222,107 +1961,37 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
                      <div className="space-y-2 w-full">
                        <input
                          type="text"
-                         value={buildingNumber}
-                         onChange={e => setBuildingNumber(e.target.value)}
-                         placeholder="Building Number"
-                         className="border-b-3 border-solid border-b-blue-600 focus-visible:border-b-green-600 rounded-none px-3 py-2 w-full"
+                         value={locationAddress}
+                         onChange={(e) => setLocationAddress(e.target.value)}
+                         placeholder="Address"
+                         className="border-b-3 border-solid !important border-b-blue-600 !important focus-visible:border-b-green-600 !important rounded-none px-3 py-2 w-full"
                        />
                        <input
                          type="text"
-                         value={apartment}
-                         onChange={e => setApartment(e.target.value)}
-                         placeholder="Apartment"
-                         className="border-b-3 border-solid border-b-blue-600 focus-visible:border-b-green-600 rounded-none px-3 py-2 w-full"
-                       />
-                       <input
-                         type="text"
-                         value={street}
-                         onChange={e => setStreet(e.target.value)}
-                         placeholder="Street"
-                         className="border-b-3 border-solid border-b-blue-600 focus-visible:border-b-green-600 rounded-none px-3 py-2 w-full"
-                       />
-                       <input
-                         type="text"
-                         value={city}
-                         onChange={e => setCity(e.target.value)}
+                         value={locationCity}
+                         onChange={(e) => setLocationCity(e.target.value)}
                          placeholder="City"
-                         className="border-b-3 border-solid border-b-blue-600 focus-visible:border-b-green-600 rounded-none px-3 py-2 w-full"
+                         className="border-b-3 border-solid !important border-b-blue-600 !important focus-visible:border-b-green-600 !important rounded-none px-3 py-2 w-full"
                        />
-                       <input
-                         type="text"
-                         value={town}
-                         onChange={e => setTown(e.target.value)}
-                         placeholder="Town"
-                         className="border-b-3 border-solid border-b-blue-600 focus-visible:border-b-green-600 rounded-none px-3 py-2 w-full"
-                       />
-                       <input
-                         type="text"
-                         value={stateValue}
-                         onChange={e => setStateValue(e.target.value)}
-                         placeholder="State"
-                         className="border-b-3 border-solid border-b-blue-600 focus-visible:border-b-green-600 rounded-none px-3 py-2 w-full"
-                       />
-                       <input
-                         type="text"
-                         value={lga}
-                         onChange={e => setLga(e.target.value)}
-                         placeholder="LGA"
-                         className="border-b-3 border-solid border-b-blue-600 focus-visible:border-b-green-600 rounded-none px-3 py-2 w-full"
-                       />
-                       <input
-                         type="text"
-                         value={lcda}
-                         onChange={e => setLcda(e.target.value)}
-                         placeholder="LCDA"
-                         className="border-b-3 border-solid border-b-blue-600 focus-visible:border-b-green-600 rounded-none px-3 py-2 w-full"
-                       />
-                       <input
-                         type="text"
-                         value={landmark}
-                         onChange={e => setLandmark(e.target.value)}
-                         placeholder="Landmark"
-                         className="border-b-3 border-solid border-b-blue-600 focus-visible:border-b-green-600 rounded-none px-3 py-2 w-full"
-                       />
-                       <input
-                         type="text"
-                         value={additionalInformation}
-                         onChange={e => setAdditionalInformation(e.target.value)}
-                         placeholder="Additional Information"
-                         className="border-b-3 border-solid border-b-blue-600 focus-visible:border-b-green-600 rounded-none px-3 py-2 w-full"
-                       />
-                       <input
-                         type="text"
-                         value={country}
-                         onChange={e => setCountry(e.target.value)}
-                         placeholder="Country"
-                         className="border-b-3 border-solid border-b-blue-600 focus-visible:border-b-green-600 rounded-none px-3 py-2 w-full"
-                       />
-                       <input
-                         type="text"
-                         value={fullAddress}
-                         onChange={e => setFullAddress(e.target.value)}
-                         placeholder="Full Address"
-                         className="border-b-3 border-solid border-b-blue-600 focus-visible:border-b-green-600 rounded-none px-3 py-2 w-full"
-                       />
-                       <input
-                         type="text"
-                         value={postalCode}
-                         onChange={e => setPostalCode(e.target.value)}
-                         placeholder="Postal Code"
-                         className="border-b-3 border-solid border-b-blue-600 focus-visible:border-b-green-600 rounded-none px-3 py-2 w-full"
-                       />
+                       <select
+                         value={(locationState ?? '') + ''}
+                         onChange={(e) => setLocationState(e.target.value)}
+                         className="border-b-3 border-solid !important border-b-blue-600 !important focus-visible:border-b-green-600 !important rounded-none px-3 py-2 w-full"
+                       >
+                         <option value="">Select State</option>
+                         {NIGERIAN_STATES.map(state => <option key={state} value={state}>{state}</option>)}
+                       </select>
                        <div className="flex justify-end gap-2 mt-2">
                          <Button variant="outline" onClick={handleCancelEditLocation}>Cancel</Button>
-                         <Button onClick={handleSaveLocation}>Save</Button>
+                         <Button onClick={handleSaveLocation} disabled={locationAddress === (profile.address || "") && locationCity === (profile.city || "") && locationState === (profile.state || "")}>Save</Button>
                        </div>
                      </div>
                    ) : (
                   <div>
-                    <h3 className="text-lg font-medium">Address</h3>
-                    <div className="text-gray-600">
-                      {profile.fullAddress && <div>{profile.fullAddress}</div>}
-                      <div>{[profile.buildingNumber, profile.apartment, profile.street, profile.city, profile.town, profile.state, profile.lga, profile.lcda, profile.landmark, profile.additionalInformation, profile.country, profile.postalCode].filter(Boolean).join(", ")}</div>
-                    </div>
+                    <h3 className="text-lg font-medium">
+                      Lives in {profile.city || "Not specified"}, {profile.state || "Not specified"}
+                    </h3>
+                    <p className="text-gray-600">{profile.address}</p>
                   </div>
                    )}
                   {isCurrentUser && (
@@ -2669,10 +2338,6 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
               {removeAccountError && <div className="text-xs text-red-500 mt-1">{removeAccountError}</div>}
             </div>
           </div>
-        )}
-
-        {activeSection === "lending-licence" && (
-          <LendingLicenceSection profile={profile} onUpdate={handleUpdate} uploadLendingLicense={uploadLendingLicense} />
         )}
 
         {activeSection === "loan-helper" && (
