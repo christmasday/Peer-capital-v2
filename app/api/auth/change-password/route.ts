@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createServerClient } from "@/lib/supabase/server"
 import { cookies } from "next/headers"
 import { getCurrentUserId } from "@/lib/auth-utils"
+import { sendNotificationEmail } from "@/lib/notification-service"
 
 export async function POST(request: NextRequest) {
   try {
@@ -45,6 +46,18 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       )
     }
+
+    // Send password change notification
+    await sendNotificationEmail({
+      type: 'password_change',
+      userId: currentUserId,
+      title: 'Password Changed Successfully',
+      description: 'Your PeerCapital account password has been successfully changed.',
+      metadata: {
+        timestamp: new Date().toISOString(),
+        ip_address: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+      }
+    })
 
     return NextResponse.json(
       { message: "Password changed successfully" },

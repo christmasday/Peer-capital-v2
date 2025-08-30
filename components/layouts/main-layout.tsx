@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import type React from "react"
 import { TopNav } from "@/components/navigation/top-nav"
+import { SessionTracker } from "@/components/session-tracker"
 import { getJWTFromStorage, isJWTExpired } from "@/lib/jwt-client"
 import Cookies from "js-cookie"
 
@@ -47,6 +48,7 @@ export function MainLayout({
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(true)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
   // Enhanced authentication check
   useEffect(() => {
@@ -85,6 +87,11 @@ export function MainLayout({
           // Simple client-side check without verification
           if (!isJWTExpired(jwt)) {
             jwtValid = true
+            // Extract user ID from JWT
+            const payload = parseJWT(jwt)
+            if (payload && (payload.sub || payload.userId)) {
+              setCurrentUserId(payload.sub || payload.userId)
+            }
           } else {
             // Don't redirect yet, try other auth methods
           }
@@ -194,6 +201,9 @@ export function MainLayout({
     <div className="flex flex-col min-h-screen bg-gray-50 overflow-hidden">
       <TopNav userName={userName} userImage={userImage} unreadNotificationsCount={unreadNotificationsCount} />
       <main className={`flex-1 w-full mx-auto ${className} overflow-hidden`}>{children}</main>
+      {isAuthenticated && currentUserId && (
+        <SessionTracker userId={currentUserId} />
+      )}
     </div>
   )
 }

@@ -261,6 +261,41 @@ export interface Database {
           updated_at?: string
         }
       }
+      user_sessions: {
+        Row: {
+          id: string
+          user_id: string
+          session_token: string
+          is_active: boolean
+          last_activity: string
+          created_at: string
+          expires_at: string
+          user_agent: string | null
+          ip_address: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          session_token: string
+          is_active?: boolean
+          last_activity?: string
+          created_at?: string
+          expires_at?: string
+          user_agent?: string | null
+          ip_address?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          session_token?: string
+          is_active?: boolean
+          last_activity?: string
+          created_at?: string
+          expires_at?: string
+          user_agent?: string | null
+          ip_address?: string | null
+        }
+      }
       loan_helpers: {
         Row: {
           id: string
