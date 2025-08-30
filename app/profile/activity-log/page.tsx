@@ -1,3 +1,4 @@
+
 import { ActivityTimeline } from "@/components/profile/activity-timeline";
 import { checkAuth } from "@/lib/auth-utils";
 import { MainLayout } from "@/components/layouts/main-layout";

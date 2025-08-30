@@ -122,7 +122,9 @@ export function LandingFooter() {
                 </Link>
               </li>
               <li>
-                <ManageCookiesButton variant="default" />
+
+                <ManageCookiesButton variant="footer" />
+
               </li>
             </ul>
           </motion.div>

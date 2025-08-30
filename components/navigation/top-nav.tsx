@@ -2,15 +2,21 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Menu, X, Home, Wallet, BarChart2, MessageCircle, Search, ChevronRight, Lock, Settings as SettingsIcon, List } from "lucide-react"
+
+import { Menu, X, Home, Wallet, BarChart2, MessageCircle, Search, Settings, Shield, Activity } from "lucide-react"
+
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
 } from "@/components/ui/dropdown-menu"
 import { SignoutButton } from "@/components/auth/signout-button"
 import { Logo } from "@/components/logo"
@@ -210,51 +216,51 @@ export function TopNav({ userName, userImage, hideSearch }: TopNavProps) {
                 </div>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuContent align="end" className="w-64">
               <Link href="/profile" className="block">
                 <DropdownMenuLabel className="cursor-pointer hover:bg-gray-50">
                   <div className="flex items-center gap-3">
-                    <div className="relative h-8 w-8 rounded-full overflow-hidden bg-blue-100">
-                      <Image
-                        src={userImage || "/vibrant-street-market.png"}
-                        alt="Profile"
-                        fill
-                        className="object-cover"
-                        priority
-                      />
+
+                    <div className="relative h-8 w-8 rounded-full overflow-hidden bg-blue-100 flex-shrink-0">
+                      <Image src={userImage || "/vibrant-street-market.png"} alt="Profile" fill className="object-cover" />
                     </div>
-                    <div className="flex flex-col">
-                      <span>{displayName}</span>
+                    <div className="flex flex-col min-w-0">
+                      <span className="truncate">{displayName}</span>
+
                       <span className="text-xs text-gray-500">View profile</span>
                     </div>
                   </div>
                 </DropdownMenuLabel>
               </Link>
               <DropdownMenuSeparator />
-              {/* Settings & Privacy Nested Menu */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <div className="flex items-center cursor-pointer px-2 py-2 hover:bg-gray-100 rounded">
-                    <SettingsIcon className="h-4 w-4 mr-2" />
-                    <span>Settings & privacy</span>
-                    <ChevronRight className="h-4 w-4 ml-auto" />
-                  </div>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" side="right" className="w-56 ml-2">
-                  <Link href="/settings" className="flex items-center px-2 py-2 hover:bg-gray-100 rounded">
-                    <SettingsIcon className="h-4 w-4 mr-2" />
-                    <span>Settings</span>
+
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <Settings className="h-4 w-4 mr-2" />
+                  <span>Settings & privacy</span>
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  <Link href="/settings">
+                    <DropdownMenuItem className="cursor-pointer">
+                      <Settings className="h-4 w-4 mr-2" />
+                      <span>Settings</span>
+                    </DropdownMenuItem>
                   </Link>
-                  <Link href="/privacy-center" className="flex items-center px-2 py-2 hover:bg-gray-100 rounded">
-                    <Lock className="h-4 w-4 mr-2" />
-                    <span>Privacy Center</span>
+                  <Link href="/privacy">
+                    <DropdownMenuItem className="cursor-pointer">
+                      <Shield className="h-4 w-4 mr-2" />
+                      <span>Privacy Center</span>
+                    </DropdownMenuItem>
                   </Link>
-                  <Link href="/profile/activity-log" className="flex items-center px-2 py-2 hover:bg-gray-100 rounded">
-                    <List className="h-4 w-4 mr-2" />
-                    <span>Activity Log</span>
+                  <Link href="/profile/activity-log">
+                    <DropdownMenuItem className="cursor-pointer">
+                      <Activity className="h-4 w-4 mr-2" />
+                      <span>Activity Log</span>
+                    </DropdownMenuItem>
                   </Link>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+
               <DropdownMenuSeparator />
               <SignoutButton
                 variant="ghost"

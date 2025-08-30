@@ -22,30 +22,41 @@ export function MessageItem({ message, currentUserId }: MessageItemProps) {
     .toUpperCase()
 
   return (
-    <div className={cn("flex items-start gap-2 mb-4", isOwnMessage ? "flex-row-reverse" : "flex-row")}>
-      <Avatar className="h-8 w-8 mt-1">
-        {profile?.profile_picture_url ? (
-          <AvatarImage src={profile.profile_picture_url || "/placeholder.svg"} alt={fullName} />
-        ) : (
-          <AvatarFallback className="bg-blue-100">
-            {initials || <UserRound className="h-4 w-4 text-blue-500" />}
-          </AvatarFallback>
-        )}
-      </Avatar>
+    <div className={cn("flex items-end gap-2 mb-2", isOwnMessage ? "flex-row-reverse" : "flex-row")}>
+      {!isOwnMessage && (
+        <Avatar className="h-6 w-6 mb-1">
+          {profile?.profile_picture_url ? (
+            <AvatarImage src={profile.profile_picture_url || "/placeholder.svg"} alt={fullName} />
+          ) : (
+            <AvatarFallback className="bg-blue-100 text-xs">
+              {initials || <UserRound className="h-3 w-3 text-blue-500" />}
+            </AvatarFallback>
+          )}
+        </Avatar>
+      )}
 
-      <div className="flex flex-col max-w-[75%]">
+      <div className={cn("flex flex-col max-w-[70%]", isOwnMessage ? "items-end" : "items-start")}>
         <div
           className={cn(
-            "px-4 py-2 rounded-lg",
-            isOwnMessage ? "bg-blue-500 text-white rounded-tr-none" : "bg-gray-100 text-gray-800 rounded-tl-none",
+            "px-3 py-2 rounded-2xl text-sm",
+            isOwnMessage 
+              ? "bg-blue-500 text-white rounded-br-md" 
+              : "bg-gray-200 text-gray-900 rounded-bl-md"
           )}
         >
-          <p className="whitespace-pre-wrap break-words">{message.content}</p>
+          <p className="whitespace-pre-wrap break-words leading-relaxed">{message.content}</p>
         </div>
-        <span className="text-xs text-gray-500 mt-1 self-start">
+        <span className={cn(
+          "text-xs text-gray-500 mt-1 px-1",
+          isOwnMessage ? "text-right" : "text-left"
+        )}>
           {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
         </span>
       </div>
+
+      {isOwnMessage && (
+        <div className="w-6" /> // Spacer to align with other messages
+      )}
     </div>
   )
 }

@@ -1,43 +1,173 @@
-import React from "react";
-import { TopNav } from "@/components/navigation/top-nav";
-import { LandingFooter } from "@/components/landing/landing-footer";
 
-export default function RiskDisclosurePage() {
+import { LandingFooter } from "@/components/landing/landing-footer"
+import { LandingNav } from "@/components/landing/landing-nav"
+import { TopNav } from "@/components/navigation/top-nav"
+import { getUserProfile } from "@/lib/actions/auth"
+import { checkAuthStatus } from "@/lib/actions/auth-check"
+
+export const dynamic = "force-dynamic"
+export const revalidate = 0
+
+export default async function RiskDisclosurePage() {
+  const auth = await checkAuthStatus()
+  let userName = "User"
+  let userImage = "/vibrant-street-market.png"
+  if (auth.authenticated) {
+    const userProfile = await getUserProfile()
+    userName = `${userProfile?.profile?.first_name || ""} ${userProfile?.profile?.last_name || ""}`.trim() || "User"
+    userImage = userProfile?.profile?.profile_picture_url || "/vibrant-street-market.png"
+  }
+
   return (
-    <>
-      <TopNav />
-      <div className="max-w-3xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
-        <h1 className="text-3xl font-bold mb-6">Risk Disclosure</h1>
-        <div className="space-y-6 text-gray-800">
-          <p>
-            <strong>Peer Capital</strong> is a platform that connects individuals seeking loans with those willing to lend. By using this platform, you acknowledge and accept the risks associated with peer-to-peer lending and investing.
+    <div className="flex flex-col min-h-screen">
+      {auth.authenticated ? <TopNav userName={userName} userImage={userImage} /> : <LandingNav />}
+      <main className="flex-1">
+        <div className="container max-w-3xl mx-auto py-10">
+          <h1 className="text-3xl font-bold mb-6">Risk Disclosure Statement</h1>
+          <p className="text-gray-700 mb-6">
+            This Risk Disclosure Statement ("Statement") outlines the significant risks associated with using
+            Peer Capital's peer-to-peer lending platform. By using our services, you acknowledge that you have
+            read, understood, and accepted these risks.
           </p>
-          <h2 className="text-xl font-semibold mt-6 mb-2">Investment Risk</h2>
-          <p>
-            All investments carry risk. There is no guarantee that you will earn a return on your investment, and you may lose some or all of your invested capital. Past performance is not indicative of future results. You should only invest funds you can afford to lose.
-          </p>
-          <h2 className="text-xl font-semibold mt-6 mb-2">No Guarantee of Returns</h2>
-          <p>
-            Peer Capital does not guarantee repayment of loans, interest, or any returns. Borrowers may default on their obligations, and lenders may not recover their principal or expected interest. All lending decisions are made at your own risk and discretion.
-          </p>
-          <h2 className="text-xl font-semibold mt-6 mb-2">Not Financial Advice</h2>
-          <p>
-            The information provided on this platform is for informational purposes only and does not constitute financial, investment, or legal advice. You are solely responsible for conducting your own due diligence and seeking independent advice before making any financial decisions.
-          </p>
-          <h2 className="text-xl font-semibold mt-6 mb-2">User Responsibility</h2>
-          <p>
-            By participating on Peer Capital, you acknowledge that you understand the risks involved and accept full responsibility for your investment and lending decisions. Peer Capital is not liable for any losses or damages arising from your use of the platform.
-          </p>
-          <h2 className="text-xl font-semibold mt-6 mb-2">Platform Limitations</h2>
-          <p>
-            Peer Capital does not provide any guarantees, warranties, or assurances regarding the creditworthiness of borrowers or the likelihood of loan repayment. All users are encouraged to review borrower profiles and make informed decisions.
-          </p>
-          <p className="mt-8 text-sm text-gray-500">
-            If you have any questions about this risk disclosure, please contact us at support@peercapital.com.
-          </p>
+
+          <section className="space-y-4 mb-8">
+            <h2 className="text-xl font-semibold">1. General Risk Warning</h2>
+            <p className="text-gray-700">
+              Peer-to-peer lending involves significant risks, including the potential loss of your principal
+              investment. You should carefully consider whether peer-to-peer lending is suitable for your
+              financial situation and investment objectives.
+            </p>
+          </section>
+
+          <section className="space-y-4 mb-8">
+            <h2 className="text-xl font-semibold">2. Credit Risk</h2>
+            <ul className="list-disc pl-6 text-gray-700 space-y-2">
+              <li>Borrowers may default on their loan obligations, resulting in loss of principal and interest.</li>
+              <li>Credit assessments and risk ratings are estimates and may not accurately predict default probability.</li>
+              <li>Economic downturns or personal circumstances may increase default rates across the platform.</li>
+              <li>Recovery of funds from defaulted loans may be limited or delayed.</li>
+            </ul>
+          </section>
+
+          <section className="space-y-4 mb-8">
+            <h2 className="text-xl font-semibold">3. Platform and Operational Risks</h2>
+            <ul className="list-disc pl-6 text-gray-700 space-y-2">
+              <li>Technical failures, cyber attacks, or system outages may temporarily prevent access to funds.</li>
+              <li>Platform insolvency or regulatory action could result in loss of access to your account.</li>
+              <li>Changes to platform terms, fees, or features may affect your investment returns.</li>
+              <li>Third-party service providers may experience failures affecting platform operations.</li>
+            </ul>
+          </section>
+
+          <section className="space-y-4 mb-8">
+            <h2 className="text-xl font-semibold">4. Liquidity Risk</h2>
+            <ul className="list-disc pl-6 text-gray-700 space-y-2">
+              <li>Peer-to-peer loans are illiquid investments with fixed terms.</li>
+              <li>Early withdrawal may not be available or may result in penalties.</li>
+              <li>Secondary market liquidity, if available, may be limited and subject to significant discounts.</li>
+              <li>Market conditions may affect the ability to sell or transfer loan interests.</li>
+            </ul>
+          </section>
+
+          <section className="space-y-4 mb-8">
+            <h2 className="text-xl font-semibold">5. Regulatory and Legal Risks</h2>
+            <ul className="list-disc pl-6 text-gray-700 space-y-2">
+              <li>Changes in laws or regulations may affect platform operations or investment returns.</li>
+              <li>Regulatory investigations or enforcement actions could impact platform viability.</li>
+              <li>Tax treatment of peer-to-peer lending income may change.</li>
+              <li>Legal disputes between borrowers and lenders may affect recovery prospects.</li>
+            </ul>
+          </section>
+
+          <section className="space-y-4 mb-8">
+            <h2 className="text-xl font-semibold">6. Interest Rate and Market Risks</h2>
+            <ul className="list-disc pl-6 text-gray-700 space-y-2">
+              <li>Interest rates on loans are fixed and may become unfavorable compared to market rates.</li>
+              <li>Inflation may erode the real value of your investment returns.</li>
+              <li>Economic conditions may affect borrower ability to repay and platform performance.</li>
+              <li>Currency fluctuations may impact returns for international transactions.</li>
+            </ul>
+          </section>
+
+          <section className="space-y-4 mb-8">
+            <h2 className="text-xl font-semibold">7. Diversification and Concentration Risks</h2>
+            <ul className="list-disc pl-6 text-gray-700 space-y-2">
+              <li>Investing in a small number of loans increases concentration risk.</li>
+              <li>Geographic or sector concentration may amplify losses during economic downturns.</li>
+              <li>Platform-specific risks may affect all your investments simultaneously.</li>
+              <li>Diversification across multiple platforms may not eliminate all risks.</li>
+            </ul>
+          </section>
+
+          <section className="space-y-4 mb-8">
+            <h2 className="text-xl font-semibold">8. Information and Transparency Risks</h2>
+            <ul className="list-disc pl-6 text-gray-700 space-y-2">
+              <li>Borrower information may be incomplete, inaccurate, or outdated.</li>
+              <li>Platform reporting and analytics may not capture all relevant risk factors.</li>
+              <li>Historical performance data may not be indicative of future results.</li>
+              <li>Complex loan structures may be difficult to understand and evaluate.</li>
+            </ul>
+          </section>
+
+          <section className="space-y-4 mb-8">
+            <h2 className="text-xl font-semibold">9. Fraud and Misrepresentation Risks</h2>
+            <ul className="list-disc pl-6 text-gray-700 space-y-2">
+              <li>Borrowers may provide false information or documentation.</li>
+              <li>Identity theft or account takeover may result in unauthorized transactions.</li>
+              <li>Platform security measures may not prevent all fraudulent activities.</li>
+              <li>Recovery from fraud-related losses may be limited or impossible.</li>
+            </ul>
+          </section>
+
+          <section className="space-y-4 mb-8">
+            <h2 className="text-xl font-semibold">10. Tax and Accounting Considerations</h2>
+            <ul className="list-disc pl-6 text-gray-700 space-y-2">
+              <li>Interest income is generally taxable and must be reported to tax authorities.</li>
+              <li>Losses from defaults may have limited tax deductibility.</li>
+              <li>Complex tax rules may apply to peer-to-peer lending income.</li>
+              <li>Professional tax advice may be required to ensure compliance.</li>
+            </ul>
+          </section>
+
+          <section className="space-y-4 mb-8">
+            <h2 className="text-xl font-semibold">11. Investment Suitability</h2>
+            <p className="text-gray-700">
+              Peer-to-peer lending may not be suitable for all investors. Consider your investment objectives,
+              risk tolerance, financial situation, and investment experience before investing. You should not
+              invest more than you can afford to lose.
+            </p>
+          </section>
+
+          <section className="space-y-4 mb-8">
+            <h2 className="text-xl font-semibold">12. No Guarantee of Returns</h2>
+            <p className="text-gray-700">
+              Past performance does not guarantee future results. There is no assurance that you will achieve
+              your investment objectives or that your investment will not lose value. Peer Capital does not
+              guarantee any specific rate of return or the safety of your principal investment.
+            </p>
+          </section>
+
+          <section className="space-y-4 mb-8">
+            <h2 className="text-xl font-semibold">13. Professional Advice</h2>
+            <p className="text-gray-700">
+              Consider consulting with a qualified financial advisor, tax professional, or legal counsel before
+              making investment decisions. Peer Capital does not provide investment, tax, or legal advice.
+            </p>
+          </section>
+
+          <section className="space-y-4 mb-8">
+            <h2 className="text-xl font-semibold">14. Acknowledgment</h2>
+            <p className="text-gray-700">
+              By using Peer Capital's services, you acknowledge that you have read and understood this Risk
+              Disclosure Statement and accept the risks associated with peer-to-peer lending. You agree to
+              make investment decisions based on your own assessment of these risks.
+            </p>
+          </section>
+
+          <p className="text-gray-600 text-sm">Last updated: {new Date().toLocaleDateString()}</p>
         </div>
-      </div>
+      </main>
       <LandingFooter />
-    </>
-  );
-} 
+    </div>
+  )
+}

@@ -67,7 +67,7 @@ export function getPasswordResetEmailTemplate(resetUrl: string): string {
       </div>
       <div style="background-color: #f3f4f6; padding: 15px; text-align: center; font-size: 12px; color: #6b7280;">
         <p>&copy; ${new Date().getFullYear()} PeerCapital. All rights reserved.</p>
-        <p>Plot 123, Example Street, Lagos, Nigeria</p>
+        <p>Lagos, Nigeria</p>
       </div>
     </div>
   `
@@ -98,7 +98,7 @@ export function getWelcomeEmailTemplate(userName: string): string {
       </div>
       <div style="background-color: #f3f4f6; padding: 15px; text-align: center; font-size: 12px; color: #6b7280;">
         <p>&copy; ${new Date().getFullYear()} PeerCapital. All rights reserved.</p>
-        <p>Plot 123, Example Street, Lagos, Nigeria</p>
+        <p>Lagos, Nigeria</p>
       </div>
     </div>
   `
@@ -156,7 +156,145 @@ export function getTransactionEmailTemplate({
       </div>
       <div style="background-color: #f3f4f6; padding: 15px; text-align: center; font-size: 12px; color: #6b7280;">
         <p>&copy; ${new Date().getFullYear()} PeerCapital. All rights reserved.</p>
-        <p>Plot 123, Example Street, Lagos, Nigeria</p>
+        <p>Lagos, Nigeria</p>
+      </div>
+    </div>
+  `
+}
+
+// Account activity notification email template
+export function getAccountActivityEmailTemplate({
+  userName,
+  eventTitle,
+  eventDescription,
+  eventType,
+  metadata,
+  isLoggedIn = false,
+}: {
+  userName: string
+  eventTitle: string
+  eventDescription: string
+  eventType: string
+  metadata?: Record<string, any>
+  isLoggedIn?: boolean
+}): string {
+  // Get appropriate icon and color based on event type
+  const getEventIcon = (type: string) => {
+    switch (type) {
+      case 'login':
+        return '🔐'
+      case 'logout':
+        return '🚪'
+      case 'password_change':
+        return '🔑'
+      case 'account_funding':
+        return '💰'
+      case 'withdrawal':
+        return '💸'
+      case 'loan_request':
+        return '📋'
+      case 'loan_repayment':
+        return '✅'
+      case 'verification':
+        return '✅'
+      case 'security_alert':
+        return '⚠️'
+      default:
+        return '📢'
+    }
+  }
+
+  const getEventColor = (type: string) => {
+    switch (type) {
+      case 'login':
+      case 'logout':
+        return '#3b82f6'
+      case 'password_change':
+      case 'security_alert':
+        return '#ef4444'
+      case 'account_funding':
+      case 'withdrawal':
+        return '#10b981'
+      case 'loan_request':
+      case 'loan_repayment':
+        return '#8b5cf6'
+      case 'verification':
+        return '#f59e0b'
+      default:
+        return '#6b7280'
+    }
+  }
+
+  const eventIcon = getEventIcon(eventType)
+  const eventColor = getEventColor(eventType)
+
+  // Format metadata for display
+  const formatMetadata = (meta?: Record<string, any>) => {
+    if (!meta) return ''
+    
+    return Object.entries(meta)
+      .map(([key, value]) => {
+        const formattedKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+        return `<p style="margin: 5px 0;"><strong>${formattedKey}:</strong> ${value}</p>`
+      })
+      .join('')
+  }
+
+  // Customize content based on login status
+  const getSecurityNotice = () => {
+    if (isLoggedIn) {
+      return `
+        <div style="background-color: #dbeafe; border: 1px solid #3b82f6; border-radius: 4px; padding: 15px; margin: 20px 0;">
+          <p style="margin: 0; color: #1e40af; font-size: 14px;">
+            <strong>Account Activity:</strong> This notification was sent because you have email notifications enabled for this type of activity. 
+            You are currently logged into your account.
+          </p>
+        </div>
+      `
+    } else {
+      return `
+        <div style="background-color: #fef3c7; border: 1px solid #f59e0b; border-radius: 4px; padding: 15px; margin: 20px 0;">
+          <p style="margin: 0; color: #92400e; font-size: 14px;">
+            <strong>Security Notice:</strong> This notification was sent because you were not logged into your account when this activity occurred. 
+            If you don't recognize this activity, please contact our support team immediately.
+          </p>
+        </div>
+      `
+    }
+  }
+
+  return `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background-color: #0f172a; padding: 20px; text-align: center;">
+        <h1 style="color: white; margin: 0;">PeerCapital</h1>
+      </div>
+      <div style="padding: 20px; border: 1px solid #e5e7eb; border-top: none;">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <div style="font-size: 48px; margin-bottom: 10px;">${eventIcon}</div>
+          <h2 style="color: #0f172a; margin: 0;">${eventTitle}</h2>
+        </div>
+        
+        <p>Hello ${userName},</p>
+        <p>${eventDescription}</p>
+        
+        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 15px; margin: 20px 0; border-left: 4px solid ${eventColor};">
+          <p style="margin: 5px 0;"><strong>Event Type:</strong> ${eventType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</p>
+          <p style="margin: 5px 0;"><strong>Time:</strong> ${new Date().toLocaleString()}</p>
+          <p style="margin: 5px 0;"><strong>Status:</strong> ${isLoggedIn ? 'Logged In' : 'Not Logged In'}</p>
+          ${formatMetadata(metadata)}
+        </div>
+        
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${process.env.NEXT_PUBLIC_APP_URL || "https://peercapital.com.ng"}/dashboard" style="background-color: #0f172a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">View Account</a>
+        </div>
+        
+        ${getSecurityNotice()}
+        
+        <p>Best regards,<br>The PeerCapital Team</p>
+      </div>
+      <div style="background-color: #f3f4f6; padding: 15px; text-align: center; font-size: 12px; color: #6b7280;">
+        <p>&copy; ${new Date().getFullYear()} PeerCapital. All rights reserved.</p>
+        <p>Lagos, Nigeria</p>
       </div>
     </div>
   `

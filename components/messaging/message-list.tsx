@@ -4,12 +4,12 @@ import { useState, useEffect, useRef } from "react"
 import { type MessageWithProfile, getMessages } from "@/lib/actions/messages"
 import { MessageItem } from "@/components/messaging/message-item"
 import { Button } from "@/components/ui/button"
-import { Loader2 } from "lucide-react"
+import { Loader2, Shield } from "lucide-react"
 import { useSupabaseClient } from "@/components/supabase/SupabaseProvider"
 
 interface MessageListProps {
   otherUserId: string
-  currentUserId: string
+  currentUserId: string | null
   onNewMessage?: () => void
 }
 
@@ -60,7 +60,12 @@ export function MessageList({ otherUserId, currentUserId, onNewMessage }: Messag
   }
 
   useEffect(() => {
-    loadMessages()
+    if (currentUserId) {
+      loadMessages()
+    }
+  }, [currentUserId, otherUserId])
+
+  useEffect(() => {
     // Set up Supabase Realtime subscription for new messages
     if (!supabase || !currentUserId || !otherUserId) return
     const channel = supabase
@@ -127,9 +132,21 @@ export function MessageList({ otherUserId, currentUserId, onNewMessage }: Messag
 
   if (messages.length === 0) {
     return (
-      <div className="text-center p-8 text-gray-500 h-96 flex flex-col justify-center">
-        <p>No messages yet</p>
-        <p className="text-sm mt-2">Start the conversation by sending a message</p>
+      <div className="flex flex-col h-full">
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center text-gray-500">
+            <p>No messages yet</p>
+            <p className="text-sm mt-2">Start the conversation by sending a message</p>
+          </div>
+        </div>
+        
+        {/* Encryption Notice */}
+        <div className="p-4 bg-blue-50 border-t border-blue-100">
+          <div className="flex items-center gap-2 text-sm text-blue-700">
+            <Shield className="h-4 w-4" />
+            <span>New messages and calls are secured with end-to-end encryption. Only people in this chat can read, listen to, or share them.</span>
+          </div>
+        </div>
       </div>
     )
   }
@@ -153,9 +170,17 @@ export function MessageList({ otherUserId, currentUserId, onNewMessage }: Messag
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((message) => (
-          <MessageItem key={message.id} message={message} currentUserId={currentUserId} />
+          <MessageItem key={message.id} message={message} currentUserId={currentUserId || ""} />
         ))}
         <div ref={messagesEndRef} />
+      </div>
+
+      {/* Encryption Notice */}
+      <div className="p-4 bg-blue-50 border-t border-blue-100">
+        <div className="flex items-center gap-2 text-sm text-blue-700">
+          <Shield className="h-4 w-4" />
+          <span>New messages and calls are secured with end-to-end encryption. Only people in this chat can read, listen to, or share them.</span>
+        </div>
       </div>
     </div>
   )
