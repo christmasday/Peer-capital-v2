@@ -4,7 +4,7 @@ import { sendEmail, getAccountActivityEmailTemplate } from "@/lib/email-service"
 import { cookies } from "next/headers"
 
 export interface NotificationEvent {
-  type: 'login' | 'logout' | 'password_change' | 'account_funding' | 'withdrawal' | 'loan_request' | 'loan_repayment' | 'verification' | 'security_alert'
+  type: 'login' | 'password_change' | 'account_funding' | 'withdrawal' | 'loan_request' | 'loan_repayment' | 'verification' | 'security_alert'
   userId: string
   title: string
   description: string
@@ -122,7 +122,6 @@ export async function sendNotificationEmail(event: NotificationEvent): Promise<b
     // Check if this specific activity type is enabled
     const activityTypeMap: Record<string, keyof typeof preferences> = {
       'login': 'account_activity',
-      'logout': 'account_activity',
       'password_change': 'security_alerts',
       'account_funding': 'transaction_activity',
       'withdrawal': 'transaction_activity',
@@ -133,8 +132,8 @@ export async function sendNotificationEmail(event: NotificationEvent): Promise<b
     }
 
     const activityType = activityTypeMap[event.type]
-    if (activityType && !preferences[activityType]) {
-      console.log(`User ${event.userId} has ${activityType} notifications disabled`)
+    if (activityType && !preferences[activityType as keyof typeof preferences]) {
+      console.log(`User ${event.userId} has ${String(activityType)} notifications disabled`)
       return false
     }
 

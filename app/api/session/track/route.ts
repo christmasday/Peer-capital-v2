@@ -42,19 +42,8 @@ export async function POST(request: NextRequest) {
         }
       })
     } else if (action === 'logout') {
-      // Track logout session
+      // Track logout session (no notification sent)
       await trackUserSession(currentUserId, 'logout')
-      
-      // Send logout notification (regardless of login status)
-      await sendNotificationEmail({
-        type: 'logout',
-        userId: currentUserId,
-        title: 'Account Logout',
-        description: 'You have been logged out of your PeerCapital account.',
-        metadata: {
-          timestamp: new Date().toISOString(),
-        }
-      })
     } else if (action === 'activity') {
       // Update session activity
       if (sessionToken) {
