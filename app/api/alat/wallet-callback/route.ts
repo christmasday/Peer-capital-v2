@@ -3,7 +3,11 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createNotification } from "@/lib/actions/notifications";
 
 export async function POST(req: NextRequest) {
- 
+  const authResult = await verifyAuth(req) as any;
+  if (!authResult.authenticated) {
+    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+  }
+
   try {
     const payload = await req.json();
     const adminClient = createAdminClient();
