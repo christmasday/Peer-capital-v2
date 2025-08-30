@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createNotification } from "@/lib/actions/notifications";
+import { verifyAuth } from "@/lib/auth-middleware";
 
 export async function POST(req: NextRequest) {
   const authResult = await verifyAuth(req) as any;

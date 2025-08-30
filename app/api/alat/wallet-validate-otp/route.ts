@@ -1,28 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAuth } from "@/lib/auth-middleware";
 
-// This endpoint expects a query param ?accountNumber=...
-export async function GET(req: NextRequest) {
+export async function POST(req: NextRequest) {
   const authResult = await verifyAuth(req) as any;
   if (!authResult.authenticated) {
     return NextResponse.json({ error: "Authentication required" }, { status: 401 });
   }
 
   try {
-    const { searchParams } = new URL(req.url);
-    const phoneNumber = searchParams.get("phoneNumber");
-    if (!phoneNumber) {
-      return NextResponse.json({ status: "error", message: "Missing phone number parameter" }, { status: 400 });
-    }
+    const body = await req.json();
 
-    // Forward request to Alat API (Get Wallet Details)
+    // Forward request to Alat API (Step 2)
     const response = await fetch(
-      `https://apiplayground.alat.ng/wallet-creation/api/CustomerAccount/GetPartnershipAccountDetails?phoneNumber=${encodeURIComponent(phoneNumber)}`,
+      "https://playground.alat.ng/wallet-creation/api/CustomerAccount/ValidateBvnAndEnqueueAccountCreation",
       {
-        method: "GET",
+        method: "POST",
         headers: {
           "x-api-key": process.env.ALAT_API_KEY!,
+          "Content-Type": "application/json",
         },
+        body: JSON.stringify(body),
       }
     );
 
@@ -30,7 +27,7 @@ export async function GET(req: NextRequest) {
 
     if (!response.ok) {
       return NextResponse.json(
-        { status: "error", ...data },
+        { status: "error", message: data.message || "Failed to validate OTP and enqueue account creation" },
         { status: response.status }
       );
     }
