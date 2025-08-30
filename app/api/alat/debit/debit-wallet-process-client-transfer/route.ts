@@ -19,9 +19,7 @@ export async function POST(req: NextRequest) {
         method: "POST",
         headers: {
           access: process.env.ALAT_CHANNEL_ID!, // Channel Id
-          "Ocp-Apim-Subscription-Key": process.env.PRIMARY_KEY!,
           "Content-Type": "application/json-patch+json",
-          "Cache-Control": "no-cache",
         },
         body: JSON.stringify(body),
       }

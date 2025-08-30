@@ -19,9 +19,7 @@ export async function GET(req: NextRequest) {
       method: "GET",
       headers: {
         access: process.env.ALAT_CHANNEL_ID!,
-        "Ocp-Apim-Subscription-Key": process.env.PRIMARY_KEY!,
         "Content-Type": "application/json",
-        "Cache-Control": "no-cache",
       },
     });
 

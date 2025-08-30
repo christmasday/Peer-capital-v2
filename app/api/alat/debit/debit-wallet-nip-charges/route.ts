@@ -1,28 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAuth } from "@/lib/auth-middleware";
 
-export async function POST(req: NextRequest) {
+export async function GET(req: NextRequest) {
   const authResult = await verifyAuth(req) as any;
   if (!authResult.authenticated) {
     return NextResponse.json({ error: "Authentication required" }, { status: 401 });
   }
 
   try {
-    const body = await req.json();
-    if (!body.accountNumber) {
-      return NextResponse.json({ status: "error", message: "Missing accountNumber in request body" }, { status: 400 });
-    }
-
-    // Forward request to Alat API (Transaction History)
+    // Forward request to Alat API (Get NIP Charges)
     const response = await fetch(
-      "https://apiplayground.alat.ng/ws-acct-mgt/api/AccountMaintenance/CustomerAccount/transhistoryV2",
+      "https://apiplayground.alat.ng/debit-wallet/api/Shared/GetNIPCharges",
       {
-        method: "POST",
-        headers: {
-          "x-api-key": process.env.ALAT_API_KEY!,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
+        method: "GET",
       }
     );
 

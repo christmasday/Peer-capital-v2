@@ -13,15 +13,20 @@ export async function POST(req: NextRequest) {
       method: "POST",
       headers: {
         access: process.env.ALAT_CHANNEL_ID!,
-        "Ocp-Apim-Subscription-Key": process.env.PRIMARY_KEY!,
         "Content-Type": "application/json-patch+json",
-        "Cache-Control": "no-cache",
       },
       body: JSON.stringify(body),
     });
 
-    const data = await response.json();
-    return NextResponse.json(data, { status: response.status });
+    const data = await response.text();
+    // Try to parse as JSON, fallback to plain text
+    let parsed;
+    try {
+      parsed = JSON.parse(data);
+    } catch {
+      parsed = data;
+    }
+    return NextResponse.json(parsed, { status: response.status });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || "Internal server error" }, { status: 500 });
   }

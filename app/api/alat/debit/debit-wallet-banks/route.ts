@@ -13,12 +13,6 @@ export async function GET(req: NextRequest) {
       "https://apiplayground.alat.ng/debit-wallet/api/Shared/GetAllBanks",
       {
         method: "GET",
-        headers: {
-          access: process.env.ALAT_CHANNEL_ID!, // Channel Id
-          "Ocp-Apim-Subscription-Key": process.env.PRIMARY_KEY!,
-          "Cache-Control": "no-cache", 
-          "Content-Type": "application/json",
-        },
       }
     );
 
