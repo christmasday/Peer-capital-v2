@@ -2,7 +2,9 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+
 import { Menu, X, Home, Wallet, BarChart2, MessageCircle, Search, Settings, Shield, Activity } from "lucide-react"
+
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import {
@@ -218,17 +220,20 @@ export function TopNav({ userName, userImage, hideSearch }: TopNavProps) {
               <Link href="/profile" className="block">
                 <DropdownMenuLabel className="cursor-pointer hover:bg-gray-50">
                   <div className="flex items-center gap-3">
+
                     <div className="relative h-8 w-8 rounded-full overflow-hidden bg-blue-100 flex-shrink-0">
                       <Image src={userImage || "/vibrant-street-market.png"} alt="Profile" fill className="object-cover" />
                     </div>
                     <div className="flex flex-col min-w-0">
                       <span className="truncate">{displayName}</span>
+
                       <span className="text-xs text-gray-500">View profile</span>
                     </div>
                   </div>
                 </DropdownMenuLabel>
               </Link>
               <DropdownMenuSeparator />
+
               <DropdownMenuSub>
                 <DropdownMenuSubTrigger>
                   <Settings className="h-4 w-4 mr-2" />
@@ -255,6 +260,7 @@ export function TopNav({ userName, userImage, hideSearch }: TopNavProps) {
                   </Link>
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
+
               <DropdownMenuSeparator />
               <SignoutButton
                 variant="ghost"

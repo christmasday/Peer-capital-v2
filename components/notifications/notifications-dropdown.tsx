@@ -45,8 +45,12 @@ export function NotificationsDropdown({ open, onOpenChange, onNotificationRead }
     try {
       const result = await getNotifications(1, 10)
       if (!result.error) {
-        setNotifications(result.notifications || [])
-        setUnreadCount(result.unreadCount || 0)
+        const all = (result.notifications || []) as Notification[]
+        const filtered = all.filter((n) => n.type !== "message")
+        // Recompute unread for non-message notifications if backend count is aggregate
+        const unread = filtered.filter((n) => !n.is_read).length
+        setNotifications(filtered)
+        setUnreadCount(unread)
       } else {
       }
     } catch (error) {
@@ -75,7 +79,9 @@ export function NotificationsDropdown({ open, onOpenChange, onNotificationRead }
           filter: `user_id=eq.${session.user.id}`,
         },
         (payload) => {
-          setNotifications((prev) => [payload.new as Notification, ...prev])
+          const newNotif = payload.new as Notification
+          if (newNotif.type === "message") return // ignore message notifications here
+          setNotifications((prev) => [newNotif, ...prev])
           setUnreadCount((prev) => prev + 1)
           new Audio('/notification.mp3').play()
         }

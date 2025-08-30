@@ -122,7 +122,9 @@ export function LandingFooter() {
                 </Link>
               </li>
               <li>
+
                 <ManageCookiesButton variant="footer" />
+
               </li>
             </ul>
           </motion.div>
@@ -133,7 +135,11 @@ export function LandingFooter() {
           animate={{ opacity: 1 }}
           transition={{ duration: 0.6, delay: 0.5 }}
         >
+          <p className="mt-3 text-gray-400">
+            Peer capital is a financial technology company, not a bank. Money remittance and banking services are provided by our partner licensed financial institution.
+          </p>
           <p>&copy; {new Date().getFullYear()} Peer Capital. All rights reserved.</p>
+          
         </motion.div>
       </div>
     </footer>

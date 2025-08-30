@@ -9,6 +9,7 @@ import fetch from 'node-fetch'
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/lib/supabase/database.types"
 import { createNotification } from "@/lib/actions/notifications"
+import { getBlockedUsers } from "@/lib/actions/connections"
 
 // Mock data for fallback
 const mockLoanRequests = [
@@ -328,6 +329,12 @@ export async function getAllLoanRequests() {
     }));
 
     return { success: true, loanRequests: enriched };
+
+    // Filter out requests from blocked users
+    const { blocked } = await getBlockedUsers();
+    const filtered = data?.filter((req: any) => !blocked.includes(req.user_id)) || [];
+    return { success: true, loanRequests: filtered };
+
   } catch (error) {
     console.error("Unexpected error fetching all loan requests:", error);
     return { loanRequests: [] };
@@ -365,39 +372,80 @@ export async function approveLoanRequest({ loanRequestId, pin, approverId }: { l
     return { success: false, error: "Could not fetch user bank details" }
   }
 
-  // 1. Debit lender, credit borrower
-  // Get lender's account balance
+  // Fetch lender's account balance
   const { data: lenderAccount, error: lenderAccountError } = await adminClient
     .from("account_balances")
-    .select("id, balance")
+    .select("balance")
     .eq("user_id", approverId)
-    .single()
+    .single();
   if (lenderAccountError || !lenderAccount) {
-    return { success: false, error: "Could not fetch lender's account balance" }
+    return { success: false, error: "Could not fetch lender's account balance" };
   }
-  if (lenderAccount.balance < loanRequest.amount) {
-    return { success: false, error: "Lender does not have enough funds to approve this loan" }
+  // Calculate lender admin charge
+  const lenderChargePercent = parseFloat(process.env.ADMIN_LENDER_CHARGE_PERCENT || "1.5");
+  const lenderCharge = Math.round((loanRequest.amount * lenderChargePercent) / 100);
+  const totalRequired = loanRequest.amount + lenderCharge;
+  if (lenderAccount.balance < totalRequired) {
+    return { success: false, error: `Insufficient funds. You need at least ₦${totalRequired} to approve this loan (including admin charge).` };
   }
-  // Debit lender
-  const newLenderBalance = lenderAccount.balance - loanRequest.amount
-  await adminClient
-    .from("account_balances")
-    .update({ balance: newLenderBalance, updated_at: new Date().toISOString() })
-    .eq("user_id", approverId)
-  // Credit borrower
-  const { data: borrowerAccount, error: borrowerAccountError } = await adminClient
-    .from("account_balances")
-    .select("id, balance")
-    .eq("user_id", loanRequest.user_id)
-    .single()
-  if (borrowerAccountError || !borrowerAccount) {
-    return { success: false, error: "Could not fetch borrower's account balance" }
+
+  // 1. Initiate ALAT debit/process-transfer for loan amount
+  const transferRes = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/api/alat/debit/process-transfer`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      transactionReference: loanRequestId,
+      amount: loanRequest.amount,
+      sourceAccountNumber: helperProfile.account_number,
+      destinationAccountNumber: requesterProfile.account_number,
+      narration: `Loan disbursement for request ${loanRequestId}`,
+      user_id: approverId,
+    }),
+  });
+  const transferData = await transferRes.json();
+  if (transferData.status !== "success") {
+    return { success: false, error: transferData.message || transferData.error || "ALAT transfer failed" };
   }
-  const newBorrowerBalance = borrowerAccount.balance + loanRequest.amount
-  await adminClient
-    .from("account_balances")
-    .update({ balance: newBorrowerBalance, updated_at: new Date().toISOString() })
-    .eq("user_id", loanRequest.user_id)
+
+  // 1b. Debit lender admin charge (percentage of loan amount)
+  const lenderChargeReference = `${loanRequestId}-lender-admin-charge`;
+  const lenderChargeRes = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/api/alat/debit/process-transfer`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      transactionReference: lenderChargeReference,
+      amount: lenderCharge,
+      sourceAccountNumber: helperProfile.account_number,
+      destinationAccountNumber: adminAccountNumber,
+      narration: `Lender admin charge for loan request ${loanRequestId}`,
+      user_id: approverId,
+    }),
+  });
+  const lenderChargeData = await lenderChargeRes.json();
+  if (lenderChargeData.status !== "success") {
+    return { success: false, error: lenderChargeData.message || lenderChargeData.error || "Lender admin charge debit failed" };
+  }
+
+  // 1c. Debit borrower admin charge (percentage of loan amount)
+  const borrowerChargePercent = parseFloat(process.env.ADMIN_BORROWER_CHARGE_PERCENT || "1.5");
+  const borrowerCharge = Math.round((loanRequest.amount * borrowerChargePercent) / 100);
+  const borrowerChargeReference = `${loanRequestId}-borrower-admin-charge`;
+  const borrowerChargeRes = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/api/alat/debit/process-transfer`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      transactionReference: borrowerChargeReference,
+      amount: borrowerCharge,
+      sourceAccountNumber: requesterProfile.account_number,
+      destinationAccountNumber: adminAccountNumber,
+      narration: `Borrower admin charge for loan request ${loanRequestId}`,
+      user_id: loanRequest.user_id,
+    }),
+  });
+  const borrowerChargeData = await borrowerChargeRes.json();
+  if (borrowerChargeData.status !== "success") {
+    return { success: false, error: borrowerChargeData.message || borrowerChargeData.error || "Borrower admin charge debit failed" };
+  }
 
   // 2. Calculate repayment due date
   let dueDate = new Date()
@@ -422,49 +470,7 @@ export async function approveLoanRequest({ loanRequestId, pin, approverId }: { l
     updated_at: new Date().toISOString(),
   })
 
-  // 4. Register recipient with Paystack (if not already)
-  const paystackKey = process.env.PAYSTACK_SECRET_KEY
-  if (!paystackKey) {
-    return { success: false, error: "Paystack secret key not configured" }
-  }
-  // Create transfer recipient for requester
-  const recipientRes = await fetch("https://api.paystack.co/transferrecipient", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${paystackKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      type: "nuban",
-      name: `${requesterProfile.first_name} ${requesterProfile.last_name}`,
-      account_number: requesterProfile.account_number,
-      bank_code: requesterProfile.bank_name, // This should be the bank code, not name
-      currency: "NGN",
-    }),
-  })
-  const recipientData = await recipientRes.json() as any
-  if (!recipientData.status || !recipientData.data?.recipient_code) {
-    return { success: false, error: recipientData.message || "Failed to create transfer recipient" }
-  }
-  // 5. Initiate transfer
-  const transferRes = await fetch("https://api.paystack.co/transfer", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${paystackKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      source: "balance",
-      amount: loanRequest.amount * 100, // Paystack expects kobo
-      recipient: recipientData.data.recipient_code,
-      reason: `Peer Capital loan transfer for request ${loanRequestId}`,
-    }),
-  })
-  const transferData = await transferRes.json() as any
-  if (!transferData.status) {
-    return { success: false, error: transferData.message || "Paystack transfer failed" }
-  }
-  // 6. Update loan request status
+  // 4. Update loan request status
   const { error: updateError } = await adminClient
     .from("loan_requests")
     .update({ status: "approved" })
@@ -473,7 +479,7 @@ export async function approveLoanRequest({ loanRequestId, pin, approverId }: { l
     return { success: false, error: "Failed to update loan status" }
   }
 
-  // Send email notification for loan disbursement
+  // 5. Send email notification for loan disbursement
   try {
     const { getProfileById } = await import("@/lib/actions/profile")
     const { sendTransactionEmail } = await import("@/lib/actions/email-notifications")
@@ -490,7 +496,7 @@ export async function approveLoanRequest({ loanRequestId, pin, approverId }: { l
     }
   } catch (e) { /* ignore email errors */ }
 
-  // Insert into loan_history for approval
+  // 6. Insert into loan_history for approval
   await adminClient.from("loan_history").insert({
     loan_request_id: loanRequestId,
     lender_id: approverId,

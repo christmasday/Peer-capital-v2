@@ -1,6 +1,7 @@
 "use server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { revalidatePath } from "next/cache"
+import { getBlockedUsers } from "@/lib/actions/connections"
 
 export async function submitReview({
   reviewerId,
@@ -44,5 +45,25 @@ export async function submitReview({
       success: false,
       message: "An unexpected error occurred. Please try again.",
     }
+  }
+}
+
+export async function getReviewsForUser(userId: string) {
+  try {
+    const adminClient = createAdminClient()
+    const { data, error } = await adminClient
+      .from("user_reviews")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+    if (error) {
+      return { error: "Failed to fetch reviews" }
+    }
+    // Filter out reviews from blocked users
+    const { blocked } = await getBlockedUsers()
+    const filtered = (data || []).filter((review) => !blocked.includes(review.reviewer_id))
+    return { data: filtered }
+  } catch (error) {
+    return { error: "An unexpected error occurred" }
   }
 }

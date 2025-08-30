@@ -100,4 +100,3 @@ export default async function AcceptableUsePage() {
       <LandingFooter />
     </div>
   )
-}
