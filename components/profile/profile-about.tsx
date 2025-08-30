@@ -146,6 +146,24 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
   const [accountsError, setAccountsError] = useState("")
   const [removingAccountId, setRemovingAccountId] = useState<string | null>(null)
   const [removeAccountError, setRemoveAccountError] = useState("")
+  // Add state for all address fields
+  const [buildingNumber, setBuildingNumber] = useState(profile.buildingNumber || "");
+  const [apartment, setApartment] = useState(profile.apartment || "");
+  const [street, setStreet] = useState(profile.street || "");
+  const [city, setCity] = useState(profile.city || "");
+  const [town, setTown] = useState(profile.town || "");
+  const [stateValue, setStateValue] = useState(profile.state || "");
+  const [lga, setLga] = useState(profile.lga || "");
+  const [lcda, setLcda] = useState(profile.lcda || "");
+  const [landmark, setLandmark] = useState(profile.landmark || "");
+  const [additionalInformation, setAdditionalInformation] = useState(profile.additionalInformation || "");
+  const [fullAddress, setFullAddress] = useState(profile.fullAddress || "");
+  const [postalCode, setPostalCode] = useState(profile.postalCode || "");
+  const [walletCreated, setWalletCreated] = useState(false);
+  const [trackingId, setTrackingId] = useState<string | null>(null);
+  const [walletPhoneNumber, setWalletPhoneNumber] = useState<string | null>(null);
+  const [showOtpDialog, setShowOtpDialog] = useState(false);
+  const [isVerifyingWalletOtp, setIsVerifyingWalletOtp] = useState(false);
 
   const handleVerifyPhoneOtp = async () => {
     setIsVerifyingOtp(true);
@@ -325,38 +343,6 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
       if (pollInterval) clearInterval(pollInterval);
     };
   }, [paystackResponse, isCurrentUser, activeSection, toast]);
-
-  useEffect(() => {
-    if (!isCurrentUser && profile.id) {
-      fetch(`/api/blocked-users`)
-        .then(res => res.json())
-        .then(data => {
-          setIsBlocked(!!data.blocked.find((u: any) => u.id === profile.id));
-        });
-    }
-  }, [profile.id, isCurrentUser]);
-
-  const handleBlock = async () => {
-    setBlockLoading(true);
-    await fetch(`/api/block-user`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: profile.id }),
-    });
-    setIsBlocked(true);
-    setBlockLoading(false);
-  };
-
-  const handleUnblock = async () => {
-    setBlockLoading(true);
-    await fetch(`/api/unblock-user`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: profile.id }),
-    });
-    setIsBlocked(false);
-    setBlockLoading(false);
-  };
 
   const handleSocialMediaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSocialMediaData({
@@ -1478,6 +1464,141 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
     }
   }
 
+  // Add LendingLicenceSection component
+  function LendingLicenceSection({ profile, onUpdate, uploadLendingLicense }: { profile: any, onUpdate: (fields: any) => Promise<void>, uploadLendingLicense: (file: File) => Promise<string> }) {
+    const [licenseUrl, setLicenseUrl] = useState(profile.lending_license_url || "");
+    const [licenseFile, setLicenseFile] = useState<File | null>(null);
+    const [uploading, setUploading] = useState(false);
+    const [savingLicense, setSavingLicense] = useState(false);
+    const [messageLicense, setMessageLicense] = useState<string | null>(null);
+    const [editLicense, setEditLicense] = useState(false);
+    const [licenseFileError, setLicenseFileError] = useState<string | null>(null);
+    const MAX_ID_DOC_SIZE_MB = 5;
+    const isDirtyLicense = editLicense && licenseFile !== null;
+
+    const handleLicenseFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        if (file.size > MAX_ID_DOC_SIZE_MB * 1024 * 1024) {
+          setLicenseFileError(`File size exceeds ${MAX_ID_DOC_SIZE_MB}MB. Please upload a smaller file.`);
+          setLicenseFile(null);
+          setLicenseUrl("");
+          return;
+        }
+        setLicenseFileError(null);
+        if (file.type.startsWith('image/')) {
+          try {
+            const compressedFile = await imageCompression(file, {
+              maxSizeMB: 1, // Target max size in MB
+              maxWidthOrHeight: 1920, // Optional: resize large images
+              useWebWorker: true,
+            });
+            setLicenseFile(compressedFile);
+          } catch (err) {
+            setLicenseFileError('Image compression failed. Please try another image.');
+            setLicenseFile(null);
+            return;
+          }
+        } else {
+          setLicenseFile(file); // For PDFs, no compression
+        }
+        setLicenseUrl("");
+      }
+    };
+
+    const handleSaveLicense = async () => {
+      setSavingLicense(true);
+      setMessageLicense(null);
+      let url = licenseUrl;
+      try {
+        if (licenseFile) {
+          setUploading(true);
+          setMessageLicense("Uploading license...");
+          url = await uploadLendingLicense(licenseFile);
+          setLicenseUrl(url);
+          setUploading(false);
+        }
+        await onUpdate({ lendingLicenseUrl: url });
+        setMessageLicense("Saved!");
+        setLicenseFile(null);
+        setEditLicense(false);
+      } catch (err: any) {
+        setMessageLicense(err?.message || "Save failed");
+      } finally {
+        setSavingLicense(false);
+        setUploading(false);
+      }
+    };
+    const handleCancelLicense = () => {
+      setLicenseUrl(profile.lending_license_url || "");
+      setLicenseFile(null);
+      setEditLicense(false);
+      setMessageLicense(null);
+    };
+
+    return (
+      <div className="space-y-6 w-full">
+        <div>
+          <div className="flex items-center justify-between">
+            <label className="font-semibold block mb-2">Lending License</label>
+            {!editLicense && (
+              <button
+                className="text-blue-600 flex items-center gap-1 text-sm"
+                onClick={() => setEditLicense(true)}
+                type="button"
+              >
+                <Edit className="h-4 w-4"/>
+              </button>
+            )}
+          </div>
+          {!editLicense ? (
+            <div>
+              {profile.lending_license_url ? (
+                <img
+                  src={profile.lending_license_url}
+                  alt="Lending License"
+                  className="w-40 h-40 object-cover mb-2 rounded border"
+                />
+              ) : (
+                <span className="text-gray-800">No license uploaded</span>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {licenseUrl && (
+                <img
+                  src={licenseUrl}
+                  alt="Lending License Preview"
+                  className="w-40 h-40 object-cover mb-2 rounded border"
+                />
+              )}
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleLicenseFileChange}
+                disabled={uploading || savingLicense}
+                className="w-full"
+              />
+              {licenseFileError && <div className="text-sm text-red-500 mt-1">{licenseFileError}</div>}
+              <div className="flex gap-2 mt-2 w-full">
+                <Button variant="outline" className="w-1/2" onClick={handleCancelLicense} type="button" disabled={savingLicense}>Cancel</Button>
+                <Button
+                  className="w-1/2"
+                  onClick={handleSaveLicense}
+                  disabled={savingLicense || uploading || !isDirtyLicense}
+                  type="button"
+                >
+                  {savingLicense || uploading ? "Saving..." : "Save"}
+                </Button>
+              </div>
+              {messageLicense && <div className="text-sm text-gray-500 mt-2">{messageLicense}</div>}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
       {/* Left sidebar with sections */}
@@ -2378,100 +2499,38 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
             <CardContent>
               <Button
                 onClick={async () => {
-                  if (profile.correlationId) {
-                    // If correlationId exists, proceed to send API request to Alat
-                    setIsCreatingWallet(true);
-                    try {
-                      const res = await fetch("/api/alat/wallet/create-wallet", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          phoneNumber: profile.phone_number,
-                          email: profile.email,
-                          correlationId: profile.correlationId,
-                          bvn: profile.bvn,
-                        }),
-                      });
-                      const data = await res.json();
-                      setWalletApiResponse(data);
-                      if (data.error || data.status === "error") {
-                        // If error, delete correlationId from DB
-                        const result = await updateProfile({ correlationId: null }, profile.id);
-                        console.log("[Wallet] Deleted correlationId after error:", result);
-                        // Optionally, refresh the profile or reload the page
-                        // window.location.reload();
+                  try {
+                    const res = await fetch("/api/alat/wallet/create-wallet", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        phoneNumber: profile.phone_number,
+                        email: profile.email,
+                        nin: profile.nin,
+                      }),
+                    });
+                    const data = await res.json();
+                    if (res.ok && !data.error) {
+                      setWalletCreated(true);
+                      toast({ title: "Wallet Created!", description: "Your wallet has been created successfully." });
+                      // Check for trackingId and phoneNumber in response
+                      if (data.trackingId && data.phoneNumber) {
+                        setTrackingId(data.trackingId);
+                        setWalletPhoneNumber(data.phoneNumber);
+                        // Do not call updateProfile with unknown fields
+                        setShowOtpDialog(true);
                       }
-                    } catch (err) {
-                      setWalletApiResponse({ error: err instanceof Error ? err.message : String(err) });
-                    } finally {
-                      setIsCreatingWallet(false);
+                    } else {
+                      toast({ title: "Error", description: data.message || data.error || "Failed to create wallet", variant: "destructive" });
                     }
-                  } else {
-                    // If not, open the face verification page
-                    const width = 400, height = 600;
-                    const left = window.screenX + (window.outerWidth - width) / 2;
-                    const top = window.screenY + (window.outerHeight - height) / 2;
-                    const x_tk = process.env.NEXT_PUBLIC_ALAT_API_KEY;
-                    const redirectUri = window.location.origin + window.location.pathname + window.location.search;
-                    window.open(
-                      `https://face-verification-dev.azurewebsites.net/?bvn=${profile.bvn}&x_tk=${x_tk}&rd_uri=${redirectUri}`,
-                      'FaceVerification',
-                      `width=${width},height=${height},left=${left},top=${top},resizable,scrollbars`
-                    );
+                  } catch (err) {
+                    toast({ title: "Error", description: "Failed to create wallet", variant: "destructive" });
                   }
                 }}
-                className="w-full mb-6"
+                className="w-full"
               >
                 Create Wallet
               </Button>
-              {isCreatingWallet && <div className="text-blue-600">Creating wallet...</div>}
-              {walletApiResponse && (
-                <Dialog open={!!walletApiResponse} onOpenChange={() => setWalletApiResponse(null)}>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Wallet Creation Result</DialogTitle>
-                    </DialogHeader>
-                    <div className="text-sm bg-gray-100 p-4 rounded text-gray-800">
-                      {walletApiResponse.message || "Unknown error"}
-                </div>
-                    <Button onClick={() => setWalletApiResponse(null)} className="mt-4">Close</Button>
-                  </DialogContent>
-                </Dialog>
-              )}
-              {/* BVN Display and Inline Edit */}
-              <div className="mb-4">
-                <label className="block font-medium mb-1">BVN</label>
-                {isEditingBvn ? (
-                  <div className="flex flex-col gap-2">
-                    <input
-                      type="text"
-                      value={bvnText}
-                      onChange={e => setBvnText(e.target.value.replace(/[^0-9]/g, "").slice(0, 11))}
-                      placeholder="Enter your BVN"
-                      className="border px-3 py-2 rounded w-full"
-                      maxLength={11}
-                      disabled={isSavingBvn}
-                    />
-                    {bvnError && <div className="text-red-500 text-sm">{bvnError}</div>}
-                    <div className="flex gap-2 justify-end">
-                      <Button variant="outline" onClick={handleCancelBvn} disabled={isSavingBvn}>Cancel</Button>
-                      <Button onClick={handleSaveBvn} disabled={isSavingBvn || bvnText === (profile.bvn || "") || bvnText.length !== 11}>
-                        {isSavingBvn ? "Saving..." : "Save"}
-                  </Button>
-                    </div>
-                        </div>
-                      ) : (
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-900 font-mono">{profile.bvn || "Not set"}</span>
-                    {/* Only show Edit button if wallet account details are NOT present */}
-                    {!(profile.account_number && profile.account_name) && (
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setIsEditingBvn(true)}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      )}
-                    </div>
-                  )}
-                </div>
             </CardContent>
           </Card>
         )}
@@ -2605,11 +2664,6 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
       </div>
           </DialogContent>
         </Dialog>
-        {!isCurrentUser && (
-          <Button onClick={isBlocked ? handleUnblock : handleBlock} disabled={blockLoading} variant={isBlocked ? "outline" : "destructive"} className="ml-2">
-            {blockLoading ? (isBlocked ? "Unblocking..." : "Blocking...") : isBlocked ? "Unblock" : "Block"}
-          </Button>
-        )}
     </div>
     </div>
   );

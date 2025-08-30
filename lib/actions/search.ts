@@ -3,7 +3,6 @@
 import { createServerClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { cookies } from "next/headers"
-import { getBlockedUsers } from "@/lib/actions/connections"
 
 export async function searchUsers(query: string) {
   try {
@@ -60,7 +59,7 @@ export async function searchUsers(query: string) {
       if (fallbackError) {
       } else if (fallbackData && fallbackData.length > 0) {
         // Filter the results manually
-        data = fallbackData.filter((user: any) => {
+        data = fallbackData.filter((user) => {
           const firstName = (user.first_name || "").toLowerCase()
           const lastName = (user.last_name || "").toLowerCase()
           const email = (user.email || "").toLowerCase()
@@ -71,17 +70,13 @@ export async function searchUsers(query: string) {
     }
 
     // Transform the data to the expected format
-    let results = (data || []).map((user: any) => ({
+    return (data || []).map((user) => ({
       id: user.id,
       email: user.email || "",
       displayName:
         `${user.first_name || ""} ${user.last_name || ""}`.trim() || (user.email ? user.email.split("@")[0] : "User"),
       avatarUrl: user.profile_picture_url,
     }))
-    // Filter out blocked users
-    const { blocked } = await getBlockedUsers()
-    results = results.filter((user: any) => !blocked.includes(user.id))
-    return results
   } catch (error) {
     // Return empty array instead of throwing to prevent UI errors
     return []
