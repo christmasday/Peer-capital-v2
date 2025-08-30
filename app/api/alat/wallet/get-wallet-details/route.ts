@@ -3,7 +3,7 @@ import { verifyAuth } from "@/lib/auth-middleware";
 
 // This endpoint expects a query param ?accountNumber=...
 export async function GET(req: NextRequest) {
-   const authResult = await verifyAuth(req) as any;
+  const authResult = await verifyAuth(req) as any;
   if (!authResult.authenticated) {
     return NextResponse.json({ error: "Authentication required" }, { status: 401 });
   }

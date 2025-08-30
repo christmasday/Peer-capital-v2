@@ -14,7 +14,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { transferFromAccount } from "@/lib/actions/account"
 import { ReceiptModal } from "@/components/receipts/receipt-modal"
-import { v4 as uuidv4 } from "uuid"
 
 // Form schema
 const formSchema = z.object({
@@ -208,14 +207,10 @@ export function TransferForm({ currentBalance }: TransferFormProps) {
         setIsSubmitting(false)
         return
       }
-      // Generate required fields
-      const transactionReference = `TRF-${Date.now()}-${Math.floor(Math.random() * 10000)}`
-      const timestamp = new Date().toISOString()
-      let sourceAccountNumber = walletInfo?.walletNumber
-      let destinationAccountNumber = ""
-      let destinationBankCode = ""
-      let destinationBankName = ""
-      let destinationAccountName = ""
+      let payload: any = {
+        amount: values.amount,
+        reason: values.reason,
+      }
       if (values.mode === "beneficiary") {
         const beneficiary = beneficiaries.find(b => b.id === values.beneficiaryId)
         if (!beneficiary) {
@@ -223,38 +218,18 @@ export function TransferForm({ currentBalance }: TransferFormProps) {
           setIsSubmitting(false)
           return
         }
-        destinationAccountNumber = beneficiary.account_number
-        destinationBankCode = beneficiary.bank_code
-        destinationBankName = beneficiary.bank_name
-        destinationAccountName = beneficiary.account_name
+        payload.accountNumber = beneficiary.account_number
+        payload.bankCode = beneficiary.bank_code
+        payload.accountName = beneficiary.account_name
       } else {
         if (!accountName) {
           setError("Please validate the account number and bank")
           setIsSubmitting(false)
           return
         }
-        destinationAccountNumber = values.accountNumber || ""
-        destinationBankCode = values.bankCode || ""
-        destinationBankName = banks.find(b => b.code === destinationBankCode)?.name || ""
-        destinationAccountName = accountName
-      }
-      // Validate all required fields
-      if (!transactionReference || !values.amount || !timestamp || !sourceAccountNumber || !destinationAccountNumber) {
-        setError("Missing required transaction details. Please check your input.")
-        setIsSubmitting(false)
-        return
-      }
-      let payload: any = {
-        transactionReference,
-        amount: values.amount,
-        timestamp,
-        sourceAccountNumber,
-        destinationAccountNumber,
-        destinationBankCode,
-        destinationBankName,
-        destinationAccountName,
-        narration: values.reason,
-        useCustomNarration: true,
+        payload.accountNumber = values.accountNumber
+        payload.bankCode = values.bankCode
+        payload.accountName = accountName
       }
       // Call process transfer API
       const res = await fetch("/api/alat/debit/process-transfer", {
