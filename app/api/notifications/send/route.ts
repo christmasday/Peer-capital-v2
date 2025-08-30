@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
 
     // Validate event type
     const validEventTypes = [
-      'login', 'logout', 'password_change', 'account_funding', 
+      'login', 'password_change', 'account_funding', 
       'withdrawal', 'loan_request', 'loan_repayment', 'verification', 'security_alert'
     ]
     

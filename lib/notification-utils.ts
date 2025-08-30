@@ -43,18 +43,6 @@ export const notificationHelpers = {
       }
     }),
 
-  logout: (userId: string, metadata?: Record<string, any>) =>
-    sendAccountNotification({
-      type: 'logout',
-      userId,
-      title: 'Account Logout',
-      description: 'You have been logged out of your PeerCapital account.',
-      metadata: {
-        timestamp: new Date().toISOString(),
-        ...metadata,
-      }
-    }),
-
   passwordChange: (userId: string, metadata?: Record<string, any>) =>
     sendAccountNotification({
       type: 'password_change',

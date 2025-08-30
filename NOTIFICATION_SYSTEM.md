@@ -21,7 +21,6 @@ The notification system sends email notifications to users when they have email 
 
 #### Account Activity
 - **Login**: New login detected
-- **Logout**: Account logout
 - **Password Change**: Password successfully changed
 
 #### Transaction Activity
@@ -74,7 +73,7 @@ The existing notification preferences table is used to control which notificatio
 **POST** `/api/notifications/send`
 ```json
 {
-  "type": "login" | "logout" | "password_change" | "account_funding" | "withdrawal" | "loan_request" | "loan_repayment" | "verification" | "security_alert",
+  "type": "login" | "password_change" | "account_funding" | "withdrawal" | "loan_request" | "loan_repayment" | "verification" | "security_alert",
   "userId": "string",
   "title": "string",
   "description": "string",
