@@ -296,6 +296,111 @@ export interface Database {
           ip_address?: string | null
         }
       }
+      user_roles: {
+        Row: {
+          id: string
+          user_id: string
+          role_type: string
+          created_at: string
+          updated_at: string
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          role_type: string
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          role_type?: string
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+        }
+      }
+      support_tickets: {
+        Row: {
+          id: string
+          user_id: string | null
+          email: string
+          category: string
+          subject: string
+          description: string
+          status: string
+          priority: string
+          assigned_to: string | null
+          created_at: string
+          updated_at: string
+          resolved_at: string | null
+          user_agent: string | null
+          ip_address: string | null
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          email: string
+          category: string
+          subject: string
+          description: string
+          status?: string
+          priority?: string
+          assigned_to?: string | null
+          created_at?: string
+          updated_at?: string
+          resolved_at?: string | null
+          user_agent?: string | null
+          ip_address?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          email?: string
+          category?: string
+          subject?: string
+          description?: string
+          status?: string
+          priority?: string
+          assigned_to?: string | null
+          created_at?: string
+          updated_at?: string
+          resolved_at?: string | null
+          user_agent?: string | null
+          ip_address?: string | null
+        }
+      }
+      support_ticket_responses: {
+        Row: {
+          id: string
+          ticket_id: string
+          user_id: string | null
+          is_staff_response: boolean
+          message: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          ticket_id: string
+          user_id?: string | null
+          is_staff_response?: boolean
+          message: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          ticket_id?: string
+          user_id?: string | null
+          is_staff_response?: boolean
+          message?: string
+          created_at?: string
+          updated_at?: string
+        }
+      }
       loan_helpers: {
         Row: {
           id: string
@@ -559,42 +664,86 @@ export interface Database {
           created_at?: string
         }
       }
-      transfer_beneficiaries: {
-        Row: {
-          id: string
-          user_id: string
-          account_name: string
-          account_number: string
-          bank_name: string
-          bank_code: string
-          recipient_code: string
-          created_at: string
-          updated_at: string
+              transfer_beneficiaries: {
+          Row: {
+            id: string
+            user_id: string
+            account_name: string
+            account_number: string
+            bank_name: string
+            bank_code: string
+            recipient_code: string
+            created_at: string
+            updated_at: string
+          }
+          Insert: {
+            id?: string
+            user_id: string
+            account_name: string
+            account_number: string
+            bank_name: string
+            bank_code: string
+            recipient_code: string
+            created_at?: string
+            updated_at?: string
+          }
+          Update: {
+            id?: string
+            user_id?: string
+            account_name?: string
+            account_number?: string
+            bank_name?: string
+            bank_code?: string
+            recipient_code?: string
+            created_at?: string
+            updated_at?: string
+          }
         }
-        Insert: {
-          id?: string
-          user_id: string
-          account_name: string
-          account_number: string
-          bank_name: string
-          bank_code: string
-          recipient_code: string
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          account_name?: string
-          account_number?: string
-          bank_name?: string
-          bank_code?: string
-          recipient_code?: string
-          created_at?: string
-          updated_at?: string
+        virtual_accounts: {
+          Row: {
+            id: string
+            user_id: string
+            account_number: string
+            account_name: string
+            bank_name: string
+            bank_code: string
+            currency: string
+            assigned: boolean
+            paystack_id: string
+            created_at: string
+            updated_at: string
+            email: string | null
+          }
+          Insert: {
+            id?: string
+            user_id: string
+            account_number: string
+            account_name: string
+            bank_name: string
+            bank_code: string
+            currency?: string
+            assigned?: boolean
+            paystack_id: string
+            created_at?: string
+            updated_at?: string
+            email?: string | null
+          }
+          Update: {
+            id?: string
+            user_id?: string
+            account_number?: string
+            account_name?: string
+            bank_name?: string
+            bank_code?: string
+            currency?: string
+            assigned?: boolean
+            paystack_id?: string
+            created_at?: string
+            updated_at?: string
+            email?: string | null
+          }
         }
       }
-    }
     Views: {
       [_ in never]: never
     }

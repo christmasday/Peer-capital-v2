@@ -3,7 +3,7 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
-import { Menu, X, Home, Wallet, BarChart2, MessageCircle, Search, Settings, Shield, Activity } from "lucide-react"
+import { Menu, X, Home, Wallet, BarChart2, MessageCircle, Search, Settings, Shield, Activity, HelpCircle, AlertCircle, Mail, Flag } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
@@ -42,10 +42,36 @@ export function TopNav({ userName, userImage, hideSearch }: TopNavProps) {
   const [unreadNotifications, setUnreadNotifications] = useState(0)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [fetchError, setFetchError] = useState(false)
+  const [localUserName, setLocalUserName] = useState(userName || "")
+  const [localUserImage, setLocalUserImage] = useState(userImage || "")
   const pathname = usePathname()
 
+  // Fetch user data if not provided via props
+  useEffect(() => {
+    const fetchUserData = async () => {
+      if (!userName || !userImage) {
+        try {
+          const response = await fetch("/api/auth/get-user-profile")
+          if (response.ok) {
+            const data = await response.json()
+            if (data.profile) {
+              const fullName = `${data.profile.first_name || ""} ${data.profile.last_name || ""}`.trim() || data.user.email || "User"
+              setLocalUserName(fullName)
+              setLocalUserImage(data.profile.profile_picture_url || "")
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching user data:", error)
+        }
+      }
+    }
+
+    fetchUserData()
+  }, [userName, userImage])
+
   // Ensure we have a valid user name to display
-  const displayName = userName && userName.trim() !== "" ? userName : "My Account"
+  const displayName = (userName || localUserName) && (userName || localUserName).trim() !== "" ? (userName || localUserName) : "My Account"
+  const displayImage = userImage || localUserImage
 
   const navItems = [
     { href: "/home", label: "Home", icon: Home },
@@ -207,7 +233,7 @@ export function TopNav({ userName, userImage, hideSearch }: TopNavProps) {
               <Button variant="ghost" size="icon" className="rounded-full">
                 <div className="relative h-8 w-8 rounded-full overflow-hidden bg-blue-100">
                   <Image
-                    src={userImage || "/vibrant-street-market.png"}
+                    src={displayImage || "/vibrant-street-market.png"}
                     alt="Profile"
                     fill
                     className="object-cover"
@@ -222,7 +248,7 @@ export function TopNav({ userName, userImage, hideSearch }: TopNavProps) {
                   <div className="flex items-center gap-3">
 
                     <div className="relative h-8 w-8 rounded-full overflow-hidden bg-blue-100 flex-shrink-0">
-                      <Image src={userImage || "/vibrant-street-market.png"} alt="Profile" fill className="object-cover" />
+                      <Image src={displayImage || "/vibrant-street-market.png"} alt="Profile" fill className="object-cover" />
                     </div>
                     <div className="flex flex-col min-w-0">
                       <span className="truncate">{displayName}</span>
@@ -256,6 +282,39 @@ export function TopNav({ userName, userImage, hideSearch }: TopNavProps) {
                     <DropdownMenuItem className="cursor-pointer">
                       <Activity className="h-4 w-4 mr-2" />
                       <span>Activity Log</span>
+                    </DropdownMenuItem>
+                  </Link>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <HelpCircle className="h-4 w-4 mr-2" />
+                  <span>Help & Support</span>
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  <Link href="/faq">
+                    <DropdownMenuItem className="cursor-pointer">
+                      <HelpCircle className="h-4 w-4 mr-2" />
+                      <span>Help Center</span>
+                    </DropdownMenuItem>
+                  </Link>
+                  <Link href="/account-status">
+                    <DropdownMenuItem className="cursor-pointer">
+                      <AlertCircle className="h-4 w-4 mr-2" />
+                      <span>Account Status</span>
+                    </DropdownMenuItem>
+                  </Link>
+                  <Link href="/support-inbox">
+                    <DropdownMenuItem className="cursor-pointer">
+                      <Mail className="h-4 w-4 mr-2" />
+                      <span>Support Inbox</span>
+                    </DropdownMenuItem>
+                  </Link>
+                  <Link href="/report-problem">
+                    <DropdownMenuItem className="cursor-pointer">
+                      <Flag className="h-4 w-4 mr-2" />
+                      <span>Report a Problem</span>
                     </DropdownMenuItem>
                   </Link>
                 </DropdownMenuSubContent>

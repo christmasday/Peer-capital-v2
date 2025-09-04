@@ -35,35 +35,10 @@ export function HomeContent({ userProfile, loanHelpers, virtualAccount }: HomeCo
   }
 
   useEffect(() => {
-    async function fetchWallet() {
-      setWalletLoading(true)
-      setWalletError(null)
-      try {
-        // Use account number from userProfile
-        const accountNumber = userProfile?.profile?.account_number
-        if (!accountNumber) {
-          setWalletError("No account number found")
-          setWalletLoading(false)
-          return
-        }
-        const res = await fetch(`/api/alat/wallet/get-wallet-balance?accountNumber=${accountNumber}`, { credentials: "include" })
-        const data = await res.json()
-        if (data.result && data.result.walletNumber && data.result.availableBalance) {
-          setWalletInfo({
-            walletNumber: data.result.walletNumber,
-            availableBalance: data.result.availableBalance,
-          })
-        } else {
-          setWalletError("Could not fetch wallet info")
-        }
-      } catch (err) {
-        setWalletError("Could not fetch wallet info")
-      } finally {
-        setWalletLoading(false)
-      }
-    }
-    fetchWallet()
-  }, [userProfile?.profile?.account_number])
+    // Skip ALAT wallet fetching for now - we'll use database data instead
+    setWalletLoading(false)
+    setWalletError(null)
+  }, [])
 
   const handleFindLenders = async () => {
     setIsSearching(true)
@@ -159,17 +134,8 @@ export function HomeContent({ userProfile, loanHelpers, virtualAccount }: HomeCo
                     <Eye className="h-4 w-4" />
                   </button>
                 </div>
-                {walletLoading ? (
-                  <div className="text-sm text-blue-100">Loading wallet info...</div>
-                ) : walletInfo ? (
-                  <>
-                    <div className="text-2xl font-bold mb-2">₦{Number(walletInfo.availableBalance || 0).toLocaleString()}</div>
-                  </>
-                ) : walletError ? (
-                  <div className="text-sm text-red-200">{walletError}</div>
-                ) : (
-                  <div className="text-2xl font-bold mb-2">{formatCurrency(userProfile.account?.balance || 0)}</div>
-                )}
+                {/* Display account balance from database */}
+                <div className="text-2xl font-bold mb-2">{formatCurrency(userProfile.account?.balance || 0)}</div>
 
                 <div className="text-sm opacity-90 mb-6">
                   &amp; Loan Balance {formatCurrency(userProfile.account?.loan_balance || 0)}
@@ -198,16 +164,16 @@ export function HomeContent({ userProfile, loanHelpers, virtualAccount }: HomeCo
                   </Link>
                 </div>
 
-                {/* Virtual Account Number and Bank Name Display - below icons */}
-                {walletInfo ? (
+                {/* Virtual Account Display - use database data */}
+                {virtualAccount ? (
                   <div className="mt-8">
-                    <span className="text-xs text-blue-100 block">Your wallet account:</span>
-                    <span className="font-mono text-xl font-bold tracking-widest">{walletInfo.walletNumber}</span>
-                    <span className="text-xs text-blue-100 ml-1">Wema Bank</span>
+                    <span className="text-xs text-blue-100 block">Your virtual account:</span>
+                    <span className="font-mono text-xl font-bold tracking-widest">{virtualAccount.account_number}</span>
+                    <span className="text-xs text-blue-100 ml-1">{virtualAccount.bank_name}</span>
                   </div>
                 ) : (
                   <Link href="/profile?tab=about">
-                    <Button variant="secondary" size="sm" className="mt-8">Create wallet</Button>
+                    <Button variant="secondary" size="sm" className="mt-8">Create Virtual Account</Button>
                   </Link>
                 )}
               </div>

@@ -1,6 +1,7 @@
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 
 export async function GET(request: Request) {
   const supabase = createRouteHandlerClient({ cookies })
@@ -12,17 +13,55 @@ export async function GET(request: Request) {
   } = await supabase.auth.getUser()
 
   if (userError || !user) {
+    console.log("❌ GET /api/account-balance - User error:", userError)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  // Get the user's account balance
-  const { data, error } = await supabase.from("account_balances").select("*").eq("user_id", user.id).single()
+  console.log("🔍 GET /api/account-balance - User ID:", user.id)
+
+  // Use admin client to fetch from database
+  const adminClient = createAdminClient()
+  
+  // Get the user's account balance from the database
+  const { data, error } = await adminClient
+    .from("account_balances")
+    .select("*")
+    .eq("user_id", user.id)
+    .single()
+
+  console.log("💰 Account balance query result:", { data, error })
 
   if (error) {
+    // If no record exists, create one with default values
+    if (error.code === "PGRST116") {
+      console.log("📝 No account balance record found, creating one...")
+      const { data: newBalance, error: createError } = await adminClient
+        .from("account_balances")
+        .insert([{ user_id: user.id, balance: 0, loan_balance: 0 }])
+        .select()
+        .single()
+
+      if (createError) {
+        console.log("❌ Error creating account balance:", createError)
+        return NextResponse.json({ error: "Failed to create account balance" }, { status: 500 })
+      }
+
+      console.log("✅ Created new account balance:", newBalance)
+      return NextResponse.json({
+        balance: newBalance?.balance || 0,
+        loan_balance: newBalance?.loan_balance || 0
+      })
+    }
+
+    console.log("❌ Error fetching account balance:", error)
     return NextResponse.json({ error: "Failed to fetch account balance" }, { status: 500 })
   }
 
-  return NextResponse.json({ data })
+  console.log("✅ Success - returning balance data:", data)
+  return NextResponse.json({
+    balance: data?.balance || 0,
+    loan_balance: data?.loan_balance || 0
+  })
 }
 
 export async function POST(request: Request) {

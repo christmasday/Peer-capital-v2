@@ -1,0 +1,296 @@
+"use client"
+
+import { useEffect, useState } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Eye, EyeOff, Plus, ArrowLeftRight, TrendingUp, Wallet } from "lucide-react"
+import Link from "next/link"
+import { useToast } from "@/hooks/use-toast"
+
+interface VirtualAccount {
+  account_number: string
+  account_name: string
+  bank_name: string
+  currency: string
+  assigned: boolean
+}
+
+interface AccountBalance {
+  balance: number
+  loan_balance: number
+}
+
+export function DashboardOverview() {
+  const [virtualAccount, setVirtualAccount] = useState<VirtualAccount | null>(null)
+  const [accountBalance, setAccountBalance] = useState<AccountBalance | null>(null)
+  const [userName, setUserName] = useState<string>("User")
+  const [loading, setLoading] = useState(true)
+  const [showBalance, setShowBalance] = useState(true)
+  const [creatingAccount, setCreatingAccount] = useState(false)
+  const { toast } = useToast()
+
+  useEffect(() => {
+    // Only fetch data if we're in the browser (not during SSR)
+    if (typeof window !== 'undefined') {
+      fetchDashboardData()
+    }
+  }, [])
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true)
+      console.log("🔍 Fetching dashboard data...")
+      
+      // Check if we're authenticated by trying to get user profile first
+      const profileRes = await fetch("/api/auth/get-user-profile")
+      console.log("📱 Profile response status:", profileRes.status)
+      
+      if (!profileRes.ok) {
+        console.log("❌ User not authenticated, skipping data fetch")
+        setLoading(false)
+        return
+      }
+      
+      const profileData = await profileRes.json()
+      console.log("📱 Profile data:", profileData)
+      if (profileData.profile) {
+        const fullName = `${profileData.profile.first_name || ""} ${profileData.profile.last_name || ""}`.trim() || profileData.user.email || "User"
+        setUserName(fullName)
+      }
+      
+      // Fetch virtual account from database
+      console.log("🏦 Fetching virtual account from database...")
+      const virtualAccountRes = await fetch("/api/virtual-account")
+      console.log("🏦 Virtual account response status:", virtualAccountRes.status)
+      if (virtualAccountRes.ok) {
+        const virtualAccountData = await virtualAccountRes.json()
+        console.log("🏦 Virtual account data:", virtualAccountData)
+        if (virtualAccountData.success && virtualAccountData.virtualAccount) {
+          setVirtualAccount(virtualAccountData.virtualAccount)
+        }
+      } else {
+        console.log("❌ Virtual account response not ok:", virtualAccountRes.status, virtualAccountRes.statusText)
+        try {
+          const errorData = await virtualAccountRes.json()
+          console.log("❌ Virtual account error data:", errorData)
+        } catch (e) {
+          console.log("❌ Could not parse virtual account error response")
+        }
+      }
+
+      // Fetch account balance from database
+      console.log("💰 Fetching account balance from database...")
+      const balanceRes = await fetch("/api/account-balance")
+      console.log("💰 Balance response status:", balanceRes.status)
+      if (balanceRes.ok) {
+        const balanceData = await balanceRes.json()
+        console.log("💰 Balance data from database:", balanceData)
+        setAccountBalance(balanceData)
+      } else {
+        console.log("❌ Balance response not ok:", balanceRes.status, balanceRes.statusText)
+        try {
+          const errorData = await balanceRes.json()
+          console.log("❌ Balance error data:", errorData)
+        } catch (e) {
+          console.log("❌ Could not parse balance error response")
+        }
+      }
+    } catch (error) {
+      console.error("❌ Error fetching dashboard data:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const createVirtualAccount = async () => {
+    try {
+      setCreatingAccount(true)
+      // Still use Paystack API to create the account
+      const response = await fetch("/api/paystack/virtual-account", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      })
+      
+      const data = await response.json()
+      
+      if (data.success) {
+        toast({
+          title: "Success",
+          description: "Virtual account created successfully!",
+        })
+        // Refresh data to show the newly created account from database
+        fetchDashboardData()
+      } else {
+        toast({
+          title: "Error",
+          description: data.error || "Failed to create virtual account",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create virtual account",
+        variant: "destructive",
+      })
+    } finally {
+      setCreatingAccount(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="max-w-6xl mx-auto space-y-6">
+      {/* Welcome Message */}
+      <div className="text-center mb-6">
+        <h1 className="text-3xl font-bold text-gray-900">
+          Welcome back, {userName}
+        </h1>
+      </div>
+
+      {/* Main Account Card */}
+      <Card className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
+        <CardContent className="p-6">
+          {/* Balance Section */}
+          <div className="flex justify-between items-start mb-6">
+            <div className="text-center w-full">
+              <p className="text-blue-100 text-sm">Account Balance</p>
+              <div className="flex items-center justify-center gap-2">
+                <span className="text-3xl font-bold">
+                  {showBalance ? `₦${accountBalance?.balance?.toLocaleString() || '0'}` : '₦****'}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-white hover:bg-blue-500 p-1"
+                  onClick={() => setShowBalance(!showBalance)}
+                >
+                  {showBalance ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+              <p className="text-blue-200 text-sm mt-1">
+                & Loan Balance ₦{accountBalance?.loan_balance?.toLocaleString() || '0'}
+              </p>
+              {/* Debug info - remove in production */}
+              <p className="text-blue-200 text-xs mt-1">
+                Debug: Balance={accountBalance?.balance}, Loan={accountBalance?.loan_balance}
+              </p>
+            </div>
+          </div>
+
+          {/* Quick Actions */}
+          <div className="grid grid-cols-3 gap-4 mb-6">
+            <Link href="/account/fund">
+              <Button variant="secondary" className="w-full h-16 flex flex-col items-center justify-center gap-2 bg-white text-blue-600 hover:bg-gray-50">
+                <Plus className="h-6 w-6" />
+                <span className="text-sm font-medium">Fund</span>
+              </Button>
+            </Link>
+            
+            <Link href="/account/transfer">
+              <Button variant="secondary" className="w-full h-16 flex flex-col items-center justify-center gap-2 bg-white text-blue-600 hover:bg-gray-50">
+                <ArrowLeftRight className="h-6 w-6" />
+                <span className="text-sm font-medium">Transfer</span>
+              </Button>
+            </Link>
+            
+            <Link href="/loans">
+              <Button variant="secondary" className="w-full h-16 flex flex-col items-center justify-center gap-2 bg-white text-blue-600 hover:bg-gray-50">
+                <TrendingUp className="h-6 w-6" />
+                <span className="text-sm font-medium">Loans</span>
+              </Button>
+            </Link>
+          </div>
+
+          {/* Virtual Account Section */}
+          <div className="border-t border-blue-500 pt-4">
+            <p className="text-blue-100 text-sm mb-2 text-center">Your Virtual Account:</p>
+            {virtualAccount ? (
+              <div className="flex items-center justify-center gap-4">
+                <div className="text-center">
+                  <p className="text-xl font-bold">{virtualAccount.account_number}</p>
+                  <p className="text-blue-200 text-sm">{virtualAccount.bank_name}</p>
+                  {/* Debug info - remove in production */}
+                  <p className="text-blue-200 text-xs">
+                    Debug: {JSON.stringify(virtualAccount)}
+                  </p>
+                </div>
+                <Badge className={virtualAccount.assigned ? "bg-green-500" : "bg-yellow-500"}>
+                  {virtualAccount.assigned ? "Active" : "Pending"}
+                </Badge>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Wallet className="h-5 w-5 text-blue-200" />
+                  <span className="text-blue-200">No virtual account</span>
+                </div>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={createVirtualAccount}
+                  disabled={creatingAccount}
+                  className="bg-white text-blue-600 hover:bg-gray-50"
+                >
+                  {creatingAccount ? "Creating..." : "Create"}
+                </Button>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Additional Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Recent Transactions */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg text-center">Recent Transactions</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center py-8 text-gray-500">
+              <Wallet className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+              <p>No recent transactions</p>
+              <Link href="/transactions">
+                <Button variant="outline" className="mt-4">
+                  View All Transactions
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Quick Stats */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg text-center">Quick Stats</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Total Deposits</span>
+                <span className="font-semibold">₦0</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Total Transfers</span>
+                <span className="font-semibold">₦0</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Active Loans</span>
+                <span className="font-semibold text-red-600">₦0</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  )
+}

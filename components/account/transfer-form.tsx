@@ -59,10 +59,7 @@ export function TransferForm({ currentBalance }: TransferFormProps) {
   const [nipChargeLoading, setNipChargeLoading] = useState(false)
   const [nipChargeError, setNipChargeError] = useState<string | null>(null)
 
-  // Wallet info state
-  const [walletInfo, setWalletInfo] = useState<{ walletNumber: string, availableBalance: string } | null>(null)
-  const [walletLoading, setWalletLoading] = useState(false)
-  const [walletError, setWalletError] = useState<string | null>(null)
+  // Removed ALAT wallet state; transfers are processed via Paystack
 
   // Fetch beneficiaries
   useEffect(() => {
@@ -164,37 +161,7 @@ export function TransferForm({ currentBalance }: TransferFormProps) {
     }
   }, [amount])
 
-  // Fetch wallet info on mount
-  useEffect(() => {
-    async function fetchWallet() {
-      setWalletLoading(true)
-      setWalletError(null)
-      try {
-        // Get account number from localStorage or props (if available)
-        let accountNumber = null
-        try {
-          const userProfile = JSON.parse(localStorage.getItem("userProfile") || "null")
-          accountNumber = userProfile?.profile?.account_number
-        } catch {}
-        if (!accountNumber) return setWalletError("No account number found")
-        const res = await fetch(`/api/alat/wallet/get-wallet-balance?accountNumber=${accountNumber}`, { credentials: "include" })
-        const data = await res.json()
-        if (data.result && data.result.walletNumber && data.result.availableBalance) {
-          setWalletInfo({
-            walletNumber: data.result.walletNumber,
-            availableBalance: data.result.availableBalance,
-          })
-        } else {
-          setWalletError("Could not fetch wallet info")
-        }
-      } catch (err) {
-        setWalletError("Could not fetch wallet info")
-      } finally {
-        setWalletLoading(false)
-      }
-    }
-    fetchWallet()
-  }, [])
+  // Removed ALAT wallet fetch effect
 
   // Handle form submission
   async function onSubmit(values: FormValues) {
@@ -208,15 +175,14 @@ export function TransferForm({ currentBalance }: TransferFormProps) {
         setIsSubmitting(false)
         return
       }
-      // Generate required fields
-      const transactionReference = `TRF-${Date.now()}-${Math.floor(Math.random() * 10000)}`
-      const timestamp = new Date().toISOString()
-      let sourceAccountNumber = walletInfo?.walletNumber
+
+      // Determine destination details from mode
       let destinationAccountNumber = ""
       let destinationBankCode = ""
       let destinationBankName = ""
       let destinationAccountName = ""
-      if (values.mode === "beneficiary") {
+
+      if (mode === "beneficiary") {
         const beneficiary = beneficiaries.find(b => b.id === values.beneficiaryId)
         if (!beneficiary) {
           setError("Please select a beneficiary")
@@ -238,39 +204,54 @@ export function TransferForm({ currentBalance }: TransferFormProps) {
         destinationBankName = banks.find(b => b.code === destinationBankCode)?.name || ""
         destinationAccountName = accountName
       }
-      // Validate all required fields
-      if (!transactionReference || !values.amount || !timestamp || !sourceAccountNumber || !destinationAccountNumber) {
-        setError("Missing required transaction details. Please check your input.")
-        setIsSubmitting(false)
-        return
-      }
-      let payload: any = {
-        transactionReference,
-        amount: values.amount,
-        timestamp,
-        sourceAccountNumber,
-        destinationAccountNumber,
-        destinationBankCode,
-        destinationBankName,
-        destinationAccountName,
-        narration: values.reason,
-        useCustomNarration: true,
-      }
-      // Call process transfer API
-      const res = await fetch("/api/alat/debit/process-transfer", {
+
+      // Create/ensure Paystack transfer recipient
+      const recipientRes = await fetch("/api/paystack/transferrecipient", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          type: "nuban",
+          name: destinationAccountName,
+          account_number: destinationAccountNumber,
+          bank_code: destinationBankCode,
+          currency: "NGN",
+        }),
       })
-      const data = await res.json()
-      if (!res.ok || data.error) {
-        setError(data.message || data.error || "Transfer failed")
+      const recipientData = await recipientRes.json()
+      if (!recipientRes.ok || recipientData.status === false) {
+        setError(recipientData.message || recipientData.error || "Failed to create transfer recipient")
         setIsSubmitting(false)
         return
       }
+      const recipientCode = recipientData.data?.recipient_code || recipientData.recipient_code
+      if (!recipientCode) {
+        setError("Could not obtain recipient code from payment provider")
+        setIsSubmitting(false)
+        return
+      }
+
+      // Initiate Paystack transfer via our API
+      const transferRes = await fetch("/api/transfer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: values.amount,
+          bankName: destinationBankName,
+          accountNumber: destinationAccountNumber,
+          accountName: destinationAccountName,
+          recipientCode,
+          reason: values.reason,
+        }),
+      })
+      const transferData = await transferRes.json()
+      if (!transferRes.ok || transferData.error) {
+        setError(transferData.message || transferData.error || "Transfer failed")
+        setIsSubmitting(false)
+        return
+      }
+
       setSuccess(true)
-      setTransactionDetails(data)
+      setTransactionDetails(transferData)
       form.reset()
     } catch (err) {
       setError("An unexpected error occurred. Please try again.")
@@ -282,18 +263,7 @@ export function TransferForm({ currentBalance }: TransferFormProps) {
   return (
     <Card className="w-full">
       <CardHeader>
-        <div className="flex flex-col gap-2 mb-2">
-          {walletLoading ? (
-            <div className="text-sm text-blue-700">Loading account info...</div>
-          ) : walletInfo ? (
-            <div className="flex flex-col md:flex-row md:items-center md:gap-6 gap-1">
-              <div className="text-sm text-gray-700">Account Number: <span className="font-mono font-bold">{walletInfo.walletNumber}</span></div>
-              <div className="text-sm text-gray-700">Current Balance: <span className="font-bold">₦{Number(walletInfo.availableBalance).toLocaleString()}</span></div>
-            </div>
-          ) : walletError ? (
-            <div className="text-sm text-red-600">{walletError}</div>
-          ) : null}
-        </div>
+        {/* Removed ALAT wallet info/error header */}
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8">
             <ArrowLeft className="h-4 w-4" />

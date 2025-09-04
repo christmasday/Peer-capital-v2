@@ -272,9 +272,9 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
           // Only update settings if balance is 0
           const { success, error } = await updateLoanHelperSettings(
             profile.id,
-            0, // loan amount
-            0, // interest rate
-            0, // repayment time
+            0, // loan amounT
+            0, // interest ratE
+            0, // repayment timE
             "months", // repayment unit
             "", // terms and conditions
           );
@@ -1575,7 +1575,7 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
           setWalletApiResponse(data);
           if (data.error || data.status === "error") {
             // If error, delete correlationId from DB
-            const result = await updateProfile({ correlationId: null }, profile.id);
+            const result = await updateProfile({ correlationId: undefined }, profile.id);
             console.log("[Wallet] Deleted correlationId after error:", result);
             // Optionally, refresh the profile or reload the page
             // window.location.reload();
@@ -1622,7 +1622,7 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
           setWalletApiResponse(data);
           if (data.error || data.status === "error") {
             // If error, delete correlationId from DB
-            const result = await updateProfile({ correlationId: null }, profile.id);
+            const result = await updateProfile({ correlationId: undefined }, profile.id);
             console.log("[Wallet] Deleted correlationId after error:", result);
             // Optionally, refresh the profile or reload the page
             // window.location.reload();
@@ -2711,68 +2711,65 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
               <CardTitle className="text-lg">Wallet</CardTitle>
             </CardHeader>
             <CardContent>
-              <Button
-                onClick={async () => {
-                  if (profile.correlationId) {
-                    // If correlationId exists, proceed to send API request to Alat
-                    setIsCreatingWallet(true);
-                    try {
-                      const res = await fetch("/api/alat/wallet/create-wallet", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          phoneNumber: profile.phone_number,
-                          email: profile.email,
-                          correlationId: profile.correlationId,
-                          bvn: profile.bvn,
-                        }),
-                      });
-                      const data = await res.json();
-                      setWalletApiResponse(data);
-                      if (data.error || data.status === "error") {
-                        // If error, delete correlationId from DB
-                        const result = await updateProfile({ correlationId: null }, profile.id);
-                        console.log("[Wallet] Deleted correlationId after error:", result);
-                        // Optionally, refresh the profile or reload the page
-                        // window.location.reload();
-                      }
-                    } catch (err) {
-                      setWalletApiResponse({ error: err instanceof Error ? err.message : String(err) });
-                    } finally {
-                      setIsCreatingWallet(false);
-                    }
-                  } else {
-                    // If not, open the face verification page
-                    const width = 400, height = 600;
-                    const left = window.screenX + (window.outerWidth - width) / 2;
-                    const top = window.screenY + (window.outerHeight - height) / 2;
-                    const x_tk = process.env.NEXT_PUBLIC_ALAT_API_KEY;
-                    const redirectUri = window.location.origin + window.location.pathname + window.location.search;
-                    window.open(
-                      `https://face-verification-dev.azurewebsites.net/?bvn=${profile.bvn}&x_tk=${x_tk}&rd_uri=${redirectUri}`,
-                      'FaceVerification',
-                      `width=${width},height=${height},left=${left},top=${top},resizable,scrollbars`
-                    );
-                  }
-                }}
-                className="w-full mb-6"
-              >
-                Create Wallet
-              </Button>
-              {isCreatingWallet && <div className="text-blue-600">Creating wallet...</div>}
-              {walletApiResponse && (
-                <Dialog open={!!walletApiResponse} onOpenChange={() => setWalletApiResponse(null)}>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Wallet Creation Result</DialogTitle>
-                    </DialogHeader>
-                    <div className="text-sm bg-gray-100 p-4 rounded text-gray-800">
-                      {walletApiResponse.message || "Unknown error"}
-                </div>
-                    <Button onClick={() => setWalletApiResponse(null)} className="mt-4">Close</Button>
-                  </DialogContent>
-                </Dialog>
-              )}
+              {/* Paystack Virtual Account Details */}
+              <div className="mb-6">
+                <h3 className="text-md font-semibold mb-3">Virtual Account Details</h3>
+                {virtualAccount ? (
+                  <div className="space-y-3 p-4 bg-gray-50 rounded-lg">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Account Number:</span>
+                      <span className="font-mono text-sm font-medium">{virtualAccount.account_number}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Account Name:</span>
+                      <span className="text-sm font-medium">{virtualAccount.account_name}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Bank:</span>
+                      <span className="text-sm font-medium">{virtualAccount.bank_name}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Currency:</span>
+                      <span className="text-sm font-medium">{virtualAccount.currency}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Status:</span>
+                      <Badge className={virtualAccount.assigned ? "bg-green-500" : "bg-yellow-500"}>
+                        {virtualAccount.assigned ? "Active" : "Pending"}
+                      </Badge>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center p-6 bg-gray-50 rounded-lg">
+                    <Wallet className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                    <p className="text-gray-600 mb-3">No virtual account found</p>
+                    <Button
+                                             onClick={async () => {
+                         try {
+                           const res = await fetch("/api/paystack/virtual-account", {
+                             method: "POST",
+                             headers: { "Content-Type": "application/json" },
+                           });
+                           const data = await res.json();
+                           if (data.success) {
+                             toast({ title: "Success", description: "Virtual account created successfully!" });
+                             // Refresh the page to show the new virtual account
+                             window.location.reload();
+                           } else {
+                             toast({ title: "Error", description: data.error || "Failed to create virtual account", variant: "destructive" });
+                           }
+                         } catch (error) {
+                           toast({ title: "Error", description: "Failed to create virtual account", variant: "destructive" });
+                         }
+                       }}
+                      className="w-full"
+                    >
+                      Create Virtual Account
+                    </Button>
+                  </div>
+                )}
+              </div>
+
               {/* BVN Display and Inline Edit */}
               <div className="mb-4">
                 <label className="block font-medium mb-1">BVN</label>
@@ -2792,10 +2789,10 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
                       <Button variant="outline" onClick={handleCancelBvn} disabled={isSavingBvn}>Cancel</Button>
                       <Button onClick={handleSaveBvn} disabled={isSavingBvn || bvnText === (profile.bvn || "") || bvnText.length !== 11}>
                         {isSavingBvn ? "Saving..." : "Save"}
-                  </Button>
+                      </Button>
                     </div>
-                        </div>
-                      ) : (
+                  </div>
+                ) : (
                   <div className="flex items-center gap-2">
                     <span className="text-gray-900 font-mono">{profile.bvn || "Not set"}</span>
                     {/* Only show Edit button if wallet account details are NOT present */}
@@ -2803,10 +2800,12 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
                       <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setIsEditingBvn(true)}>
                         <Edit className="h-4 w-4" />
                       </Button>
-                      )}
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              
             </CardContent>
           </Card>
         )}

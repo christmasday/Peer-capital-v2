@@ -25,17 +25,17 @@ export default async function TransferPage() {
       userName={userProfile.profile?.first_name || "User"}
       userImage={userProfile.profile?.profile_picture_url || "/vibrant-street-market.png"}
     >
-      <div className="max-w-6xl mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="max-w-4xl mx-auto">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
           <div className="lg:col-span-2">
             <TransferForm currentBalance={accountBalance} />
           </div>
 
-          <div className="space-y-6">
+          <div className="space-y-6 text-center">
             {/* Account Summary */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Account Summary</CardTitle>
+                <CardTitle className="text-lg text-center">Account Summary</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
@@ -71,46 +71,7 @@ export default async function TransferPage() {
               </CardContent>
             </Card>
 
-            {/* Transfer Information */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Transfer Information</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-start gap-2">
-                  <Clock className="h-5 w-5 text-blue-600 mt-0.5" />
-                  <div>
-                    <p className="font-medium">Processing Time</p>
-                    <p className="text-sm text-gray-500">
-                      Transfers are typically processed within 24 hours during business days.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-2">
-                  <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
-                  <div>
-                    <p className="font-medium">Transfer Limits</p>
-                    <p className="text-sm text-gray-500">
-                      Minimum: ₦1,000
-                      <br />
-                      Maximum: ₦1,000,000 per transaction
-                      <br />
-                      Daily limit: ₦5,000,000
-                    </p>
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t text-sm text-gray-500">
-                  <p>
-                    For transfers above ₦1,000,000, please contact our support team at{" "}
-                    <a href="mailto:support@peercapital.com" className="text-blue-600">
-                      support@peercapital.com
-                    </a>
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+            {/* Transfer Information removed per request */}
           </div>
         </div>
       </div>

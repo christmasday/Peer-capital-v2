@@ -58,6 +58,7 @@ export async function createVirtualAccount() {
       return { error: "You must be logged in to create a virtual account" }
     }
 
+    console.log("🔍 createVirtualAccount - Auth user ID:", userId)
 
     // Get user profile data
     const { data: profile, error: profileError } = await adminClient
@@ -67,8 +68,11 @@ export async function createVirtualAccount() {
       .single()
 
     if (profileError || !profile) {
+      console.log("❌ Could not fetch user profile for auth user:", userId, "Error:", profileError)
       return { error: "Could not fetch user profile" }
     }
+
+    console.log("✅ Found profile:", profile.id, "for auth user:", userId)
 
     // Get the user's email using our robust helper function
     const userEmail = await getUserEmail(userId)
@@ -186,49 +190,62 @@ export async function getVirtualAccount(emailOrUserId?: string) {
   try {
     const adminClient = createAdminClient()
 
-    let email = emailOrUserId;
-    // If not provided, get the current user's email
+    let userId = emailOrUserId;
+    let profileId = null;
+    
+    // If not provided, get the current user's ID
     if (!emailOrUserId) {
-      const userId = await getCurrentUserId()
+      userId = await getCurrentUserId()
       if (!userId) {
         return { error: "You must be logged in to view virtual account details" }
       }
-      // Fetch email from profile
+      
+      // Get the profile ID from the auth user ID
       const { data: profile, error: profileError } = await adminClient
         .from("profiles")
-        .select("email")
-        .eq("id", userId)
+        .select("id")
+        .eq("auth_user_id", userId)
         .single()
-      if (profileError || !profile?.email) {
-        return { error: "Could not determine your email address" }
+      
+      if (profileError || !profile?.id) {
+        console.log("❌ Could not find profile for auth user:", userId, "Error:", profileError)
+        return { error: "Could not determine profile ID" }
       }
-      email = profile.email
+      
+      profileId = profile.id
+      console.log("✅ Found profile ID:", profileId, "for auth user:", userId)
     } else if (emailOrUserId && emailOrUserId.includes("@")) {
-      // Already an email
-      email = emailOrUserId
-    } else {
-      // If a user id is provided, fetch the email
+      // If an email is provided, get the user ID
       const { data: profile, error: profileError } = await adminClient
         .from("profiles")
-        .select("email")
-        .eq("id", emailOrUserId)
+        .select("id")
+        .eq("email", emailOrUserId)
         .single()
-      if (profileError || !profile?.email) {
-        return { error: "Could not determine your email address" }
+      if (profileError || !profile?.id) {
+        return { error: "Could not determine user ID" }
       }
-      email = profile.email
+      profileId = profile.id
+    } else {
+      // Assume it's already a profile ID
+      profileId = emailOrUserId
     }
 
-    if (!email || typeof email !== "string") {
-      return { error: "Could not determine your email address" };
+    // Handle build-time "offline-user" case
+    if (profileId === "offline-user" || !profileId || typeof profileId !== "string") {
+      console.log("⚠️ Skipping virtual account fetch for build-time user:", profileId)
+      return { success: false, message: "No virtual account found" };
     }
+
+    console.log("🔍 getVirtualAccount - Looking for profile_id:", profileId)
 
     // 1. Check the local database for the virtual account
     const { data: virtualAccount, error } = await adminClient
       .from("virtual_accounts")
       .select("*")
-      .eq("email", email)
+      .eq("user_id", profileId)
       .single()
+
+    console.log("🏦 Database query result:", { virtualAccount, error })
 
     if (virtualAccount) {
       return { success: true, virtualAccount };
@@ -243,7 +260,19 @@ export async function getVirtualAccount(emailOrUserId?: string) {
     if (!PAYSTACK_SECRET_KEY) {
       return { error: "Paystack secret key not configured" };
     }
-    const url = `https://api.paystack.co/customer/${encodeURIComponent(email)}`;
+    
+    // Get user email for Paystack API call
+    const { data: profile, error: profileError } = await adminClient
+      .from("profiles")
+      .select("email")
+      .eq("id", profileId)
+      .single()
+    
+    if (profileError || !profile?.email) {
+      return { error: "Could not determine user email" }
+    }
+    
+    const url = `https://api.paystack.co/customer/${encodeURIComponent(profile.email)}`;
     const response = await fetch(url, {
       method: "GET",
       headers: {
@@ -257,16 +286,9 @@ export async function getVirtualAccount(emailOrUserId?: string) {
       if (customer.dedicated_account) {
         // Upsert the dedicated account into the virtual_accounts table
         const va = customer.dedicated_account;
-        // Look up user_id by email
-        const { data: userProfile } = await adminClient
-          .from("profiles")
-          .select("id")
-          .eq("email", email)
-          .single();
-        const user_id = userProfile?.id || null;
         const virtualAccountData = {
-          email: email,
-          user_id: user_id,
+          email: profile.email,
+          user_id: profileId,
           account_number: va.account_number,
           account_name: va.account_name,
           bank_name: va.bank_name || va.bank?.name,
@@ -279,7 +301,7 @@ export async function getVirtualAccount(emailOrUserId?: string) {
         };
         await adminClient
           .from("virtual_accounts")
-          .upsert([virtualAccountData], { onConflict: "email" });
+          .upsert([virtualAccountData], { onConflict: "user_id" });
         return { success: true, virtualAccount: virtualAccountData, paystackCustomer: customer };
       }
     }

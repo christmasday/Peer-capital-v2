@@ -5,6 +5,9 @@ import { checkAuth } from "@/lib/auth-utils"
 import { getMaxLoanAmountByLender, getTotalAmountGivenByLender } from "@/lib/actions/find-lenders"
 import { getVirtualAccount } from "@/lib/actions/paystack"
 
+// Force dynamic rendering to prevent static generation issues
+export const dynamic = 'force-dynamic'
+
 export default async function HomePage() {
   // Check authentication
   await checkAuth()
