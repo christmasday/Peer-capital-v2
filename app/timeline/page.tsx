@@ -16,6 +16,7 @@ export default function TimelinePage() {
   const [commentsMap, setCommentsMap] = useState<Record<string, any[]>>({})
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [deletingPost, setDeletingPost] = useState<string | null>(null)
+  const [userFirstName, setUserFirstName] = useState<string>("")
 
   useEffect(() => {
     ;(async () => {
@@ -26,10 +27,9 @@ export default function TimelinePage() {
           setTimeline([])
         } else {
           const data = await res.json()
-          console.log("Timeline API response (first post):", data.posts?.[0])
-          console.log("Current user ID from API:", data.currentUserId)
           setTimeline(data.posts || [])
           setCurrentUserId(data.currentUserId || null)
+          setUserFirstName(data.userFirstName || "")
         }
       } catch (_) {
         setError("Failed to load timeline.")
@@ -68,7 +68,6 @@ export default function TimelinePage() {
         const tl = await fetch("/api/timeline", { credentials: "include" })
         if (tl.ok) {
           const data = await tl.json()
-          console.log("After like - first post:", data.posts?.[0])
           setTimeline(data.posts || [])
         }
       }
@@ -158,7 +157,9 @@ export default function TimelinePage() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">what's up?</h1>
+      <h1 className="text-2xl font-bold text-gray-900 mb-6">
+        What's up{userFirstName ? `, ${userFirstName}` : ""}?
+      </h1>
 
       {/* Create Post */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6">
@@ -241,27 +242,18 @@ export default function TimelinePage() {
                   </div>
                   
                   {/* Delete button - only show for post owner */}
-                  {(() => {
-                    const shouldShow = currentUserId && p.user_id === currentUserId
-                    console.log(`Delete button check for post ${p.id}:`, {
-                      currentUserId,
-                      postUserId: p.user_id,
-                      shouldShow,
-                      match: currentUserId === p.user_id
-                    })
-                    return shouldShow && (
-                      <button
-                        className="flex items-center gap-1 text-red-600 hover:text-red-700 transition-colors"
-                        onClick={() => deletePost(p.id)}
-                        disabled={deletingPost === p.id}
-                        aria-label="Delete post"
-                        style={{ cursor: 'pointer' }}
-                      >
-                        <Trash2 className="h-5 w-5" />
-                        {deletingPost === p.id && <span className="text-xs">Deleting...</span>}
-                      </button>
-                    )
-                  })()}
+                  {currentUserId && p.user_id === currentUserId && (
+                    <button
+                      className="flex items-center gap-1 text-red-600 hover:text-red-700 transition-colors"
+                      onClick={() => deletePost(p.id)}
+                      disabled={deletingPost === p.id}
+                      aria-label="Delete post"
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <Trash2 className="h-5 w-5" />
+                      {deletingPost === p.id && <span className="text-xs">Deleting...</span>}
+                    </button>
+                  )}
                 </div>
                 {commentFor === p.id && (
                   <div className="mt-3 border-t pt-3">

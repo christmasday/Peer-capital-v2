@@ -125,7 +125,7 @@ export function NotificationsDropdown({ open, onOpenChange, onNotificationRead }
   return (
     <DropdownMenu open={open !== undefined ? open : isOpen} onOpenChange={handleOpenChange}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative">
+        <Button variant="ghost" size="icon" className="relative group transition-all">
           <NotificationBadge />
         </Button>
       </DropdownMenuTrigger>

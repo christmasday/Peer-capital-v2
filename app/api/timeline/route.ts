@@ -15,15 +15,16 @@ export async function GET(req: NextRequest) {
     // Resolve profile using auth user ID (profiles.id == auth user id)
     const { data: profile, error: profileError } = await admin
       .from("profiles")
-      .select("id")
+      .select("id, first_name")
       .eq("id", authUserId)
       .single()
 
     if (profileError || !profile) {
-      return NextResponse.json({ posts: [] })
+      return NextResponse.json({ posts: [], currentUserId: null, userFirstName: "" })
     }
 
     const profileId = profile.id
+    const userFirstName = profile.first_name || ""
 
     // Get followed profile IDs
     const { data: following, error: followErr } = await admin
@@ -33,7 +34,7 @@ export async function GET(req: NextRequest) {
       .eq("status", "active")
 
     if (followErr) {
-      return NextResponse.json({ posts: [] })
+      return NextResponse.json({ posts: [], currentUserId: profileId, userFirstName })
     }
 
     const followingIds = (following || []).map((f) => f.following_id)
@@ -60,7 +61,7 @@ export async function GET(req: NextRequest) {
 
     if (error) {
       console.error("Error fetching posts:", error)
-      return NextResponse.json({ posts: [] })
+      return NextResponse.json({ posts: [], currentUserId: profileId, userFirstName })
     }
 
     // Get profile information for each post
@@ -86,19 +87,16 @@ export async function GET(req: NextRequest) {
       let hasCommented = false
       let hasReposted = false
       // Like
-      const { data: likeRecord, error: likeError } = await admin
+      const { data: likeRecord } = await admin
         .from("post_likes").select("id").eq("post_id", post.id).eq("user_id", profileId).maybeSingle()
-      console.log(`[Timeline] Checking like for post ${post.id}, user ${profileId}:`, likeRecord, likeError)
       if (likeRecord?.id) hasLiked = true
       // Comment
-      const { data: commentRecord, error: commentError } = await admin
+      const { data: commentRecord } = await admin
         .from("post_comments").select("id").eq("post_id", post.id).eq("user_id", profileId).maybeSingle()
-      console.log(`[Timeline] Checking comment for post ${post.id}, user ${profileId}:`, commentRecord, commentError)
       if (commentRecord?.id) hasCommented = true
       // Repost
-      const { data: repostRecord, error: repostError } = await admin
+      const { data: repostRecord } = await admin
         .from("reposts").select("id").eq("post_id", post.id).eq("user_id", profileId).maybeSingle()
-      console.log(`[Timeline] Checking repost for post ${post.id}, user ${profileId}:`, repostRecord, repostError)
       if (repostRecord?.id) hasReposted = true
       // Add as top-level keys!
       return {
@@ -118,14 +116,9 @@ export async function GET(req: NextRequest) {
         hasReposted: !!hasReposted,
       }
     }))
-    if (formattedPosts.length > 0) {
-      // Print first post for debugging
-      // eslint-disable-next-line no-console
-      console.log("First timeline API post:", formattedPosts[0])
-    }
-    return NextResponse.json({ posts: formattedPosts, currentUserId: profileId })
+    return NextResponse.json({ posts: formattedPosts, currentUserId: profileId, userFirstName })
   } catch {
-    return NextResponse.json({ posts: [], currentUserId: null })
+    return NextResponse.json({ posts: [], currentUserId: null, userFirstName: "" })
   }
 }
 

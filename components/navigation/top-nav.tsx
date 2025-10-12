@@ -191,15 +191,15 @@ export function TopNav({ userName, userImage, hideSearch }: TopNavProps) {
 
           {/* Timeline Link */}
           <Link href="/timeline" className="hidden md:block">
-            <Button variant="ghost" size="icon" className={`relative ${pathname.startsWith("/timeline") ? "text-blue-700" : ""}`}>
-              <Activity className="h-5 w-5 text-gray-700" />
+            <Button variant="ghost" size="icon" className={`relative group transition-all ${pathname.startsWith("/timeline") ? "text-blue-700" : ""}`}>
+              <Activity className="h-5 w-5 text-gray-700 transition-all duration-300 group-hover:fill-blue-500 group-hover:text-blue-500" />
             </Button>
           </Link>
 
           {/* Messages Dropdown */}
           <div className="relative">
-            <Button variant="ghost" size="icon" className="relative" onClick={() => setMessagesOpen((o) => !o)}>
-              <MessageCircle className="h-5 w-5 text-gray-700" />
+            <Button variant="ghost" size="icon" className="relative group transition-all" onClick={() => setMessagesOpen((o) => !o)}>
+              <MessageCircle className="h-5 w-5 text-gray-700 transition-all duration-300 group-hover:fill-green-500 group-hover:text-green-500" />
               {unreadMessages > 0 && (
                 <span className="absolute top-1 right-1 h-5 w-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
                   {unreadMessages > 9 ? "9+" : unreadMessages}

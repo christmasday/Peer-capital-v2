@@ -44,7 +44,7 @@ export function NotificationBadge({ className }: NotificationBadgeProps) {
 
   return (
     <div className={`relative ${className || ""}`}>
-      <Bell className="h-5 w-5" />
+      <Bell className="h-5 w-5 transition-all duration-300 group-hover:fill-yellow-500 group-hover:text-yellow-500" />
       {!loading && !error && unreadCount > 0 && (
         <Badge
           className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center p-0 bg-red-500 text-white"

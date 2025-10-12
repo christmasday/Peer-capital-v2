@@ -26,13 +26,11 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ po
     return NextResponse.json({ liked: false })
   } else {
     // Insert only if not exists; handle error gracefully if violated
-    console.log(`[Like] Inserting like for post ${postId}, user ${userId}`)
-    const { data: insertData, error: insertError } = await db.from("post_likes").insert({ 
+    const { error: insertError } = await db.from("post_likes").insert({ 
       id: uuidv4(),
       post_id: postId, 
       user_id: userId 
     })
-    console.log(`[Like] Insert result:`, insertData, insertError)
     if (insertError) {
       console.error(`[Like] Failed to insert:`, insertError)
       return NextResponse.json({ error: "Failed to like post" }, { status: 500 })
