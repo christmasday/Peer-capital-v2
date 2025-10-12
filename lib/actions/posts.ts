@@ -23,7 +23,7 @@ async function getCurrentUserId() {
     // If session method fails, try JWT
     try {
       const { getJWTFromCookies, verifyJWT } = await import("@/lib/jwt")
-      const jwt = getJWTFromCookies()
+      const jwt = await getJWTFromCookies()
       if (jwt) {
         const { payload, error } = await verifyJWT(jwt)
         if (!error && payload && (payload.userId || payload.sub)) {

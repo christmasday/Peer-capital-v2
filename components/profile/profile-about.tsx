@@ -9,7 +9,7 @@ import { updateSocialMedia } from "@/lib/actions/profile"
 import { updateBio } from "@/lib/actions/profile"
 import { updateProfile, uploadIdDocument, uploadLendingLicenseServer } from "@/lib/actions/profile"
 import { getLoanHelperSettings, updateLoanHelperSettings } from "@/lib/actions/loan-helper-settings"
-import { getVirtualAccount, createVirtualAccount, validateCustomerIdentification } from "@/lib/actions/paystack"
+// Removed Paystack virtual account integration
 import { getAccountBalance } from "@/lib/actions/account"
 import { Textarea } from "@/components/ui/textarea"
 import { createAdminClient } from "@/lib/supabase/admin"
@@ -171,6 +171,10 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
   const [correlationId, setCorrelationId] = useState<string | null>(null);
   const [walletApiResponse, setWalletApiResponse] = useState<any>(null);
   const [isCreatingWallet, setIsCreatingWallet] = useState(false);
+  // (1) Add new state hooks inside your main component (below other hooks):
+  const [isOtpModalOpen, setOtpModalOpen] = useState(false);
+  const [otpInput, setOtpInput] = useState("");
+  const [otpErrorMsg, setOtpErrorMsg] = useState("");
 
   const searchParams = useSearchParams();
   const correlationIdFromUrl = searchParams.get("c_id") || searchParams.get("correlationID");
@@ -211,9 +215,9 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
     { id: "contact", name: "Contact and basic info", icon: Phone },
     { id: "details", name: "Details about you", icon: User },
     { id: "lending-licence", name: "Lending Licence", icon: Briefcase },
-    { id: "bank", name: "Bank Account details", icon: Briefcase },
+    { id: "bank", name: "Repayment Account", icon: Briefcase },
     { id: "loan-helper", name: "Loan helper settings", icon: Briefcase },
-    ...(isCurrentUser ? [{ id: "wallet", name: "Wallet", icon: WalletIcon }] : []),
+    // Wallet removed per request
   ]
 
   useEffect(() => {
@@ -306,40 +310,11 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
     fetchLoanHelper();
   }, [activeSection, loanHelperLoaded, profile.id]);
 
-  // Fetch virtual account on mount (only for current user)
-  useEffect(() => {
-    if (isCurrentUser && profile.id) {
-      setIsLoadingVA(true)
-      getVirtualAccount(profile.id).then((res) => {
-        setVirtualAccount(res.virtualAccount || null)
-        setVaError(res.error || null)
-        setIsLoadingVA(false)
-      })
-    }
-  }, [isCurrentUser, profile.id])
+  // Virtual account removed
 
-  // Fetch countries on mount
-  useEffect(() => {
-    setIsLoadingCountries(true);
-    fetch("https://api.paystack.co/country", { headers: { Authorization: `Bearer ${process.env.NEXT_PUBLIC_PAYSTACK_KEY}` } })
-      .then(res => res.json())
-      .then(data => {
-        setCountries(data.data || []);
-        setIsLoadingCountries(false);
-      });
-  }, []);
+  // Paystack countries fetch removed
 
-  // Fetch banks when country changes
-  useEffect(() => {
-    if (!country) return;
-    setIsLoadingBanks(true);
-    fetch(`https://api.paystack.co/bank?country=${encodeURIComponent(country)}`, { headers: { Authorization: `Bearer ${process.env.NEXT_PUBLIC_PAYSTACK_KEY}` } })
-      .then(res => res.json())
-      .then(data => {
-        setBanks(data.data || []);
-        setIsLoadingBanks(false);
-      });
-  }, [country]);
+  // Paystack banks fetch removed
 
   useEffect(() => {
     // If initialSection is 'about', default to 'overview'
@@ -350,27 +325,7 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
     }
   }, [initialSection]);
 
-  useEffect(() => {
-    let pollInterval: NodeJS.Timeout | null = null;
-    if (paystackResponse && paystackResponse.inProgress && isCurrentUser && activeSection === "virtual-account") {
-      pollInterval = setInterval(async () => {
-        const res = await getVirtualAccount();
-        if (res && res.virtualAccount) {
-          setVirtualAccount(res.virtualAccount);
-          setPaystackResponse(null);
-          toast({
-            title: "Virtual Account Created",
-            description: "Your virtual account is now ready!",
-            variant: "default",
-          });
-          if (pollInterval) clearInterval(pollInterval);
-        }
-      }, 10000); // Poll every 10 seconds
-    }
-    return () => {
-      if (pollInterval) clearInterval(pollInterval);
-    };
-  }, [paystackResponse, isCurrentUser, activeSection, toast]);
+  // Paystack polling removed
 
   useEffect(() => {
     if (!isCurrentUser && profile.id) {
@@ -1148,34 +1103,41 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
     'bold', 'italic', 'underline', 'list', 'bullet', 'link',
   ];
 
-  // Add BVN verification handler
+  // Add BVN verification handler (Stablesrail onboard-user)
   async function handleVerifyBvn() {
     setIsVerifyingBvn(true);
     setBvnVerificationMsg(null);
     setBvnError(null);
     try {
-      const res = await fetch("/api/paystack/validate-account", {
+      // Persist BVN first
+      if (bvnText && bvnText.length === 11 && bvnText !== (profile.bvn || "")) {
+        const saved = await updateProfile({ bvn: bvnText })
+        if (!saved?.success) {
+          setBvnError(saved?.error || "Failed to save BVN before verification")
+          setIsVerifyingBvn(false)
+          return
+        }
+      }
+
+      const res = await fetch("/api/stablesrail/onboard-user", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          account_number: profile.account_number,
-          bank_code: profile.bank_code,
-          bvn: bvnText,
-        }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setBvnVerified(true);
-        setBvnVerificationMsg("BVN verified successfully!");
+        credentials: "include",
+        body: JSON.stringify({ bvn: bvnText }),
+      })
+      const data = await res.json()
+      if (res.ok && data?.success) {
+        setBvnVerified(false)
+        setBvnVerificationMsg("BVN verification initiated. We'll notify you once it's completed.")
       } else {
-        setBvnVerified(false);
-        setBvnVerificationMsg(data.error || "Verification failed");
+        setBvnVerified(false)
+        setBvnVerificationMsg(data?.error || "Verification initiation failed")
       }
     } catch (err: any) {
-      setBvnVerified(false);
-      setBvnVerificationMsg("Verification failed. Please try again.");
+      setBvnVerified(false)
+      setBvnVerificationMsg("Verification initiation failed. Please try again.")
     } finally {
-      setIsVerifyingBvn(false);
+      setIsVerifyingBvn(false)
     }
   }
 
@@ -1655,6 +1617,33 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
       updateProfile({ correlationId: correlationIdFromUrl }, profile.id);
     }
   }, [correlationIdFromUrl, profile.id, profile.correlationId]);
+
+  // (2) Add callback for OTP verify
+  async function handleVerifyOtp() {
+    setIsVerifyingOtp(true);
+    setOtpErrorMsg("");
+    try {
+      const res = await fetch("/api/stablesrail/verify-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ code: otpInput, sessionId: profile.correlation_id || profile.correlationId }),
+      });
+      const data = await res.json();
+      if (res.ok && data?.success) {
+        setBvnVerified(true);
+        toast({title:"BVN Verified", description:"Your BVN has been successfully verified."});
+        setOtpModalOpen(false);
+        setOtpInput("");
+      } else {
+        setOtpErrorMsg(data?.error || "Verification failed. Please try again.");
+      }
+    } catch (err) {
+      setOtpErrorMsg("Verification failed. Please try again.");
+    } finally {
+      setIsVerifyingOtp(false);
+    }
+  }
 
   if (isBlocked && !isCurrentUser) {
     return (
@@ -2600,7 +2589,8 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
 
         {activeSection === "bank" && (
           <div className="space-y-6">
-            <h2 className="text-xl font-medium">Bank Account Details</h2>
+            <h2 className="text-xl font-medium">Repayment Account</h2>
+            <div className="text-sm text-gray-600">BVN: {profile.bvn || "Not provided"}</div>
             <div className="flex justify-between items-center mb-4">
               <span className="font-medium">Your Accounts</span>
               {isCurrentUser && (
@@ -2796,9 +2786,24 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
                   <div className="flex items-center gap-2">
                     <span className="text-gray-900 font-mono">{profile.bvn || "Not set"}</span>
                     {/* Only show Edit button if wallet account details are NOT present */}
-                    {!(profile.account_number && profile.account_name) && (
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setIsEditingBvn(true)}>
+                    {!(profile.account_number && profile.account_name) && !profile.bvn_verified && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        onClick={() => setIsEditingBvn(true)}
+                      >
                         <Edit className="h-4 w-4" />
+                      </Button>
+                    )}
+                    {isCurrentUser && !profile.bvn_verified && profile.correlation_id && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => setOtpModalOpen(true)}
+                        className="ml-2"
+                      >
+                        Verify
                       </Button>
                     )}
                   </div>
@@ -2837,13 +2842,12 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
                     setOtpError("");
                     try {
                       const phoneToUse = walletPhoneNumber || profile.phone_number;
-                      const res = await fetch("/api/alat/wallet/validate-nin-otp", {
+                      const res = await fetch("/api/stablesrail/verify-otp", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
-                          phoneNumber: phoneToUse,
-                          otp,
-                          trackingId: trackingId,
+                          code: otp,
+                          sessionId: profile.correlation_id || profile.correlationId,
                         }),
                       });
                       const data = await res.json();
@@ -2937,6 +2941,32 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
                 </Button>
               </DialogFooter>
       </div>
+          </DialogContent>
+        </Dialog>
+        {/* OTP Dialog for BVN Verification */}
+        <Dialog open={isOtpModalOpen} onOpenChange={setOtpModalOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Verify BVN with OTP</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3">
+              <input
+                type="text"
+                placeholder="Enter OTP"
+                value={otpInput}
+                onChange={e => setOtpInput(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
+                maxLength={6}
+                className="border px-3 py-2 w-full rounded"
+                disabled={isVerifyingOtp}
+              />
+              {otpErrorMsg && <div className="text-red-600 text-sm">{otpErrorMsg}</div>}
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" onClick={()=>setOtpModalOpen(false)} disabled={isVerifyingOtp}>Cancel</Button>
+                <Button onClick={handleVerifyOtp} disabled={otpInput.length!==6 || isVerifyingOtp}>
+                  {isVerifyingOtp? "Verifying..." : "Submit"}
+                </Button>
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
         {!isCurrentUser && (

@@ -74,9 +74,7 @@ export function TopNav({ userName, userImage, hideSearch }: TopNavProps) {
   const displayImage = userImage || localUserImage
 
   const navItems = [
-    { href: "/home", label: "Home", icon: Home },
-    { href: "/loans", label: "Loans", icon: Wallet },
-    { href: "/transactions", label: "Transactions", icon: BarChart2 },
+    // Home link removed per request
   ]
 
   useEffect(() => {
@@ -169,10 +167,34 @@ export function TopNav({ userName, userImage, hideSearch }: TopNavProps) {
         <div className="flex items-center gap-4">
           {/* Search */}
           {!hideSearch && (
-            <Button variant="ghost" size="icon" className="relative" onClick={() => setSearchOpen(true)}>
-              <Search className="h-5 w-5 text-gray-700" />
-            </Button>
+            <div className="relative">
+              <div className="hidden md:flex items-center">
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Search users..."
+                    className="w-64 rounded-full border border-gray-200 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        setSearchOpen(true)
+                      }
+                    }}
+                  />
+                  <Search className="h-4 w-4 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+              </div>
+              <Button variant="ghost" size="icon" className="md:hidden relative" onClick={() => setSearchOpen(true)}>
+                <Search className="h-5 w-5 text-gray-700" />
+              </Button>
+            </div>
           )}
+
+          {/* Timeline Link */}
+          <Link href="/timeline" className="hidden md:block">
+            <Button variant="ghost" size="icon" className={`relative ${pathname.startsWith("/timeline") ? "text-blue-700" : ""}`}>
+              <Activity className="h-5 w-5 text-gray-700" />
+            </Button>
+          </Link>
 
           {/* Messages Dropdown */}
           <div className="relative">
@@ -363,6 +385,18 @@ export function TopNav({ userName, userImage, hideSearch }: TopNavProps) {
                       </Link>
                     )
                   })}
+                  <Link
+                    href="/timeline"
+                    onClick={() => setIsMenuOpen(false)}
+                    className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                      pathname.startsWith("/timeline")
+                        ? "bg-blue-50 text-blue-700 font-medium"
+                        : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                    }`}
+                  >
+                    <Activity className="h-5 w-5" />
+                    <span>Timeline</span>
+                  </Link>
                   <Link
                     href="/messages"
                     onClick={() => setIsMenuOpen(false)}

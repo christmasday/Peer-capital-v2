@@ -107,7 +107,7 @@ export function DashboardOverview() {
     try {
       setCreatingAccount(true)
       // Still use Paystack API to create the account
-      const response = await fetch("/api/paystack/virtual-account", {
+      const response = await fetch("/api/virtual-account", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       })
@@ -210,41 +210,7 @@ export function DashboardOverview() {
             </Link>
           </div>
 
-          {/* Virtual Account Section */}
-          <div className="border-t border-blue-500 pt-4">
-            <p className="text-blue-100 text-sm mb-2 text-center">Your Virtual Account:</p>
-            {virtualAccount ? (
-              <div className="flex items-center justify-center gap-4">
-                <div className="text-center">
-                  <p className="text-xl font-bold">{virtualAccount.account_number}</p>
-                  <p className="text-blue-200 text-sm">{virtualAccount.bank_name}</p>
-                  {/* Debug info - remove in production */}
-                  <p className="text-blue-200 text-xs">
-                    Debug: {JSON.stringify(virtualAccount)}
-                  </p>
-                </div>
-                <Badge className={virtualAccount.assigned ? "bg-green-500" : "bg-yellow-500"}>
-                  {virtualAccount.assigned ? "Active" : "Pending"}
-                </Badge>
-              </div>
-            ) : (
-              <div className="flex items-center justify-center gap-4">
-                <div className="flex items-center gap-2">
-                  <Wallet className="h-5 w-5 text-blue-200" />
-                  <span className="text-blue-200">No virtual account</span>
-                </div>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={createVirtualAccount}
-                  disabled={creatingAccount}
-                  className="bg-white text-blue-600 hover:bg-gray-50"
-                >
-                  {creatingAccount ? "Creating..." : "Create"}
-                </Button>
-              </div>
-            )}
-          </div>
+          {/* Virtual account removed */}
         </CardContent>
       </Card>
 

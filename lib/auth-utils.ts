@@ -11,7 +11,7 @@ export async function checkAuth() {
   const { createServerClient } = await import("@/lib/supabase/server")
 
   // Try JWT first
-  const jwt = getJWTFromCookies()
+  const jwt = await getJWTFromCookies()
   if (jwt) {
     const { payload, error } = await verifyJWT(jwt)
     if (!error && payload) {
@@ -21,7 +21,7 @@ export async function checkAuth() {
 
   // Try Supabase session as fallback
   try {
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     const supabase = createServerClient(cookieStore)
     const { data } = await supabase.auth.getSession()
 
@@ -32,13 +32,14 @@ export async function checkAuth() {
   }
 
   // Check for custom auth token
-  const customAuthToken = cookies().get("custom-auth-token")?.value
+  const cookieStore2 = await cookies()
+  const customAuthToken = cookieStore2.get("custom-auth-token")?.value
   if (customAuthToken) {
     return { authenticated: true }
   }
 
   // Check for auth bypass
-  const authBypass = cookies().get("auth-bypass")?.value
+  const authBypass = cookieStore2.get("auth-bypass")?.value
   if (authBypass === "true") {
     return { authenticated: true }
   }
@@ -53,7 +54,7 @@ export async function checkAuth() {
 export async function getCurrentUserId() {
   try {
     // First try to get user ID from JWT
-    const jwt = getJWTFromCookies()
+    const jwt = await getJWTFromCookies()
     if (jwt) {
       try {
         const { payload, error } = await verifyJWT(jwt)
@@ -69,7 +70,7 @@ export async function getCurrentUserId() {
     }
 
     // If no JWT, try to get from Supabase session
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     const supabase = createServerClient(cookieStore)
     const {
       data: { session },

@@ -8,7 +8,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 export async function checkAuthStatus() {
   try {
     // Try JWT first
-    const jwt = getJWTFromCookies()
+    const jwt = await getJWTFromCookies()
     if (jwt) {
       const { payload, error } = await verifyJWT(jwt)
       if (!error && payload && (payload.sub || payload.userId)) {

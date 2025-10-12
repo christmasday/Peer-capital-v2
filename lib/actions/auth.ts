@@ -81,7 +81,7 @@ export async function refreshJWT(currentToken: string) {
     }
 
     // Set the new JWT in cookies
-    const cookieSet = setJWTCookie(jwt)
+    const cookieSet = await setJWTCookie(jwt)
 
     if (!cookieSet) {
       return { error: "Failed to set authentication cookie" }
@@ -242,7 +242,7 @@ export async function signIn(formData: FormData) {
         // Continue with session as fallback
       } else if (generatedJwt) {
         // Set JWT in cookies
-        const cookieSet = setJWTCookie(generatedJwt)
+        const cookieSet = await setJWTCookie(generatedJwt)
         jwt = generatedJwt
       }
     } catch (jwtError) {
@@ -1323,11 +1323,11 @@ export async function resetPassword(formData: FormData) {
 export async function signOut() {
   try {
     // Clear JWT cookies
-    clearJWTCookies()
+    await clearJWTCookies()
 
     // Set a signout cookie immediately
     try {
-      const cookieStore = cookies()
+      const cookieStore = await cookies()
       cookieStore.set("auth-signout", "true", {
         path: "/",
         maxAge: 60, // 60 seconds
@@ -1388,7 +1388,7 @@ export async function getUserProfile() {
     }
 
     // Get user ID from JWT
-    const jwt = getJWTFromCookies()
+    const jwt = await getJWTFromCookies()
     let userId = null
 
     if (jwt) {
@@ -1605,7 +1605,7 @@ export async function changePassword(currentPassword: string, newPassword: strin
 
     if (!userId) {
       // Try to get user ID from JWT
-      const jwt = getJWTFromCookies()
+      const jwt = await getJWTFromCookies()
       if (jwt) {
         try {
           const { payload, error } = await verifyJWT(jwt)

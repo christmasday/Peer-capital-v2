@@ -33,7 +33,7 @@ async function getCurrentUserId() {
     // Method 2: Try to get user from JWT
     try {
       const { getJWTFromCookies, verifyJWT } = await import("@/lib/jwt")
-      const jwt = getJWTFromCookies()
+      const jwt = await getJWTFromCookies()
       if (jwt) {
         const { payload, error } = await verifyJWT(jwt)
         if (!error && payload && (payload.userId || payload.sub)) {

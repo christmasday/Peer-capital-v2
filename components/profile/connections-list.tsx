@@ -220,7 +220,7 @@ export function ConnectionsList({ userId, initialFollowersCount, initialFollowin
     try {
       // Call Paystack transferrecipient API
       const bankCode = beneficiaryBanks.find(b => b.name === beneficiaryBank)?.code
-      const res = await fetch("/api/paystack/transferrecipient", {
+      const res = await fetch("/api/virtual-account", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

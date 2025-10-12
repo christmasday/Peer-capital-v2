@@ -743,6 +743,115 @@ export interface Database {
             email?: string | null
           }
         }
+      posts: {
+        Row: {
+          id: string
+          user_id: string
+          content: string
+          image_url: string | null
+          image_sizes: any | null
+          created_at: string
+          updated_at: string
+          likes_count: number
+          comments_count: number
+          shares_count: number
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          content: string
+          image_url?: string | null
+          image_sizes?: any | null
+          created_at?: string
+          updated_at?: string
+          likes_count?: number
+          comments_count?: number
+          shares_count?: number
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          content?: string
+          image_url?: string | null
+          image_sizes?: any | null
+          created_at?: string
+          updated_at?: string
+          likes_count?: number
+          comments_count?: number
+          shares_count?: number
+        }
+      }
+      post_comments: {
+        Row: {
+          id: string
+          post_id: string
+          user_id: string
+          content: string
+          created_at: string
+          updated_at: string
+          likes_count: number
+        }
+        Insert: {
+          id?: string
+          post_id: string
+          user_id: string
+          content: string
+          created_at?: string
+          updated_at?: string
+          likes_count?: number
+        }
+        Update: {
+          id?: string
+          post_id?: string
+          user_id?: string
+          content?: string
+          created_at?: string
+          updated_at?: string
+          likes_count?: number
+        }
+      }
+      post_likes: {
+        Row: {
+          id: string
+          post_id: string | null
+          comment_id: string | null
+          user_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          post_id?: string | null
+          comment_id?: string | null
+          user_id: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          post_id?: string | null
+          comment_id?: string | null
+          user_id?: string
+          created_at?: string
+        }
+      }
+      reposts: {
+        Row: {
+          id: string
+          post_id: string
+          user_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          post_id: string
+          user_id: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          post_id?: string
+          user_id?: string
+          created_at?: string
+        }
       }
     Views: {
       [_ in never]: never

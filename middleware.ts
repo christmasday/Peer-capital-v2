@@ -22,7 +22,8 @@ export async function middleware(req: NextRequest) {
     "/disclaimers",
     "/about-us",
     "/risk-disclosure",
-    "/aml-policy"
+    "/aml-policy",
+    "/kyc-policy"
   ]
   const path = req.nextUrl.pathname
 

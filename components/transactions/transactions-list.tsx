@@ -39,15 +39,8 @@ export function TransactionsList() {
           setLoading(false)
           return
         }
-        const res = await fetch("/api/alat/wallet/wallet-transaction-history", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ accountNumber }),
-        })
-        const data = await res.json()
-        // Assume data.result is an array of transactions
-        setTransactions(data.result || [])
+        // ALAT history removed: use empty list
+        setTransactions([])
       } catch (err: any) {
         setError(err.message || "Failed to fetch transactions")
       } finally {

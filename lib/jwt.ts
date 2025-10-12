@@ -50,9 +50,9 @@ export async function verifyJWT(token: string) {
 }
 
 // Set JWT in cookies
-export function setJWTCookie(jwt: string) {
+export async function setJWTCookie(jwt: string) {
   try {
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     cookieStore.set(JWT_COOKIE_NAME, jwt, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -77,9 +77,9 @@ export function setJWTCookie(jwt: string) {
 }
 
 // Get JWT from cookies (server-side)
-export function getJWTFromCookies() {
+export async function getJWTFromCookies() {
   try {
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     return cookieStore.get(JWT_COOKIE_NAME)?.value
   } catch (error) {
     return null
@@ -87,9 +87,9 @@ export function getJWTFromCookies() {
 }
 
 // Clear JWT cookies
-export function clearJWTCookies() {
+export async function clearJWTCookies() {
   try {
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     cookieStore.set(JWT_COOKIE_NAME, "", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",

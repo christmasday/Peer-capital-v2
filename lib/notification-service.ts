@@ -17,11 +17,25 @@ export interface NotificationEvent {
 export async function isUserLoggedIn(userId: string): Promise<boolean> {
   try {
     const adminClient = createAdminClient()
+    // Resolve to auth user id if a profile id was supplied
+    let resolvedUserId = userId
+    try {
+      // Check if id exists in auth.users
+      const { data: authCheck } = await adminClient.auth.admin.getUserById(userId)
+      if (!authCheck?.user) {
+        const { data: profile } = await adminClient
+          .from("profiles")
+          .select("auth_user_id")
+          .eq("id", userId)
+          .single()
+        if (profile?.auth_user_id) resolvedUserId = profile.auth_user_id
+      }
+    } catch {}
     
     const { data: activeSessions, error } = await adminClient
       .from("user_sessions")
       .select("id")
-      .eq("user_id", userId)
+      .eq("user_id", resolvedUserId)
       .eq("is_active", true)
       .gte("expires_at", new Date().toISOString())
       .limit(1)
@@ -183,13 +197,26 @@ export async function sendNotificationEmail(event: NotificationEvent): Promise<b
 export async function trackUserSession(userId: string, action: 'login' | 'logout', sessionToken?: string, userAgent?: string, ipAddress?: string) {
   try {
     const adminClient = createAdminClient()
+    // Resolve to auth user id if a profile id was supplied
+    let resolvedUserId = userId
+    try {
+      const { data: authCheck } = await adminClient.auth.admin.getUserById(userId)
+      if (!authCheck?.user) {
+        const { data: profile } = await adminClient
+          .from("profiles")
+          .select("auth_user_id")
+          .eq("id", userId)
+          .single()
+        if (profile?.auth_user_id) resolvedUserId = profile.auth_user_id
+      }
+    } catch {}
     
     if (action === 'login') {
       // Create new session
       const { error } = await adminClient
         .from("user_sessions")
         .insert({
-          user_id: userId,
+          user_id: resolvedUserId,
           session_token: sessionToken || `session_${Date.now()}`,
           is_active: true,
           user_agent: userAgent,
@@ -205,7 +232,7 @@ export async function trackUserSession(userId: string, action: 'login' | 'logout
       const { error } = await adminClient
         .from("user_sessions")
         .update({ is_active: false })
-        .eq("user_id", userId)
+        .eq("user_id", resolvedUserId)
         .eq("is_active", true)
 
       if (error) {

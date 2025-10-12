@@ -167,7 +167,7 @@ export async function createLoanRequest({
 export async function getUserLoanRequests() {
   try {
     // Check for JWT first
-    const jwt = getJWTFromCookies()
+    const jwt = await getJWTFromCookies()
     let userId = null
 
     if (jwt) {

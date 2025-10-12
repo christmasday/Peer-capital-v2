@@ -52,7 +52,7 @@ export async function getUserTransactions(supabase: SupabaseClient<Database>) {
 export async function getTransactionById(id: string) {
   try {
     // Check for JWT first
-    const jwt = getJWTFromCookies()
+    const jwt = await getJWTFromCookies()
     let userId = null
 
     if (jwt) {

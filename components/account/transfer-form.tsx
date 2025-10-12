@@ -85,7 +85,8 @@ export function TransferForm({ currentBalance }: TransferFormProps) {
     setBanksLoading(true)
     setBanksError(null)
     try {
-      const res = await fetch("/api/alat/debit/get-banks", { credentials: "include" })
+      // ALAT endpoint removed: disable banks fetch
+      const res = new Response(JSON.stringify({ banks: [] }), { status: 200 }) as any
       if (!res.ok) throw new Error("Failed to fetch banks")
       const data = await res.json()
       // Map the API response to the expected format (include logo)
@@ -128,7 +129,8 @@ export function TransferForm({ currentBalance }: TransferFormProps) {
       setAccountValidationLoading(true)
       setAccountValidationError(null)
       setAccountName("")
-      fetch(`/api/alat/debit/destination-account-enquiry?accountNumber=${accountNumber}&bankCode=${bankCode}`, { credentials: "include" })
+      // ALAT endpoint removed: skip destination enquiry
+      Promise.resolve({ ok: true })
         .then(async (res) => {
           const data = await res.json()
           if (res.ok && data.accountName) {
@@ -147,7 +149,8 @@ export function TransferForm({ currentBalance }: TransferFormProps) {
     if (amount && amount > 0) {
       setNipChargeLoading(true)
       setNipChargeError(null)
-      fetch(`/api/alat/debit/get-nip-charges?amount=${amount}`, { credentials: "include" })
+      // ALAT endpoint removed: skip nip charges
+      Promise.resolve({ ok: true })
         .then(async (res) => {
           const data = await res.json()
           if (res.ok && data.charge) {
@@ -206,7 +209,7 @@ export function TransferForm({ currentBalance }: TransferFormProps) {
       }
 
       // Create/ensure Paystack transfer recipient
-      const recipientRes = await fetch("/api/paystack/transferrecipient", {
+      const recipientRes = await fetch("/api/virtual-account", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

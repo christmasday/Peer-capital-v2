@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Eye, Plus, ArrowRightLeft, TrendingUp, ArrowDown, Search, Loader2, AlertCircle, Info } from "lucide-react"
+import { Eye, EyeOff, Plus, ArrowRightLeft, TrendingUp, ArrowDown, Search, Loader2, AlertCircle, Info } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { HelperCard } from "@/components/helpers/helper-card"
 import { Button } from "@/components/ui/button"
@@ -11,10 +11,9 @@ import { useToast } from "@/hooks/use-toast"
 interface HomeContentProps {
   userProfile: any
   loanHelpers: any[]
-  virtualAccount?: any
 }
 
-export function HomeContent({ userProfile, loanHelpers, virtualAccount }: HomeContentProps) {
+export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
   const { toast } = useToast()
   const [loanAmount, setLoanAmount] = useState<string>("")
   const [loanDuration, setLoanDuration] = useState<string>("")
@@ -25,6 +24,13 @@ export function HomeContent({ userProfile, loanHelpers, virtualAccount }: HomeCo
   const [walletInfo, setWalletInfo] = useState<{ walletNumber: string, availableBalance: string } | null>(null)
   const [walletLoading, setWalletLoading] = useState(false)
   const [walletError, setWalletError] = useState<string | null>(null)
+  const [timeline, setTimeline] = useState<any[]>([])
+  const [timelineLoading, setTimelineLoading] = useState(true)
+  const [newPost, setNewPost] = useState(0)
+  const [postContent, setPostContent] = useState("")
+  const [accountBalance, setAccountBalance] = useState<{ balance: number; loan_balance: number } | null>(null)
+  const [showBalance, setShowBalance] = useState(true)
+  const [userVirtualAccount, setUserVirtualAccount] = useState<{ account_number: string; bank_name: string } | null>(null)
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-NG", {
@@ -38,6 +44,38 @@ export function HomeContent({ userProfile, loanHelpers, virtualAccount }: HomeCo
     // Skip ALAT wallet fetching for now - we'll use database data instead
     setWalletLoading(false)
     setWalletError(null)
+    // Load account balance and timeline
+    ;(async () => {
+      try {
+        // Account balance API removed; leave zeros
+        setAccountBalance({ balance: 0, loan_balance: 0 })
+
+        // Fetch timeline
+        const res = await fetch("/api/timeline", {
+          credentials: 'include'
+        })
+        if (res.ok) {
+          const data = await res.json()
+          setTimeline(data.posts || [])
+        }
+
+        // Fetch user's virtual account from DB via Stablesrail proxy
+        try {
+          const vaRes = await fetch('/api/stablesrail/virtual-account', { credentials: 'include' })
+          if (vaRes.ok) {
+            const vaJson = await vaRes.json()
+            if (vaJson?.data?.account_number) {
+              setUserVirtualAccount({
+                account_number: vaJson.data.account_number,
+                bank_name: vaJson.data.bank_name || 'Stablesrail',
+              })
+            }
+          }
+        } catch {}
+      } finally {
+        setTimelineLoading(false)
+      }
+    })()
   }, [])
 
   const handleFindLenders = async () => {
@@ -120,62 +158,74 @@ export function HomeContent({ userProfile, loanHelpers, virtualAccount }: HomeCo
           {/* Removed the notification button with Bell icon */}
         </div>
 
-        {/* Dashboard Grid */}
+        {/* Dashboard + Quick Loan Request */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-6">
-          {/* Account Card */}
+          {/* Dashboard only (timeline removed) */}
           <div className="lg:col-span-2">
-            <div className="w-full rounded-xl bg-blue-700 p-5 text-white overflow-hidden relative h-full">
-              <div className="absolute bottom-0 right-0 w-64 h-64 bg-blue-600 rounded-full -mr-20 -mb-20"></div>
-
-              <div className="relative z-10">
-                <div className="flex justify-between items-center mb-1.5">
-                  <div className="text-base font-medium">Account Balance</div>
-                  <button className="text-white">
-                    <Eye className="h-4 w-4" />
-                  </button>
-                </div>
-                {/* Display account balance from database */}
-                <div className="text-2xl font-bold mb-2">{formatCurrency(userProfile.account?.balance || 0)}</div>
-
-                <div className="text-sm opacity-90 mb-6">
-                  &amp; Loan Balance {formatCurrency(userProfile.account?.loan_balance || 0)}
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <Link href="/account/fund" className="flex flex-col items-center">
-                    <div className="bg-white p-2 rounded-lg mb-2">
-                      <Plus className="h-12 w-12 text-blue-700" />
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+              <div className="mb-5">
+                <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl p-5">
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="text-center w-full">
+                      <p className="text-blue-100 text-xs">Account Balance</p>
+                      <div className="flex items-center justify-center gap-2">
+                        <span className="text-2xl font-bold">
+                          {showBalance ? `₦${(accountBalance?.balance ?? 0).toLocaleString()}` : '₦****'}
+                        </span>
+                        <button className="text-white/80" onClick={() => setShowBalance(!showBalance)}>
+                          {showBalance ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                      <p className="text-blue-200 text-xs mt-1">& Loan Balance ₦{(accountBalance?.loan_balance ?? 0).toLocaleString()}</p>
                     </div>
-                    <span className="text-xs">Fund</span>
-                  </Link>
-
-                  <Link href="/account/transfer" className="flex flex-col items-center">
-                    <div className="bg-white p-2 rounded-lg mb-2">
-                      <ArrowRightLeft className="h-12 w-12 text-blue-700" />
-                    </div>
-                    <span className="text-xs">Transfer</span>
-                  </Link>
-
-                  <Link href="/loans" className="flex flex-col items-center">
-                    <div className="bg-white p-2 rounded-lg mb-2">
-                      <TrendingUp className="h-12 w-12 text-blue-700" />
-                    </div>
-                    <span className="text-xs">Loans</span>
-                  </Link>
-                </div>
-
-                {/* Virtual Account Display - use database data */}
-                {virtualAccount ? (
-                  <div className="mt-8">
-                    <span className="text-xs text-blue-100 block">Your virtual account:</span>
-                    <span className="font-mono text-xl font-bold tracking-widest">{virtualAccount.account_number}</span>
-                    <span className="text-xs text-blue-100 ml-1">{virtualAccount.bank_name}</span>
                   </div>
-                ) : (
-                  <Link href="/profile?tab=about">
-                    <Button variant="secondary" size="sm" className="mt-8">Create Virtual Account</Button>
-                  </Link>
-                )}
+                  <div className="mt-4">
+                    <p className="text-blue-100 text-xs">Your Virtual Account:</p>
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg tracking-widest font-semibold">{userVirtualAccount?.account_number || '— — — — — — — — —'}</span>
+                      {userVirtualAccount?.bank_name && (
+                        <span className="text-blue-200 text-xs">{userVirtualAccount.bank_name}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-4 mt-5">
+                    <Button
+                      variant="secondary"
+                      className="w-full h-16 flex flex-col items-center justify-center gap-2 bg-white text-blue-600 hover:bg-gray-50"
+                      onClick={() =>
+                        toast({
+                          title: 'Unavailable',
+                          description: 'Funding is currently disabled.',
+                        })
+                      }
+                    >
+                      <Plus className="h-6 w-6" />
+                      <span className="text-sm font-medium">Fund</span>
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      className="w-full h-16 flex flex-col items-center justify-center gap-2 bg-white text-blue-600 hover:bg-gray-50"
+                      onClick={() =>
+                        toast({
+                          title: 'Unavailable',
+                          description: 'Transfers are currently disabled.',
+                        })
+                      }
+                    >
+                      <ArrowRightLeft className="h-6 w-6" />
+                      <span className="text-sm font-medium">Transfer</span>
+                    </Button>
+                    <Link href="/timeline" className="w-full">
+                      <Button
+                        variant="secondary"
+                        className="w-full h-16 flex flex-col items-center justify-center gap-2 bg-white text-blue-600 hover:bg-gray-50"
+                      >
+                        <TrendingUp className="h-6 w-6" />
+                        <span className="text-sm font-medium">Timeline</span>
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
