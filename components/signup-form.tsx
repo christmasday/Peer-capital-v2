@@ -1,714 +1,715 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { AlertCircle, Info } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Progress } from "@/components/ui/progress"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { PersonalInfoStep } from "@/components/signup-steps/personal-info-step"
-import { AddressStep } from "@/components/signup-steps/address-step"
-import { SecurityStep } from "@/components/signup-steps/security-step"
-import { FinalStep } from "@/components/signup-steps/final-step"
-import { signUp, checkUserExists } from "@/lib/actions/auth"
-import { initializeStorage } from "@/lib/actions/storage"
-import { uploadProfilePicture } from "@/lib/actions/upload"
-import Link from "next/link"
+import { Progress } from "@/components/ui/progress"
+import { CheckCircle, AlertCircle, Loader2, ArrowLeft } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 
-export type SignupFormData = {
-  firstName: string
-  middleName: string
-  lastName: string
-  email: string
-  phoneNumber: string
+// Step 1: BVN Verification
+function BVNVerificationStep({ 
+  bvn, 
+  setBvn, 
+  onNext, 
+  loading, 
+  error 
+}: {
   bvn: string
-  dateOfBirth: string
-  address: string
-  city: string
-  state: string
-  zipCode: string
-  country: string
-  bankCode: string
-  password: string
-  confirmPassword: string
-  profilePicture: File | null
-  acceptTerms: boolean
-  referralCode: string
+  setBvn: (bvn: string) => void
+  onNext: () => void
+  loading: boolean
+  error: string | null
+}) {
+  const [bvnError, setBvnError] = useState<string | null>(null)
+
+  const validateBVN = (value: string) => {
+    if (!value.trim()) {
+      return "BVN is required"
+    }
+    if (!/^\d{11}$/.test(value)) {
+      return "BVN must be exactly 11 digits"
+    }
+    return null
+  }
+
+  const handleVerify = () => {
+    const validationError = validateBVN(bvn)
+    if (validationError) {
+      setBvnError(validationError)
+      return
+    }
+    setBvnError(null)
+    onNext()
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="text-center">
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Verify Your BVN</h2>
+        <p className="text-gray-600">Enter your Bank Verification Number to begin account creation</p>
+      </div>
+
+      <div className="space-y-4">
+        <div>
+          <Label htmlFor="bvn" className="text-sm font-medium text-gray-700">
+            Bank Verification Number (BVN)
+          </Label>
+          <Input
+            id="bvn"
+            type="text"
+            placeholder="Enter your 11-digit BVN"
+            value={bvn}
+            onChange={(e) => {
+              const value = e.target.value.replace(/\D/g, '') // Only allow digits
+              if (value.length <= 11) {
+                setBvn(value)
+                setBvnError(null)
+              }
+            }}
+            className="mt-1"
+            maxLength={11}
+            disabled={loading}
+          />
+          {bvnError && (
+            <p className="mt-1 text-sm text-red-600">{bvnError}</p>
+          )}
+        </div>
+
+        {error && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        <Button 
+          onClick={handleVerify} 
+          disabled={loading || !bvn.trim()}
+          className="w-full"
+        >
+          {loading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Verifying BVN...
+            </>
+          ) : (
+            "Verify BVN"
+          )}
+        </Button>
+      </div>
+    </div>
+  )
 }
 
+// Step 2: OTP Verification Modal
+function OTPVerificationStep({ 
+  otp, 
+  setOtp, 
+  onNext, 
+  onBack, 
+  loading, 
+  error,
+  requestId 
+}: {
+  otp: string
+  setOtp: (otp: string) => void
+  onNext: () => void
+  onBack: () => void
+  loading: boolean
+  error: string | null
+  requestId: string | null
+}) {
+  const [otpError, setOtpError] = useState<string | null>(null)
+
+  const validateOTP = (value: string) => {
+    if (!value.trim()) {
+      return "OTP is required"
+    }
+    if (!/^\d{6}$/.test(value)) {
+      return "OTP must be exactly 6 digits"
+    }
+    return null
+  }
+
+  const handleVerifyOTP = () => {
+    const validationError = validateOTP(otp)
+    if (validationError) {
+      setOtpError(validationError)
+      return
+    }
+    setOtpError(null)
+    onNext()
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="text-center">
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Verify OTP</h2>
+        <p className="text-gray-600">Enter the 6-digit OTP sent to your registered phone number</p>
+        {requestId && (
+          <p className="text-sm text-gray-500 mt-2">Reference: {requestId.slice(-8)}</p>
+        )}
+      </div>
+
+      <div className="space-y-4">
+        <div>
+          <Label htmlFor="otp" className="text-sm font-medium text-gray-700">
+            One-Time Password (OTP)
+          </Label>
+          <Input
+            id="otp"
+            type="text"
+            placeholder="Enter 6-digit OTP"
+            value={otp}
+            onChange={(e) => {
+              const value = e.target.value.replace(/\D/g, '') // Only allow digits
+              if (value.length <= 6) {
+                setOtp(value)
+                setOtpError(null)
+              }
+            }}
+            className="mt-1 text-center text-2xl tracking-widest"
+            maxLength={6}
+            disabled={loading}
+          />
+          {otpError && (
+            <p className="mt-1 text-sm text-red-600">{otpError}</p>
+          )}
+        </div>
+
+        {error && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        <div className="flex gap-3">
+          <Button 
+            type="button"
+            variant="outline" 
+            onClick={onBack}
+            disabled={loading}
+            className="flex-1"
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back
+          </Button>
+          <Button 
+            onClick={handleVerifyOTP} 
+            disabled={loading || !otp.trim()}
+            className="flex-1"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Verifying...
+              </>
+            ) : (
+              "Verify OTP"
+            )}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Step 3: User Details Collection
+function UserDetailsStep({ 
+  formData, 
+  setFormData, 
+  onSubmit, 
+  onBack, 
+  loading, 
+  error 
+}: {
+  formData: {
+    firstName: string
+    middleName: string
+    lastName: string
+    email: string
+    phoneNumber: string
+    dateOfBirth: string
+    referralCode: string
+  }
+  setFormData: (data: any) => void
+  onSubmit: () => void
+  onBack: () => void
+  loading: boolean
+  error: string | null
+}) {
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
+
+  const validateField = (name: string, value: string) => {
+    switch (name) {
+      case 'firstName':
+      case 'lastName':
+        return !value.trim() ? `${name === 'firstName' ? 'First' : 'Last'} name is required` : ''
+      case 'email':
+        if (!value.trim()) return 'Email is required'
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return 'Please enter a valid email address'
+        return ''
+      case 'phoneNumber':
+        if (!value.trim()) return 'Phone number is required'
+        if (!/^\d+$/.test(value)) return 'Phone number must contain only digits'
+        if (value.length > 11) return 'Phone number must not exceed 11 digits'
+        return ''
+      case 'dateOfBirth':
+        if (!value) return 'Date of birth is required'
+        const dob = new Date(value)
+        const today = new Date()
+        const age = today.getFullYear() - dob.getFullYear()
+        if (age < 18) return 'You must be at least 18 years old'
+        return ''
+      default:
+        return ''
+    }
+  }
+
+  const handleFieldChange = (name: string, value: string) => {
+    setFormData((prev: any) => ({ ...prev, [name]: value }))
+    
+    const error = validateField(name, value)
+    setValidationErrors(prev => ({ ...prev, [name]: error }))
+  }
+
+  const handleSubmit = () => {
+    const errors: Record<string, string> = {}
+    Object.keys(formData).forEach(key => {
+      if (key !== 'middleName' && key !== 'referralCode') {
+        const error = validateField(key, formData[key as keyof typeof formData])
+        if (error) errors[key] = error
+      }
+    })
+    
+    setValidationErrors(errors)
+    
+    if (Object.keys(errors).length === 0) {
+      onSubmit()
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="text-center">
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Complete Your Profile</h2>
+        <p className="text-gray-600">Enter your personal information to complete account creation</p>
+      </div>
+
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="firstName" className="text-sm font-medium text-gray-700">
+              First Name *
+            </Label>
+            <Input
+              id="firstName"
+              type="text"
+              value={formData.firstName}
+              onChange={(e) => handleFieldChange('firstName', e.target.value)}
+              className="mt-1"
+              disabled={loading}
+            />
+            {validationErrors.firstName && (
+              <p className="mt-1 text-sm text-red-600">{validationErrors.firstName}</p>
+            )}
+          </div>
+
+          <div>
+            <Label htmlFor="lastName" className="text-sm font-medium text-gray-700">
+              Last Name *
+            </Label>
+            <Input
+              id="lastName"
+              type="text"
+              value={formData.lastName}
+              onChange={(e) => handleFieldChange('lastName', e.target.value)}
+              className="mt-1"
+              disabled={loading}
+            />
+            {validationErrors.lastName && (
+              <p className="mt-1 text-sm text-red-600">{validationErrors.lastName}</p>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <Label htmlFor="middleName" className="text-sm font-medium text-gray-700">
+            Middle Name (Optional)
+          </Label>
+          <Input
+            id="middleName"
+            type="text"
+            value={formData.middleName}
+            onChange={(e) => handleFieldChange('middleName', e.target.value)}
+            className="mt-1"
+            disabled={loading}
+          />
+        </div>
+
+        <div>
+          <Label htmlFor="email" className="text-sm font-medium text-gray-700">
+            Email Address *
+          </Label>
+          <Input
+            id="email"
+            type="email"
+            value={formData.email}
+            onChange={(e) => handleFieldChange('email', e.target.value)}
+            className="mt-1"
+            disabled={loading}
+          />
+          {validationErrors.email && (
+            <p className="mt-1 text-sm text-red-600">{validationErrors.email}</p>
+          )}
+        </div>
+
+        <div>
+          <Label htmlFor="phoneNumber" className="text-sm font-medium text-gray-700">
+            Phone Number *
+          </Label>
+          <Input
+            id="phoneNumber"
+            type="tel"
+            value={formData.phoneNumber}
+            onChange={(e) => {
+              const value = e.target.value.replace(/\D/g, '')
+              if (value.length <= 11) {
+                handleFieldChange('phoneNumber', value)
+              }
+            }}
+            className="mt-1"
+            disabled={loading}
+            maxLength={11}
+          />
+          {validationErrors.phoneNumber && (
+            <p className="mt-1 text-sm text-red-600">{validationErrors.phoneNumber}</p>
+          )}
+        </div>
+
+        <div>
+          <Label htmlFor="dateOfBirth" className="text-sm font-medium text-gray-700">
+            Date of Birth *
+          </Label>
+          <Input
+            id="dateOfBirth"
+            type="date"
+            value={formData.dateOfBirth}
+            onChange={(e) => handleFieldChange('dateOfBirth', e.target.value)}
+            className="mt-1"
+            disabled={loading}
+          />
+          {validationErrors.dateOfBirth && (
+            <p className="mt-1 text-sm text-red-600">{validationErrors.dateOfBirth}</p>
+          )}
+        </div>
+
+        <div>
+          <Label htmlFor="referralCode" className="text-sm font-medium text-gray-700">
+            Referral Code (Optional)
+          </Label>
+          <Input
+            id="referralCode"
+            type="text"
+            value={formData.referralCode}
+            onChange={(e) => handleFieldChange('referralCode', e.target.value)}
+            className="mt-1"
+            disabled={loading}
+          />
+        </div>
+
+        {error && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        <div className="flex gap-3">
+          <Button 
+            type="button"
+            variant="outline" 
+            onClick={onBack}
+            disabled={loading}
+            className="flex-1"
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back
+          </Button>
+          <Button 
+            onClick={handleSubmit} 
+            disabled={loading}
+            className="flex-1"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Creating Account...
+              </>
+            ) : (
+              "Create Account"
+            )}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Success Step
+function SuccessStep({ message }: { message: string }) {
+  return (
+    <div className="text-center space-y-6">
+      <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+        <CheckCircle className="w-8 h-8 text-green-600" />
+      </div>
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Account Created Successfully!</h2>
+        <p className="text-gray-600">{message}</p>
+      </div>
+    </div>
+  )
+}
+
+// Main Signup Form Component
 export function SignupForm() {
   const router = useRouter()
-  const [currentStep, setCurrentStep] = useState(1)
-  const [formData, setFormData] = useState<SignupFormData>({
+  const { toast } = useToast()
+  
+  // Step management
+  const [step, setStep] = useState(1)
+  const totalSteps = 3
+  
+  // Form data
+  const [bvn, setBvn] = useState("")
+  const [otp, setOtp] = useState("")
+  const [requestId, setRequestId] = useState<string | null>(null)
+  const [srUserId, setSrUserId] = useState<string | null>(null)
+  const [userDetails, setUserDetails] = useState({
     firstName: "",
     middleName: "",
     lastName: "",
     email: "",
     phoneNumber: "",
-    bvn: "",
     dateOfBirth: "",
-    address: "",
-    city: "",
-    state: "",
-    zipCode: "",
-    country: "Nigeria", // Default to Nigeria
-    bankCode: "",
-    password: "",
-    confirmPassword: "",
-    profilePicture: null,
-    acceptTerms: false,
-    referralCode: "",
+    referralCode: ""
   })
-  const [formErrors, setFormErrors] = useState<string[]>([])
-  const [stepErrors, setStepErrors] = useState<{ [key: number]: boolean }>({
-    1: false,
-    2: false,
-    3: false,
-    4: false,
-  })
-  const [attemptedSubmit, setAttemptedSubmit] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isCheckingExistence, setIsCheckingExistence] = useState(false)
-  const [profilePictureUrl, setProfilePictureUrl] = useState<string | null>(null)
-  const [signupSuccess, setSignupSuccess] = useState(false)
-  const [successMessage, setSuccessMessage] = useState<string | null>(null)
-  const [storageInitialized, setStorageInitialized] = useState(false)
-  const [existingUserInfo, setExistingUserInfo] = useState<{
-    exists: boolean
-    field?: string
-    message?: string
-  } | null>(null)
+  
+  // Loading and error states
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
+  const [successMessage, setSuccessMessage] = useState("")
 
-  const totalSteps = 4
-  const progress = (currentStep / totalSteps) * 100
+  // Load data from sessionStorage on mount
+  useEffect(() => {
+    const savedRequestId = sessionStorage.getItem('signup_requestId')
+    const savedSrUserId = sessionStorage.getItem('signup_srUserId')
+    const savedStep = sessionStorage.getItem('signup_step')
+    
+    if (savedRequestId) setRequestId(savedRequestId)
+    if (savedSrUserId) setSrUserId(savedSrUserId)
+    if (savedStep) setStep(parseInt(savedStep))
+  }, [])
 
-  const updateFormData = (data: Partial<SignupFormData>) => {
-    setFormData((prev) => ({ ...prev, ...data }))
-
-    // Clear existing user error when email, phone, or BVN is changed
-    if (existingUserInfo && (data.email || data.phoneNumber || data.bvn)) {
-      setExistingUserInfo(null)
-    }
+  // Save data to sessionStorage
+  const saveToSession = (key: string, value: string) => {
+    sessionStorage.setItem(`signup_${key}`, value)
   }
 
-  // Validate current step
-  const validateStep = (step: number): boolean => {
-    let isValid = true
-    const errors: string[] = []
-
-    switch (step) {
-      case 1:
-        // Personal Info validation
-        if (!formData.firstName.trim()) {
-          errors.push("First name is required")
-          isValid = false
-        }
-        if (!formData.lastName.trim()) {
-          errors.push("Last name is required")
-          isValid = false
-        }
-        if (!formData.email.trim()) {
-          errors.push("Email address is required")
-          isValid = false
-        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-          errors.push("Please enter a valid email address")
-          isValid = false
-        }
-        if (!formData.phoneNumber.trim()) {
-          errors.push("Phone number is required")
-          isValid = false
-        } else if (!/^\d+$/.test(formData.phoneNumber)) {
-          errors.push("Phone number must contain only digits")
-          isValid = false
-        } else if (formData.phoneNumber.length > 11) {
-          errors.push("Phone number must not exceed 11 digits")
-          isValid = false
-        }
-        if (!formData.bvn.trim()) {
-          errors.push("BVN is required")
-          isValid = false
-        } else if (!/^\d{11}$/.test(formData.bvn)) {
-          errors.push("BVN must be exactly 11 digits")
-          isValid = false
-        }
-        if (!formData.dateOfBirth) {
-          errors.push("Date of birth is required")
-          isValid = false
-        } else {
-          const dob = new Date(formData.dateOfBirth)
-          const today = new Date()
-          const age = today.getFullYear() - dob.getFullYear()
-          if (age < 18) {
-            errors.push("You must be at least 18 years old")
-            isValid = false
-          }
-        }
-        if (!formData.referralCode.trim()) {
-          errors.push("Referral code is required")
-          isValid = false
-        }
-        break
-      case 2:
-        // Address validation
-        if (!formData.address.trim()) {
-          errors.push("Street address is required")
-          isValid = false
-        }
-        if (!formData.city.trim()) {
-          errors.push("City is required")
-          isValid = false
-        }
-        if (!formData.state.trim()) {
-          errors.push("State is required")
-          isValid = false
-        }
-        if (!formData.country.trim()) {
-          errors.push("Country is required")
-          isValid = false
-        }
-        break
-      case 3:
-        // Security validation
-        if (!formData.password) {
-          errors.push("Password is required")
-          isValid = false
-        } else {
-          if (formData.password.length < 8) {
-            errors.push("Password must be at least 8 characters")
-            isValid = false
-          }
-          if (!/[A-Z]/.test(formData.password)) {
-            errors.push("Password must contain at least one uppercase letter")
-            isValid = false
-          }
-          if (!/[a-z]/.test(formData.password)) {
-            errors.push("Password must contain at least one lowercase letter")
-            isValid = false
-          }
-          if (!/[0-9]/.test(formData.password)) {
-            errors.push("Password must contain at least one number")
-            isValid = false
-          }
-          if (!/[^A-Za-z0-9]/.test(formData.password)) {
-            errors.push("Password must contain at least one special character")
-            isValid = false
-          }
-        }
-        if (!formData.confirmPassword) {
-          errors.push("Please confirm your password")
-          isValid = false
-        } else if (formData.password !== formData.confirmPassword) {
-          errors.push("Passwords do not match")
-          isValid = false
-        }
-        break
-      case 4:
-        // Final step validation
-        if (!formData.acceptTerms) {
-          errors.push("You must accept the terms and conditions")
-          isValid = false
-        }
-        break
-    }
-
-    setFormErrors(errors)
-    setStepErrors((prev) => ({ ...prev, [step]: !isValid }))
-    return isValid
-  }
-
-  // Validate all steps for final submission
-  const validateAllSteps = (): boolean => {
-    // Store all validation errors
-    const allErrors: string[] = []
-
-    // Validate personal info
-    if (!formData.firstName.trim()) allErrors.push("First name is required")
-    if (!formData.lastName.trim()) allErrors.push("Last name is required")
-    if (!formData.email.trim()) {
-      allErrors.push("Email address is required")
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      allErrors.push("Please enter a valid email address")
-    }
-    if (!formData.phoneNumber.trim()) {
-      allErrors.push("Phone number is required")
-    } else if (!/^\d+$/.test(formData.phoneNumber)) {
-      allErrors.push("Phone number must contain only digits")
-    } else if (formData.phoneNumber.length > 11) {
-      allErrors.push("Phone number must not exceed 11 digits")
-    }
-    if (!formData.bvn.trim()) {
-      allErrors.push("BVN is required")
-    } else if (!/^\d{11}$/.test(formData.bvn)) {
-      allErrors.push("BVN must be exactly 11 digits")
-    }
-    if (!formData.dateOfBirth) {
-      allErrors.push("Date of birth is required")
-    } else {
-      const dob = new Date(formData.dateOfBirth)
-      const today = new Date()
-      const age = today.getFullYear() - dob.getFullYear()
-      if (age < 18) allErrors.push("You must be at least 18 years old")
-    }
-
-    // Validate address
-    if (!formData.address.trim()) allErrors.push("Street address is required")
-    if (!formData.city.trim()) allErrors.push("City is required")
-    if (!formData.state.trim()) allErrors.push("State is required")
-    if (!formData.country.trim()) allErrors.push("Country is required")
-
-    // Validate security
-    if (!formData.password) {
-      allErrors.push("Password is required")
-    } else {
-      if (formData.password.length < 8) allErrors.push("Password must be at least 8 characters")
-      if (!/[A-Z]/.test(formData.password)) allErrors.push("Password must contain at least one uppercase letter")
-      if (!/[a-z]/.test(formData.password)) allErrors.push("Password must contain at least one lowercase letter")
-      if (!/[0-9]/.test(formData.password)) allErrors.push("Password must contain at least one number")
-      if (!/[^A-Za-z0-9]/.test(formData.password))
-        allErrors.push("Password must contain at least one special character")
-    }
-    if (!formData.confirmPassword) {
-      allErrors.push("Please confirm your password")
-    } else if (formData.password !== formData.confirmPassword) {
-      allErrors.push("Passwords do not match")
-    }
-
-    // Validate final step
-    if (!formData.acceptTerms) allErrors.push("You must accept the terms and conditions")
-
-    setFormErrors(allErrors)
-    return allErrors.length === 0
-  }
-
-  const handleNext = async () => {
-    const isStepValid = validateStep(currentStep)
-
-    if (isStepValid) {
-      // If we're on the personal info step, check if email, phone, or BVN already exists
-      if (currentStep === 1) {
-        try {
-          setIsCheckingExistence(true)
-          setFormErrors([]) // Clear any previous errors
-
-          // Add a loading message
-          setFormErrors(["Checking if user exists... This may take a moment."])
-
-          // Add timeout to prevent hanging with a longer timeout
-          // const checkPromise = checkUserExists(formData.email, formData.phoneNumber, formData.bvn)
-          // const timeoutPromise = new Promise<{ exists: boolean; error?: string }>((resolve) => {
-          //   setTimeout(() => {
-          //     resolve({
-          //       exists: false,
-          //       error: "Connection is slow, but you can continue. We'll verify again before account creation.",
-          //     })
-          //   }, 15000) // 15 seconds timeout
-          // })
-
-          // const existsCheck = await Promise.race([checkPromise, timeoutPromise])
-          const existsCheck = await checkUserExists(formData.email, formData.phoneNumber, formData.bvn)
-
-          // Clear the loading message
-          setFormErrors([])
-
-          // Show a non-blocking warning if there was a timeout or error
-          if (existsCheck.error) {
-            // Show a warning but still allow continuing
-            setFormErrors([existsCheck.error])
-
-            // Wait a moment to show the message before proceeding
-            await new Promise((resolve) => setTimeout(resolve, 1500))
-
-            // Continue to next step despite the error
-            setCurrentStep(currentStep + 1)
-            setFormErrors([])
-            window.scrollTo(0, 0)
-            setIsCheckingExistence(false)
-            return
-          }
-
-          if (existsCheck.exists) {
-            setExistingUserInfo(existsCheck)
-            setFormErrors([existsCheck.message || "This user already exists"])
-            setIsCheckingExistence(false)
-            return
-          }
-
-          setExistingUserInfo(null)
-        } catch (error) {
-          // Continue anyway, the server will check again during signup
-          setFormErrors(["Unable to verify if user exists. You can continue, but we'll check again during signup."])
-
-          // Wait a moment to show the message before proceeding
-          await new Promise((resolve) => setTimeout(resolve, 1500))
-        } finally {
-          setIsCheckingExistence(false)
-        }
-      }
-
-      if (currentStep < totalSteps) {
-        setCurrentStep(currentStep + 1)
-        setFormErrors([])
-        window.scrollTo(0, 0)
-      }
-    }
-  }
-
-  const handlePrevious = () => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1)
-      setFormErrors([])
-      window.scrollTo(0, 0)
-    }
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setAttemptedSubmit(true)
-
-    // Validate all steps before submission
-    const isValid = validateAllSteps()
-
-    if (isValid) {
-      try {
-        setIsSubmitting(true)
-
-        // Check if user already exists before proceeding
-        try {
-          setIsCheckingExistence(true)
-          setFormErrors(["Verifying account information... This may take a moment."])
-
-          const existsCheck = await checkUserExists(formData.email, formData.phoneNumber, formData.bvn)
-
-          // Clear the loading message
-          setFormErrors([])
-
-          // If there was an error but we're continuing anyway
-          if (existsCheck.error) {
-            // Show a warning but continue with signup
-            setFormErrors([existsCheck.error])
-            // Wait a moment to show the message
-            await new Promise((resolve) => setTimeout(resolve, 1500))
-            setFormErrors([])
-          }
-
-          if (existsCheck.exists) {
-            setExistingUserInfo(existsCheck)
-            setFormErrors([existsCheck.message || "This user already exists"])
-            setIsSubmitting(false)
-            setIsCheckingExistence(false)
-            return
-          }
-
-          setExistingUserInfo(null)
-        } catch (error) {
-          // Continue anyway, the server will check again during signup
-          setFormErrors(["Unable to verify if user exists. Continuing with signup anyway."])
-          await new Promise((resolve) => setTimeout(resolve, 1500))
-          setFormErrors([])
-        } finally {
-          setIsCheckingExistence(false)
-        }
-
-        // Upload profile picture if exists using the server action
-        let pictureUrl = null
-        if (formData.profilePicture) {
-
-          try {
-            // Use the server action for file upload with timeout
-            const uploadPromise = uploadProfilePicture(formData.profilePicture)
-            const uploadTimeoutPromise = new Promise<{ error: string }>((resolve) => {
-              setTimeout(() => {
-                resolve({ error: "Upload timed out" })
-              }, 3000)
-            })
-
-            const uploadResult = await Promise.race([uploadPromise, uploadTimeoutPromise])
-
-            if (typeof uploadResult === "string") {
-              pictureUrl = uploadResult
-            } else if (uploadResult && uploadResult.error) {
-              // Continue with signup without the profile picture
-            }
-          } catch (uploadError) {
-            // Continue with signup without the profile picture
-          }
-        }
-
-        // Register user with Supabase
-
-        try {
-          // Add timeout to prevent hanging
-          const signupResult = await signUp({
-            email: formData.email,
-            password: formData.password,
-            firstName: formData.firstName,
-            middleName: formData.middleName,
-            lastName: formData.lastName,
-            phoneNumber: formData.phoneNumber,
-            bvn: formData.bvn,
-            dateOfBirth: formData.dateOfBirth,
-            address: formData.address,
-            city: formData.city,
-            state: formData.state,
-            zipCode: formData.zipCode,
-            country: formData.country,
-            bankCode: formData.bankCode,
-            profilePictureUrl: pictureUrl,
-            referralCode: formData.referralCode,
+  // Step 1: BVN Verification
+  const handleBVNVerification = async () => {
+    setLoading(true)
+    setError(null)
+    
+    try {
+      const response = await fetch('/api/stablesrail/onboard-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bvn })
+      })
+      
+      const data = await response.json()
+      
+      if (data.success && data.data) {
+        const requestId = data.data.requestId || data.data.data?.requestId
+        if (requestId) {
+          setRequestId(requestId)
+          saveToSession('requestId', requestId)
+          saveToSession('step', '2')
+          setStep(2)
+          toast({
+            title: "BVN Verification Initiated",
+            description: "Please check your phone for the OTP code.",
           })
-
-          const signupTimeoutPromise = new Promise<{ error: string }>((resolve) => {
-            setTimeout(() => {
-              resolve({ error: "Signup request timed out. Please try again later." })
-            }, 15000)
-          })
-
-          const result = await Promise.race([signupResult, signupTimeoutPromise])
-
-          if (result.error) {
-
-            // Check if it's an existing user error
-            if (result.error.includes("already exists") || result.error.includes("already registered")) {
-              setExistingUserInfo({
-                exists: true,
-                message: result.error,
-              })
-            }
-
-            // Add more detailed error message for database errors
-            if (result.error.includes("Database error")) {
-              setFormErrors([
-                result.error,
-                "This could be due to a temporary issue. Please try again in a few moments or contact support if the problem persists.",
-              ])
-            } else {
-              setFormErrors([result.error])
-            }
-            return
-          }
-
-            // Only set signup success and message if result is an object with 'success' and 'message'
-            if (result && typeof result === 'object' && 'success' in result && 'message' in result) {
-              setSignupSuccess(result.success === true)
-              setSuccessMessage(
-                typeof result.message === 'string'
-                  ? result.message
-                  : 'Account created successfully! You will be redirected to the login page in a moment.'
-              )
-            }
-
-            // Redirect to login page on successful signup after 2 seconds
-            setTimeout(() => {
-              router.push("/")
-            }, 2000)
-          } catch (signupError) {
-            setFormErrors(["An error occurred during signup. Please try again later."])
-          }
-        } catch (error) {
-          setFormErrors(["An unexpected error occurred. Please try again."])
-        } finally {
-          setIsSubmitting(false)
+        } else {
+          setError("Invalid response from verification service")
         }
       } else {
-        // Find the first step with errors and navigate to it
-        for (let i = 1; i <= totalSteps; i++) {
-          const stepValid = validateStep(i)
-          if (!stepValid) {
-            setCurrentStep(i)
-            window.scrollTo(0, 0)
-            break
-          }
-        }
+        setError(data.error || "Failed to verify BVN")
       }
-    }
-  
-
-  // Validate current step when it changes or when form data changes
-  useEffect(() => {
-    if (attemptedSubmit) {
-      validateStep(currentStep)
-    }
-  }, [currentStep, formData, attemptedSubmit])
-
-  // Initialize storage when component mounts
-  useEffect(() => {
-    const init = async () => {
-      if (!storageInitialized) {
-        try {
-
-          // Add a shorter timeout to prevent hanging
-          const timeoutPromise = new Promise(
-            (_, reject) =>
-              setTimeout(() => {
-                return { success: true, message: "Timed out but continuing" }
-              }, 2000), // Reduced from 5000ms to 2000ms
-          )
-
-          // Race between the actual initialization and the timeout
-          try {
-            const result = (await Promise.race([initializeStorage(), timeoutPromise])) as {
-              success: boolean
-              message?: string
-              error?: string
-            }
-
-            if (result && result.success) {
-            } else if (result && result.error) {
-            }
-          } catch (raceError) {
-            // Continue anyway
-          }
-        } catch (error) {
-        } finally {
-          // Mark as initialized regardless of success to prevent retries
-          setStorageInitialized(true)
-        }
-      }
-    }
-
-    // Initialize but don't wait for it to complete
-    init().catch((error) => {
-      setStorageInitialized(true) // Mark as initialized to prevent retries
-    })
-  }, [storageInitialized])
-
-  const renderStep = () => {
-    switch (currentStep) {
-      case 1:
-        return (
-          <>
-            <PersonalInfoStep formData={formData} updateFormData={updateFormData} />
-            <div className="mb-4">
-              <label htmlFor="referralCode" className="block text-sm font-medium text-gray-700">
-                Referral Code
-              </label>
-              <input
-                id="referralCode"
-                name="referralCode"
-                type="text"
-                autoComplete="off"
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                value={formData.referralCode}
-                onChange={e => updateFormData({ referralCode: e.target.value })}
-                required
-              />
-            </div>
-          </>
-        )
-      case 2:
-        return <AddressStep formData={formData} updateFormData={updateFormData} />
-      case 3:
-        return <SecurityStep formData={formData} updateFormData={updateFormData} />
-      case 4:
-        return <FinalStep formData={formData} updateFormData={updateFormData} />
-      default:
-        return null
+    } catch (err) {
+      setError("Network error. Please try again.")
+    } finally {
+      setLoading(false)
     }
   }
 
-  // Ensure the function returns JSX
+  // Step 2: OTP Verification
+  const handleOTPVerification = async () => {
+    if (!requestId) {
+      setError("Request ID not found. Please start over.")
+      return
+    }
+    
+    setLoading(true)
+    setError(null)
+    
+    try {
+      const response = await fetch('/api/stablesrail/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: requestId, otp })
+      })
+      
+      const data = await response.json()
+      
+      if (data.success && data.data) {
+        const userId = data.data.userId || data.data.data?.userId
+        if (userId) {
+          setSrUserId(userId)
+          saveToSession('srUserId', userId)
+          saveToSession('step', '3')
+          
+          toast({
+            title: "BVN Verified Successfully",
+            description: "Your BVN has been verified. Please complete your profile.",
+          })
+          
+          // Show success message for 2 seconds then move to next step
+          setTimeout(() => {
+            setStep(3)
+          }, 2000)
+        } else {
+          setError("Invalid response from verification service")
+        }
+      } else {
+        setError(data.error || "Invalid OTP. Please try again.")
+      }
+    } catch (err) {
+      setError("Network error. Please try again.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Step 3: Account Creation
+  const handleAccountCreation = async () => {
+    if (!requestId || !srUserId) {
+      setError("Verification data not found. Please start over.")
+      return
+    }
+    
+    setLoading(true)
+    setError(null)
+    
+    try {
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...userDetails,
+          sr_user_id: srUserId,
+          correlation_id: requestId
+        })
+      })
+      
+      const data = await response.json()
+      
+      if (data.success) {
+        setSuccess(true)
+        setSuccessMessage("Your account has been created successfully! Redirecting to login...")
+        
+        // Clear session storage
+        sessionStorage.removeItem('signup_requestId')
+        sessionStorage.removeItem('signup_srUserId')
+        sessionStorage.removeItem('signup_step')
+        
+        // Redirect to login after 3 seconds
+        setTimeout(() => {
+          router.push('/login')
+        }, 3000)
+      } else {
+        setError(data.error || "Failed to create account")
+      }
+    } catch (err) {
+      setError("Network error. Please try again.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleBack = () => {
+    if (step > 1) {
+      setStep(step - 1)
+      saveToSession('step', (step - 1).toString())
+      setError(null)
+    }
+  }
+
+  const progress = (step / totalSteps) * 100
+
+  if (success) {
+    return <SuccessStep message={successMessage} />
+  }
+
   return (
     <div className="w-full">
-      <form onSubmit={handleSubmit}>
-        <div className="space-y-2">
-          <h2 className="text-xl font-semibold text-center">
-            Step {currentStep} of {totalSteps}
-          </h2>
-          <Progress value={progress} className="h-2" />
-        </div>
-        <div className="mt-4">
-          {signupSuccess ? (
-            <Alert className="mb-4">
-              <AlertDescription>{successMessage}</AlertDescription>
-            </Alert>
-          ) : (
-            <>
-              {formErrors.length > 0 && (
-                <Alert
-                  variant={formErrors.some((err) => err.includes("Connection is slow")) ? "default" : "destructive"}
-                  className={`mb-4 ${formErrors.some((err) => err.includes("Connection is slow")) ? "bg-yellow-50 border-yellow-200" : ""}`}
-                >
-                  {formErrors.some((err) => err.includes("Connection is slow")) ? (
-                    <Info className="h-4 w-4 text-yellow-500" />
-                  ) : (
-                    <AlertCircle className="h-4 w-4" />
-                  )}
-                  <AlertDescription>
-                    <div className="mt-2">
-                      <p className="font-medium">
-                        {formErrors.some((err) => err.includes("Connection is slow"))
-                          ? "Notice:"
-                          : "Please fix the following errors:"}
-                      </p>
-                      <ul className="list-disc pl-5 mt-1 space-y-1">
-                        {formErrors.map((error, index) => (
-                          <li key={index} className="text-sm">
-                            {error}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </AlertDescription>
-                </Alert>
-              )}
+      <div className="space-y-2 mb-6">
+        <h2 className="text-xl font-semibold text-center">
+          Step {step} of {totalSteps}
+        </h2>
+        <Progress value={progress} className="h-2" />
+      </div>
 
-              {existingUserInfo?.exists && (
-                <Alert className="mb-4 bg-blue-50 border-blue-200">
-                  <Info className="h-4 w-4 text-blue-500" />
-                  <AlertDescription>
-                    <div className="mt-2">
-                      <p className="font-medium">Already have an account?</p>
-                      <p className="text-sm mt-1">
-                        <Link href="/" className="text-blue-600 hover:text-blue-800">
-                          Click here to log in
-                        </Link>{" "}
-                        instead.
-                      </p>
-                    </div>
-                  </AlertDescription>
-                </Alert>
-              )}
+      {step === 1 && (
+        <BVNVerificationStep
+          bvn={bvn}
+          setBvn={setBvn}
+          onNext={handleBVNVerification}
+          loading={loading}
+          error={error}
+        />
+      )}
 
-              {renderStep()}
-            </>
-          )}
-        </div>
-        {!signupSuccess && (
-          <div className="flex justify-between mt-6">
-            {currentStep > 1 ? (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handlePrevious}
-                disabled={isSubmitting || isCheckingExistence}
-              >
-                Previous
-              </Button>
-            ) : (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => router.push("/")}
-                disabled={isSubmitting || isCheckingExistence}
-              >
-                Cancel
-              </Button>
-            )}
-            {currentStep < totalSteps ? (
-              <Button type="button" onClick={handleNext} disabled={isSubmitting || isCheckingExistence}>
-                {isCheckingExistence ? "Checking..." : "Next"}
-              </Button>
-            ) : (
-              <Button type="submit" className="w-full" disabled={isSubmitting || isCheckingExistence}>
-                {isSubmitting ? "Creating Account..." : isCheckingExistence ? "Checking..." : "Create Account"}
-              </Button>
-            )}
-          </div>
-        )}
-      </form>
+      {step === 2 && (
+        <OTPVerificationStep
+          otp={otp}
+          setOtp={setOtp}
+          onNext={handleOTPVerification}
+          onBack={handleBack}
+          loading={loading}
+          error={error}
+          requestId={requestId}
+        />
+      )}
+
+      {step === 3 && (
+        <UserDetailsStep
+          formData={userDetails}
+          setFormData={setUserDetails}
+          onSubmit={handleAccountCreation}
+          onBack={handleBack}
+          loading={loading}
+          error={error}
+        />
+      )}
     </div>
   )
 }
-

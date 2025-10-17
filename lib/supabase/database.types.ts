@@ -743,6 +743,35 @@ export interface Database {
             email?: string | null
           }
         }
+      wallet_address: {
+        Row: {
+          id: string
+          user_id: string
+          wallet_address: string
+          request_id: string | null
+          account_number: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          wallet_address: string
+          request_id?: string | null
+          account_number?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          wallet_address?: string
+          request_id?: string | null
+          account_number?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
       posts: {
         Row: {
           id: string

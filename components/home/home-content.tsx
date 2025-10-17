@@ -1,10 +1,11 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Eye, EyeOff, Plus, ArrowRightLeft, TrendingUp, ArrowDown, Search, Loader2, AlertCircle, Info } from "lucide-react"
+import { Eye, EyeOff, Plus, ArrowRightLeft, TrendingUp, ArrowDown, Search, Loader2, AlertCircle, Info, CheckCircle } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { HelperCard } from "@/components/helpers/helper-card"
 import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 
@@ -31,6 +32,11 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
   const [accountBalance, setAccountBalance] = useState<{ balance: number; loan_balance: number } | null>(null)
   const [showBalance, setShowBalance] = useState(true)
   const [userVirtualAccount, setUserVirtualAccount] = useState<{ account_number: string; bank_name: string } | null>(null)
+  const [isCreatingVA, setIsCreatingVA] = useState(false)
+  const [showOnboardingModal, setShowOnboardingModal] = useState(false)
+  const [onboardingStep, setOnboardingStep] = useState<'bvn' | 'otp' | 'complete'>('bvn')
+  const [onboardingRequestId, setOnboardingRequestId] = useState<string | null>(null)
+  const [otpInput, setOtpInput] = useState("")
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-NG", {
@@ -144,6 +150,138 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
     setHasSearched(false)
   }
 
+  // Handle virtual account creation
+  const handleCreateVirtualAccount = async () => {
+    setIsCreatingVA(true)
+    
+    try {
+      // 1. Check if user has BVN
+      if (!userProfile.profile?.bvn) {
+        toast({
+          title: "Profile Incomplete",
+          description: "Please complete your profile and add your BVN, then try creating a virtual account again.",
+          variant: "destructive",
+        })
+        return
+      }
+      
+      // 2. Check if user has sr_user_id (already onboarded)
+      if (userProfile.profile?.sr_user_id) {
+        // User is onboarded, fetch details from user-details endpoint
+        const response = await fetch(`/api/stablesrail/user-details?userId=${userProfile.profile.sr_user_id}`, {
+          credentials: 'include'
+        })
+        
+        const data = await response.json()
+        
+        if (data.success && data.data?.virtualAccount) {
+          // Update local state with fetched virtual account
+          setUserVirtualAccount({
+            account_number: data.data.virtualAccount.accountNumber,
+            bank_name: 'Stablesrail',
+          })
+          
+          toast({
+            title: "Success",
+            description: "Virtual account details retrieved successfully!",
+          })
+        } else {
+          throw new Error(data.error || 'Failed to fetch virtual account details')
+        }
+      } else {
+        // 3. User has BVN but no sr_user_id - need to onboard
+        // Show onboarding modal/flow
+        setShowOnboardingModal(true)
+      }
+    } catch (error) {
+      console.error('Error creating virtual account:', error)
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to process request",
+        variant: "destructive",
+      })
+    } finally {
+      setIsCreatingVA(false)
+    }
+  }
+
+  // Step 1: Onboard with BVN
+  const handleBVNOnboarding = async () => {
+    try {
+      const response = await fetch('/api/stablesrail/onboard-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bvn: userProfile.profile.bvn }),
+        credentials: 'include'
+      })
+      
+      const data = await response.json()
+      
+      if (data.success && data.requestId) {
+        setOnboardingRequestId(data.requestId)
+        setOnboardingStep('otp')
+        toast({
+          title: "OTP Sent",
+          description: "Please check your phone for the verification code.",
+        })
+      } else {
+        throw new Error(data.error || 'Failed to onboard')
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to onboard",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Step 2: Verify OTP
+  const handleOTPVerification = async (otp: string) => {
+    try {
+      const response = await fetch('/api/stablesrail/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          sessionId: onboardingRequestId, 
+          otp 
+        }),
+        credentials: 'include'
+      })
+      
+      const data = await response.json()
+      
+      if (data.success && data.userId) {
+        // Save sr_user_id to profile
+        await fetch('/api/user-profile', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            sr_user_id: data.userId,
+            correlation_id: onboardingRequestId,
+            bvn_verified: true
+          }),
+          credentials: 'include'
+        })
+        
+        setOnboardingStep('complete')
+        
+        // Now create virtual account
+        await handleCreateVirtualAccount()
+        
+        setShowOnboardingModal(false)
+      } else {
+        throw new Error(data.error || 'Invalid OTP')
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to verify OTP",
+        variant: "destructive",
+      })
+    }
+  }
+
   // Determine which lenders to display
   const displayLenders = searchResults !== null ? searchResults : loanHelpers
 
@@ -181,12 +319,33 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
                   </div>
                   <div className="mt-4">
                     <p className="text-blue-100 text-xs">Your Virtual Account:</p>
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg tracking-widest font-semibold">{userVirtualAccount?.account_number || '— — — — — — — — —'}</span>
-                      {userVirtualAccount?.bank_name && (
-                        <span className="text-blue-200 text-xs">{userVirtualAccount.bank_name}</span>
-                      )}
-                    </div>
+                    {userVirtualAccount?.account_number ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg tracking-widest font-semibold">{userVirtualAccount.account_number}</span>
+                        {userVirtualAccount.bank_name && (
+                          <span className="text-blue-200 text-xs">{userVirtualAccount.bank_name}</span>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg tracking-widest font-semibold text-blue-200">— — — — — — — — —</span>
+                        <Button
+                          size="sm"
+                          onClick={handleCreateVirtualAccount}
+                          disabled={isCreatingVA}
+                          className="bg-white text-blue-600 hover:bg-gray-50 text-xs px-3 py-1 h-auto"
+                        >
+                          {isCreatingVA ? (
+                            <>
+                              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                              Creating...
+                            </>
+                          ) : (
+                            'Create Virtual Account'
+                          )}
+                        </Button>
+                      </div>
+                    )}
                   </div>
                   <div className="grid grid-cols-3 gap-4 mt-5">
                     <Button
@@ -383,6 +542,64 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
           )}
         </div>
       </div>
+
+      {/* Onboarding Modal */}
+      {showOnboardingModal && (
+        <Dialog open={showOnboardingModal} onOpenChange={setShowOnboardingModal}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                {onboardingStep === 'bvn' && 'Verify Your BVN'}
+                {onboardingStep === 'otp' && 'Enter OTP'}
+                {onboardingStep === 'complete' && 'Verification Complete'}
+              </DialogTitle>
+            </DialogHeader>
+            
+            {onboardingStep === 'bvn' && (
+              <div className="space-y-4">
+                <p className="text-sm text-gray-600">
+                  We need to verify your BVN with Stablesrail before creating your virtual account.
+                </p>
+                <p className="text-sm font-medium">BVN: {userProfile.profile?.bvn}</p>
+                <Button onClick={handleBVNOnboarding} className="w-full">
+                  Send Verification Code
+                </Button>
+              </div>
+            )}
+            
+            {onboardingStep === 'otp' && (
+              <div className="space-y-4">
+                <p className="text-sm text-gray-600">
+                  Enter the 6-digit code sent to your phone.
+                </p>
+                <Input
+                  type="text"
+                  placeholder="Enter OTP"
+                  maxLength={6}
+                  value={otpInput}
+                  onChange={(e) => setOtpInput(e.target.value)}
+                />
+                <Button 
+                  onClick={() => handleOTPVerification(otpInput)} 
+                  className="w-full"
+                  disabled={otpInput.length !== 6}
+                >
+                  Verify OTP
+                </Button>
+              </div>
+            )}
+            
+            {onboardingStep === 'complete' && (
+              <div className="text-center space-y-4">
+                <CheckCircle className="w-12 h-12 text-green-500 mx-auto" />
+                <p className="text-sm text-gray-600">
+                  Your BVN has been verified successfully!
+                </p>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }

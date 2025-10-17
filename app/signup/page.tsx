@@ -16,7 +16,7 @@ export default function SignupPage() {
           <CardHeader className="space-y-1">
               <CardTitle className="text-2xl font-bold text-center md:text-left">Create your account</CardTitle>
               <CardDescription className="text-center md:text-left">
-                Enter your information to create your account
+                Verify your BVN and create your account in 3 simple steps
               </CardDescription>
           </CardHeader>
           <CardContent>

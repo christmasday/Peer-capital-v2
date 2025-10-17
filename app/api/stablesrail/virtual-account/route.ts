@@ -55,14 +55,18 @@ export async function POST(req: NextRequest) {
     const result: any = await stablesrail.getVirtualAccountByRequestId({ requestId: String(body.requestId) })
 
     // Persist to virtual_accounts table if a virtualAccount is returned
+    let virtualAccount = null
+    let wallet = null
+    
     try {
       const admin = createAdminClient()
       const data = (result && (result.data || result)) || {}
       const va = data.virtualAccount || null
       const requestId: string | undefined = data.requestId
+      const walletAddress = data.walletAddress || null
 
       if (va && requestId) {
-        const record = {
+        const vaRecord = {
           user_id: authResult.userId as string,
           account_number: String(va.accountNumber || ''),
           account_name: String(va.accountName || ''),
@@ -77,13 +81,38 @@ export async function POST(req: NextRequest) {
         }
 
         // Upsert keyed by user_id to keep a single VA per user in our table
-        await admin.from('virtual_accounts').upsert(record, { onConflict: 'user_id' })
+        const { data: vaData } = await admin.from('virtual_accounts').upsert(vaRecord, { onConflict: 'user_id' }).select().single()
+        virtualAccount = vaData
+
+        // Persist wallet address if available
+        if (walletAddress) {
+          const walletRecord = {
+            user_id: authResult.userId as string,
+            wallet_address: String(walletAddress),
+            request_id: String(requestId),
+            account_number: String(va.accountNumber || ''),
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }
+
+          // Upsert wallet address (one per user)
+          const { data: walletData } = await admin.from('wallet_address').upsert(walletRecord, { onConflict: 'user_id' }).select().single()
+          wallet = walletData
+        }
       }
-    } catch (_) {
+    } catch (error) {
+      console.error("Error persisting virtual account or wallet:", error)
       // non-blocking persistence
     }
 
-    return NextResponse.json({ success: true, data: result })
+    return NextResponse.json({ 
+      success: true, 
+      data: result, 
+      persisted: { 
+        virtualAccount, 
+        wallet 
+      } 
+    })
   } catch (error) {
     if (error instanceof StablesrailError) {
       return NextResponse.json(

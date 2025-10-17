@@ -5,12 +5,6 @@ import { createAdminClient } from "@/lib/supabase/admin"
 
 export async function POST(req: NextRequest) {
   try {
-    // Check authentication
-    const authResult = await checkAuth()
-    if (!authResult.authenticated || !authResult.userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
     const body = await req.json()
     
     // Basic validation
@@ -18,24 +12,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 })
     }
 
+    // Validate BVN if provided
+    if (body.bvn && !/^\d{11}$/.test(body.bvn)) {
+      return NextResponse.json({ error: "BVN must be exactly 11 digits" }, { status: 400 })
+    }
+
     const stablesrail = createStablesrailClient()
     const result = await stablesrail.onboardUser(body)
 
-    // Try to persist correlation/request id on profile for tracking
-    try {
-      const admin = createAdminClient()
-      const requestId = (result as any)?.requestId || (result as any)?.data?.requestId
-      if (requestId) {
-        await admin
-          .from("profiles")
-          .update({ correlation_id: String(requestId), updated_at: new Date().toISOString() })
-          .eq("id", authResult.userId)
-      }
-    } catch (_) {
-      // non-blocking
-    }
+    // Extract requestId from response
+    const requestId = (result as any)?.requestId || (result as any)?.data?.requestId
 
-    return NextResponse.json({ success: true, data: result })
+    return NextResponse.json({ 
+      success: true, 
+      data: result,
+      requestId: requestId 
+    })
   } catch (error) {
     if (error instanceof StablesrailError) {
       return NextResponse.json(
