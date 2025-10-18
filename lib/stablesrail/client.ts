@@ -230,7 +230,10 @@ export class StablesrailClient {
   }
 
   regenerateApiKey() {
-    return this.request<unknown>("regenerateapikey", { method: "GET" })
+    return this.request<{
+      apiKey: string
+      rotatedAt: string
+    }>("regenerateapikey", { method: "GET" })
   }
 
   // ============ Webhooks & Third-Party Integration ==========

@@ -752,6 +752,12 @@ export interface Database {
           account_number: string | null
           created_at: string
           updated_at: string
+          base_address: string | null
+          ethereum_address: string | null
+          polygon_address: string | null
+          bnb_address: string | null
+          asset_chain_address: string | null
+          bantu_address: string | null
         }
         Insert: {
           id?: string
@@ -761,6 +767,12 @@ export interface Database {
           account_number?: string | null
           created_at?: string
           updated_at?: string
+          base_address?: string | null
+          ethereum_address?: string | null
+          polygon_address?: string | null
+          bnb_address?: string | null
+          asset_chain_address?: string | null
+          bantu_address?: string | null
         }
         Update: {
           id?: string
@@ -770,6 +782,12 @@ export interface Database {
           account_number?: string | null
           created_at?: string
           updated_at?: string
+          base_address?: string | null
+          ethereum_address?: string | null
+          polygon_address?: string | null
+          bnb_address?: string | null
+          asset_chain_address?: string | null
+          bantu_address?: string | null
         }
       }
       posts: {

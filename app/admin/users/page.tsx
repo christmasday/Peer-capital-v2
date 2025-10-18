@@ -59,7 +59,7 @@ export default function UserManagement() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [search, setSearch] = useState("")
-  const [statusFilter, setStatusFilter] = useState("")
+  const [statusFilter, setStatusFilter] = useState("all")
   const [pagination, setPagination] = useState<Pagination>({
     page: 1,
     limit: 20,
@@ -74,7 +74,7 @@ export default function UserManagement() {
         page: pagination.page.toString(),
         limit: pagination.limit.toString(),
         ...(search && { search }),
-        ...(statusFilter && { status: statusFilter })
+        ...(statusFilter && statusFilter !== "all" && { status: statusFilter })
       })
 
       const response = await fetch(`/api/admin/users?${params}`, {
@@ -244,7 +244,7 @@ export default function UserManagement() {
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Users</SelectItem>
+                <SelectItem value="all">All Users</SelectItem>
                 <SelectItem value="staff">Staff</SelectItem>
                 <SelectItem value="verified">Verified</SelectItem>
                 <SelectItem value="unverified">Unverified</SelectItem>

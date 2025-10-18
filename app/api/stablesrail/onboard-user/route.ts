@@ -33,6 +33,14 @@ export async function POST(req: NextRequest) {
     const requestId = (result as any)?.requestId || (result as any)?.data?.requestId
     console.log('🟢 [API] Extracted requestId:', requestId)
 
+    if (!requestId) {
+      console.error('🔴 [API] No requestId found in Stablesrail response')
+      return NextResponse.json({ 
+        error: "No requestId received from Stablesrail",
+        success: false 
+      }, { status: 400 })
+    }
+
     return NextResponse.json({ 
       success: true, 
       data: result,
@@ -42,12 +50,12 @@ export async function POST(req: NextRequest) {
     if (error instanceof StablesrailError) {
       console.error('🔴 [API] StablesrailError:', error.message, error.responseCode)
       return NextResponse.json(
-        { error: error.message, code: error.responseCode, details: error.details },
+        { error: error.message, code: error.responseCode, details: error.details, success: false },
         { status: 400 }
       )
     }
     
     console.error('🔴 [API] Error in onboard-user:', error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    return NextResponse.json({ error: "Internal server error", success: false }, { status: 500 })
   }
 }

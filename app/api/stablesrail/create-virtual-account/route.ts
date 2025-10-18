@@ -124,7 +124,8 @@ export async function POST(req: NextRequest) {
           if (walletAddress) {
             const walletRecord = {
               user_id: authResult.userId,
-              wallet_address: String(walletAddress),
+              wallet_address: String(walletAddress), // Keep for backward compatibility
+              base_address: String(walletAddress), // Save to Base blockchain column
               request_id: String(requestId),
               account_number: String(va.accountNumber || ''),
               created_at: new Date().toISOString(),

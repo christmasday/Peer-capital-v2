@@ -38,6 +38,9 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
   const [onboardingRequestId, setOnboardingRequestId] = useState<string | null>(null)
   const [otpInput, setOtpInput] = useState("")
   const [isSendingBVN, setIsSendingBVN] = useState(false)
+  const [showFundModal, setShowFundModal] = useState(false)
+  const [fundAmount, setFundAmount] = useState("")
+  const [isFunding, setIsFunding] = useState(false)
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-NG", {
@@ -228,7 +231,7 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
       const data = await response.json()
       console.log('🔵 Response data:', data)
       
-      if (data.success && data.requestId) {
+      if (response.ok && data.success && data.requestId) {
         console.log('✅ BVN onboarding successful, requestId:', data.requestId)
         setOnboardingRequestId(data.requestId)
         setOnboardingStep('otp')
@@ -295,6 +298,72 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
         description: error instanceof Error ? error.message : "Failed to verify OTP",
         variant: "destructive",
       })
+    }
+  }
+
+  const handleFund = async () => {
+    if (!fundAmount || Number(fundAmount) <= 0) {
+      toast({
+        title: "Invalid Amount",
+        description: "Please enter a valid amount greater than 0.",
+        variant: "destructive"
+      })
+      return
+    }
+
+    setIsFunding(true)
+
+    try {
+      // First, get the user's wallet addresses
+      const walletResponse = await fetch('/api/stablesrail/wallet-address', {
+        credentials: 'include'
+      })
+
+      if (!walletResponse.ok) {
+        throw new Error('Failed to fetch wallet addresses')
+      }
+
+      const walletData = await walletResponse.json()
+
+      if (!walletData.success || !walletData.walletAddresses?.base_address) {
+        throw new Error('Base wallet address not found. Please create a virtual account first.')
+      }
+
+      // Call the CNGN onramp API
+      const response = await fetch('/api/stablesrail/cngn-onramp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          owner: walletData.walletAddresses.base_address,
+          amount: Number(fundAmount),
+          assetSwap: "CNGN",
+          autoSwap: false,
+          userId: userProfile.profile.sr_user_id
+        }),
+        credentials: 'include'
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        toast({
+          title: "Funding Initiated",
+          description: `Funding request submitted successfully. Operation ID: ${data.data?.operationId || 'N/A'}`,
+        })
+        setShowFundModal(false)
+        setFundAmount("")
+      } else {
+        throw new Error(data.error || 'Failed to initiate funding')
+      }
+    } catch (error) {
+      console.error('❌ Funding failed:', error)
+      toast({
+        title: "Funding Failed",
+        description: error instanceof Error ? error.message : "Failed to initiate funding. Please try again.",
+        variant: "destructive"
+      })
+    } finally {
+      setIsFunding(false)
     }
   }
 
@@ -367,12 +436,7 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
                     <Button
                       variant="secondary"
                       className="w-full h-16 flex flex-col items-center justify-center gap-2 bg-white text-blue-600 hover:bg-gray-50"
-                      onClick={() =>
-                        toast({
-                          title: 'Unavailable',
-                          description: 'Funding is currently disabled.',
-                        })
-                      }
+                      onClick={() => setShowFundModal(true)}
                     >
                       <Plus className="h-6 w-6" />
                       <span className="text-sm font-medium">Fund</span>
@@ -624,6 +688,61 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
                 </p>
               </div>
             )}
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Fund Modal */}
+      {showFundModal && (
+        <Dialog open={showFundModal} onOpenChange={setShowFundModal}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Fund Account</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600">
+                Fund your account with CNGN via Base network
+              </p>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Amount (NGN)
+                </label>
+                <Input
+                  type="number"
+                  placeholder="Enter amount"
+                  value={fundAmount}
+                  onChange={(e) => setFundAmount(e.target.value)}
+                  min="1"
+                  step="0.01"
+                />
+              </div>
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowFundModal(false)
+                    setFundAmount("")
+                  }}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleFund}
+                  disabled={isFunding || !fundAmount || Number(fundAmount) <= 0}
+                  className="flex-1"
+                >
+                  {isFunding ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Funding...
+                    </>
+                  ) : (
+                    'Fund Account'
+                  )}
+                </Button>
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
       )}
