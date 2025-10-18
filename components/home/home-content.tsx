@@ -37,6 +37,7 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
   const [onboardingStep, setOnboardingStep] = useState<'bvn' | 'otp' | 'complete'>('bvn')
   const [onboardingRequestId, setOnboardingRequestId] = useState<string | null>(null)
   const [otpInput, setOtpInput] = useState("")
+  const [isSendingBVN, setIsSendingBVN] = useState(false)
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-NG", {
@@ -207,7 +208,14 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
 
   // Step 1: Onboard with BVN
   const handleBVNOnboarding = async () => {
+    console.log('🔵 handleBVNOnboarding called')
+    console.log('🔵 User BVN:', userProfile.profile?.bvn)
+    
+    setIsSendingBVN(true)
+    
     try {
+      console.log('🔵 Calling /api/stablesrail/onboard-user...')
+      
       const response = await fetch('/api/stablesrail/onboard-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -215,9 +223,13 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
         credentials: 'include'
       })
       
+      console.log('🔵 Response status:', response.status)
+      
       const data = await response.json()
+      console.log('🔵 Response data:', data)
       
       if (data.success && data.requestId) {
+        console.log('✅ BVN onboarding successful, requestId:', data.requestId)
         setOnboardingRequestId(data.requestId)
         setOnboardingStep('otp')
         toast({
@@ -225,14 +237,18 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
           description: "Please check your phone for the verification code.",
         })
       } else {
+        console.error('❌ BVN onboarding failed:', data.error)
         throw new Error(data.error || 'Failed to onboard')
       }
     } catch (error) {
+      console.error('❌ Exception in handleBVNOnboarding:', error)
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to onboard",
         variant: "destructive",
       })
+    } finally {
+      setIsSendingBVN(false)
     }
   }
 
@@ -561,8 +577,19 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
                   We need to verify your BVN with Stablesrail before creating your virtual account.
                 </p>
                 <p className="text-sm font-medium">BVN: {userProfile.profile?.bvn}</p>
-                <Button onClick={handleBVNOnboarding} className="w-full">
-                  Send Verification Code
+                <Button 
+                  onClick={handleBVNOnboarding} 
+                  disabled={isSendingBVN}
+                  className="w-full"
+                >
+                  {isSendingBVN ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Sending Code...
+                    </>
+                  ) : (
+                    'Send Verification Code'
+                  )}
                 </Button>
               </div>
             )}

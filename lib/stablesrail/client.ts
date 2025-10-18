@@ -214,8 +214,19 @@ export class StablesrailClient {
   }
 
   // ============ Configuration & Management ==========
-  manageIpAllowList(payload: { action: "add" | "remove"; ip: string }) {
-    return this.request<unknown>("manageipallowlist", { method: "POST", body: payload })
+  manageIpAllowList(payload: { action: "add" | "remove" | "list"; ipAddress?: string; description?: string }) {
+    return this.request<{
+      action: string
+      ipAddress?: string
+      totalIps: number
+      message: string
+      updatedAt: string
+      ipList?: Array<{
+        ipAddress: string
+        description?: string
+        addedAt: string
+      }>
+    }>("manageipallowlist", { method: "POST", body: payload })
   }
 
   regenerateApiKey() {
