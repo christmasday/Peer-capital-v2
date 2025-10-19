@@ -8,9 +8,7 @@ import {
   TestTube,
   AlertCircle,
   CheckCircle,
-  ExternalLink,
-  Eye,
-  EyeOff
+  ExternalLink
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -22,18 +20,10 @@ import { useToast } from "@/hooks/use-toast"
 import { Skeleton } from "@/components/ui/skeleton"
 
 interface WebhookConfig {
-  id: string
-  webhook_url: string
-  secret: string
+  webhookUrl: string
   enabled: boolean
-  created_at: string
-  updated_at: string
-  created_by: string
-  profiles: {
-    first_name: string
-    last_name: string
-    email: string
-  }
+  lastVerifiedAt?: string
+  updatedAt?: string
 }
 
 export default function WebhookConfiguration() {
@@ -42,9 +32,7 @@ export default function WebhookConfiguration() {
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
   const [webhookUrl, setWebhookUrl] = useState("")
-  const [webhookSecret, setWebhookSecret] = useState("")
   const [webhookEnabled, setWebhookEnabled] = useState(true)
-  const [showSecret, setShowSecret] = useState(false)
   const { toast } = useToast()
 
   const fetchWebhookConfig = async () => {
@@ -57,8 +45,7 @@ export default function WebhookConfiguration() {
         const data = await response.json()
         setWebhookConfig(data.webhookConfig)
         if (data.webhookConfig) {
-          setWebhookUrl(data.webhookConfig.webhook_url)
-          setWebhookSecret(data.webhookConfig.secret)
+          setWebhookUrl(data.webhookConfig.webhookUrl)
           setWebhookEnabled(data.webhookConfig.enabled)
         }
       } else {
@@ -82,10 +69,10 @@ export default function WebhookConfiguration() {
   }
 
   const handleSaveConfig = async () => {
-    if (!webhookUrl.trim() || !webhookSecret.trim()) {
+    if (!webhookUrl.trim()) {
       toast({
         title: "Error",
-        description: "Webhook URL and secret are required",
+        description: "Webhook URL is required",
         variant: "destructive",
       })
       return
@@ -98,7 +85,6 @@ export default function WebhookConfiguration() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           webhookUrl: webhookUrl.trim(),
-          secret: webhookSecret.trim(),
           enabled: webhookEnabled
         }),
         credentials: 'include'
@@ -185,17 +171,6 @@ export default function WebhookConfiguration() {
     }
   }
 
-  const generateSecret = () => {
-    const secret = Array.from(crypto.getRandomValues(new Uint8Array(32)))
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('')
-    setWebhookSecret(secret)
-  }
-
-  useEffect(() => {
-    fetchWebhookConfig()
-  }, [])
-
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -206,9 +181,13 @@ export default function WebhookConfiguration() {
     })
   }
 
+  useEffect(() => {
+    fetchWebhookConfig()
+  }, [])
+
   if (loading) {
     return (
-      <div className="space-y-6">
+      <div className="max-w-4xl mx-auto px-4 space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold text-gray-900">Webhook Configuration</h1>
           <Skeleton className="h-10 w-24" />
@@ -231,7 +210,7 @@ export default function WebhookConfiguration() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-4xl mx-auto px-4 space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
@@ -278,41 +257,7 @@ export default function WebhookConfiguration() {
               className="mt-1"
             />
             <p className="text-sm text-gray-500 mt-1">
-              The URL where webhook events will be sent
-            </p>
-          </div>
-
-          <div>
-            <Label htmlFor="webhook-secret">Webhook Secret</Label>
-            <div className="flex gap-2 mt-1">
-              <div className="flex-1 relative">
-                <Input
-                  id="webhook-secret"
-                  type={showSecret ? "text" : "password"}
-                  placeholder="your_webhook_secret_key"
-                  value={webhookSecret}
-                  onChange={(e) => setWebhookSecret(e.target.value)}
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 p-0"
-                  onClick={() => setShowSecret(!showSecret)}
-                >
-                  {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </Button>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={generateSecret}
-              >
-                Generate
-              </Button>
-            </div>
-            <p className="text-sm text-gray-500 mt-1">
-              Secret key for webhook signature verification
+              The URL where Stablesrail webhook events will be sent
             </p>
           </div>
 
@@ -333,7 +278,7 @@ export default function WebhookConfiguration() {
           <div className="flex gap-2">
             <Button 
               onClick={handleSaveConfig}
-              disabled={saving || !webhookUrl.trim() || !webhookSecret.trim()}
+              disabled={saving || !webhookUrl.trim()}
             >
               {saving ? (
                 <>
@@ -343,7 +288,7 @@ export default function WebhookConfiguration() {
               ) : (
                 <>
                   <Save className="h-4 w-4 mr-2" />
-                  Save Configuration
+                  Set Webhook URL
                 </>
               )}
             </Button>
@@ -370,33 +315,25 @@ export default function WebhookConfiguration() {
                   </Badge>
                 </div>
                 <div className="text-sm text-gray-500">
-                  Last updated {formatDate(webhookConfig.updated_at)}
+                  {webhookConfig.updatedAt && `Last updated ${formatDate(webhookConfig.updatedAt)}`}
                 </div>
               </div>
               
               <div>
                 <div className="font-medium text-gray-900 mb-1">Webhook URL</div>
                 <div className="font-mono text-sm text-gray-600 break-all">
-                  {webhookConfig.webhook_url}
+                  {webhookConfig.webhookUrl}
                 </div>
               </div>
 
-              <div>
-                <div className="font-medium text-gray-900 mb-1">Secret</div>
-                <div className="font-mono text-sm text-gray-600">
-                  {webhookConfig.secret.substring(0, 8)}...{webhookConfig.secret.substring(webhookConfig.secret.length - 8)}
+              {webhookConfig.lastVerifiedAt && (
+                <div>
+                  <div className="font-medium text-gray-900 mb-1">Last Verified</div>
+                  <div className="text-sm text-gray-600">
+                    {formatDate(webhookConfig.lastVerifiedAt)}
+                  </div>
                 </div>
-              </div>
-
-              <div>
-                <div className="font-medium text-gray-900 mb-1">Created by</div>
-                <div className="text-sm text-gray-600">
-                  {webhookConfig.profiles.first_name} {webhookConfig.profiles.last_name} ({webhookConfig.profiles.email})
-                </div>
-                <div className="text-xs text-gray-500">
-                  Created {formatDate(webhookConfig.created_at)}
-                </div>
-              </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -429,19 +366,23 @@ export default function WebhookConfiguration() {
             </div>
 
             <div className="space-y-2">
-              <h4 className="font-medium text-gray-900">Supported Events:</h4>
+              <h4 className="font-medium text-gray-900">Supported Stablesrail Events:</h4>
               <ul className="text-sm text-gray-600 space-y-1">
-                <li>• <code className="bg-gray-100 px-1 rounded">user.created</code> - New user registration</li>
-                <li>• <code className="bg-gray-100 px-1 rounded">user.updated</code> - User profile updates</li>
-                <li>• <code className="bg-gray-100 px-1 rounded">transaction.created</code> - New transaction</li>
-                <li>• <code className="bg-gray-100 px-1 rounded">transaction.updated</code> - Transaction status changes</li>
-                <li>• <code className="bg-gray-100 px-1 rounded">webhook.test</code> - Test event</li>
+                <li>• <code className="bg-gray-100 px-1 rounded">user.otp.send.completed</code> - OTP delivery confirmation</li>
+                <li>• <code className="bg-gray-100 px-1 rounded">virtual.account.created</code> - Virtual account creation</li>
+                <li>• <code className="bg-gray-100 px-1 rounded">payments.confirmed</code> - Payment confirmation</li>
+                <li>• <code className="bg-gray-100 px-1 rounded">wallet.funding.completed</code> - Wallet funding completion</li>
+                <li>• <code className="bg-gray-100 px-1 rounded">swaps.completed</code> - Successful token swaps</li>
+                <li>• <code className="bg-gray-100 px-1 rounded">swaps.failed</code> - Failed token swaps</li>
+                <li>• <code className="bg-gray-100 px-1 rounded">vault.return.transfer.confirmed</code> - Vault return transfer confirmation</li>
+                <li>• <code className="bg-gray-100 px-1 rounded">vault.return.payout.completed</code> - Vault return payout completion</li>
+                <li>• <code className="bg-gray-100 px-1 rounded">vault.return.payout.failed</code> - Vault return payout failure</li>
               </ul>
             </div>
 
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <ExternalLink className="h-4 w-4" />
-              <span>Webhook endpoint: <code className="bg-gray-100 px-1 rounded">/api/webhook</code></span>
+              <span>Webhook endpoint: <code className="bg-gray-100 px-1 rounded">/api/stablesrail/webhook</code></span>
             </div>
           </div>
         </CardContent>

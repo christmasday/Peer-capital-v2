@@ -237,12 +237,20 @@ export class StablesrailClient {
   }
 
   // ============ Webhooks & Third-Party Integration ==========
-  setWebhook(payload: { url: string; events?: string[] }) {
-    return this.request<unknown>("set-webhook", { method: "POST", body: payload })
+  setWebhook(payload: { webhookUrl: string; enabled: boolean }) {
+    return this.request<{
+      webhookUrl: string
+      enabled: boolean
+      updatedAt: string
+    }>("set-webhook", { method: "POST", body: payload })
   }
 
   getWebhook() {
-    return this.request<unknown>("get-webhook", { method: "GET" })
+    return this.request<{
+      webhookUrl: string
+      enabled: boolean
+      lastVerifiedAt: string
+    }>("get-webhook", { method: "GET" })
   }
 
   storePublicKey(payload: { publicKey: string; [key: string]: unknown }) {
