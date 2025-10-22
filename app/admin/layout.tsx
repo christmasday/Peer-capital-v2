@@ -13,7 +13,8 @@ import {
   Webhook,
   Menu,
   ChevronDown,
-  LogOut
+  LogOut,
+  DollarSign
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -33,6 +34,7 @@ const navigation = [
   { name: "Users", href: "/admin/users", icon: Users },
   { name: "IP Allowlist", href: "/admin/ip-allowlist", icon: Globe },
   { name: "Asset Preferences", href: "/admin/asset-preferences", icon: Settings },
+  { name: "Fee Configuration", href: "/admin/fees", icon: DollarSign },
   { name: "API Keys", href: "/admin/api-keys", icon: Key },
   { name: "Webhooks", href: "/admin/webhooks", icon: Webhook },
 ]

@@ -2,38 +2,30 @@ import { NextRequest, NextResponse } from "next/server"
 import { createStablesrailClient, StablesrailError } from "@/lib/stablesrail/client"
 import { checkAuth } from "@/lib/auth-utils"
 
-export async function POST(req: NextRequest) {
+export async function GET(req: NextRequest) {
   try {
     const auth = await checkAuth()
     if (!auth.authenticated || !auth.userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const body = await req.json().catch(() => null)
-    if (!body || typeof body !== "object") {
-      return NextResponse.json({ error: "Invalid request body" }, { status: 400 })
+    const { searchParams } = new URL(req.url)
+    const correlationId = searchParams.get('correlationId')
+    
+    if (!correlationId) {
+      return NextResponse.json({ error: "correlationId is required" }, { status: 400 })
     }
 
     const stablesrail = createStablesrailClient()
-    const result = await stablesrail.cngnOnramp({
-      userId: body.userId,
-      amount: body.amount,
-      owner: body.walletAddress, // Map walletAddress to owner parameter
-      network: body.network || "BASE",
-      assetSwap: "CNGN",
-      autoSwap: false
-    })
+    const result = await stablesrail.getCngnRequestStatus(correlationId)
     
     return NextResponse.json({ 
       success: true, 
       data: {
-        transactionId: result.transactionId,
-        correlationId: result.correlationId,
         status: result.status,
-        estimatedCompletionTime: result.estimatedCompletionTime,
-        operationId: result.operationId,
-        amount: body.amount,
-        network: body.network || "BASE"
+        transactionHash: result.transactionHash,
+        amount: result.amount,
+        failureReason: result.failureReason
       }
     })
   } catch (error) {
@@ -43,7 +35,7 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       )
     }
-    console.error("Error in cngn-onramp:", error)
+    console.error("Error fetching transaction status:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

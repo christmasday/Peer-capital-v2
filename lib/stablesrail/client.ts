@@ -177,12 +177,59 @@ export class StablesrailClient {
     return this.request<unknown>("getaccumulatedfees", { method: "GET" })
   }
 
-  manageFees(payload: { [key: string]: unknown }) {
-    return this.request<unknown>("managefees", { method: "PUT", body: payload })
+  manageFees(payload: {
+    onrampFee?: {
+      percentageFee: number;
+      capFee: number;
+      enabled: boolean;
+    };
+    offrampFee?: {
+      percentageFee: number;
+      capFee: number;
+      enabled: boolean;
+    };
+    metadata?: {
+      description?: string;
+      notes?: string;
+      lastUpdatedBy?: string;
+    };
+  }) {
+    return this.request<{
+      status: string;
+      message: string;
+      data: {
+        fintechId: string;
+        operation: string;
+        feeConfiguration: any;
+        exampleCalculation: any;
+      };
+    }>("managefees", { method: "PUT", body: payload })
   }
 
   getFees() {
-    return this.request<unknown>("getfees", { method: "GET" })
+    return this.request<{
+      status: string;
+      message: string;
+      data: {
+        fintechId: string;
+        hasConfiguration: boolean;
+        feeConfiguration: {
+          onrampFee?: {
+            percentageFee: number;
+            capFee: number;
+            enabled: boolean;
+            metadata?: any;
+          };
+          offrampFee?: {
+            percentageFee: number;
+            capFee: number;
+            enabled: boolean;
+            metadata?: any;
+          };
+        };
+        exampleCalculation: any;
+      };
+    }>("getfees", { method: "GET" })
   }
 
   updateAssets(payload: { [key: string]: unknown }) {
@@ -203,6 +250,28 @@ export class StablesrailClient {
 
   getBanksCode() {
     return this.request<unknown>("getbankscode", { method: "GET" })
+  }
+
+  tokenWithdrawal(payload: {
+    userId: string;
+    toAddress: string;
+    amount: number;
+    asset: string;
+    destinationWallet?: string;
+    network?: string;
+  }) {
+    return this.request<{
+      transactionId: string;
+      correlationId: string;
+      status: string;
+      from: string;
+      to: string;
+      amount: number;
+      ticker: string;
+      initiatedAt: string;
+      estimatedGasFee?: number;
+      platformFee?: number;
+    }>("withdrawasset", { method: "POST", body: payload })
   }
 
   manualStatusRecovery(query: { uuid: string }) {
@@ -251,6 +320,19 @@ export class StablesrailClient {
       enabled: boolean
       lastVerifiedAt: string
     }>("get-webhook", { method: "GET" })
+  }
+
+  getBankCodes() {
+    return this.request<{
+      operationId: string
+      requestId: string
+      countryCode: string
+      totalCount: number
+      banks: Array<{
+        name: string
+        code: string
+      }>
+    }>("getbankscode", { method: "GET" })
   }
 
   storePublicKey(payload: { publicKey: string; [key: string]: unknown }) {

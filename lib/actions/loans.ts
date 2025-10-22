@@ -381,70 +381,133 @@ export async function approveLoanRequest({ loanRequestId, pin, approverId }: { l
   if (lenderAccountError || !lenderAccount) {
     return { success: false, error: "Could not fetch lender's account balance" };
   }
-  // Calculate lender admin charge
-  const lenderChargePercent = parseFloat(process.env.ADMIN_LENDER_CHARGE_PERCENT || "1.5");
-  const lenderCharge = Math.round((loanRequest.amount * lenderChargePercent) / 100);
-  const totalRequired = loanRequest.amount + lenderCharge;
-  if (lenderAccount.balance < totalRequired) {
-    return { success: false, error: `Insufficient funds. You need at least ₦${totalRequired} to approve this loan (including admin charge).` };
+  // Fetch configurable admin fees
+  const { data: lenderFeeConfig } = await adminClient
+    .from("admin_fees")
+    .select("percentage")
+    .eq("fee_type", "lender_fee")
+    .single()
+
+  const { data: borrowerFeeConfig } = await adminClient
+    .from("admin_fees")
+    .select("percentage")
+    .eq("fee_type", "borrower_fee")
+    .single()
+
+  const lenderFeePercent = lenderFeeConfig?.percentage || 1.5
+  const borrowerFeePercent = borrowerFeeConfig?.percentage || 1.5
+  const lenderFeeAmount = (loanRequest.amount * lenderFeePercent) / 100
+  const borrowerFeeAmount = (loanRequest.amount * borrowerFeePercent) / 100
+
+  // Get admin wallet address
+  const adminWalletAddress = process.env.ADMIN_WALLET_ADDRESS
+  if (!adminWalletAddress) {
+    return { success: false, error: "Admin wallet not configured" }
   }
 
-  // 1. Initiate ALAT debit/process-transfer for loan amount
-  const transferRes = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/api/alat/debit/process-transfer`, {
+  // Fetch wallet addresses
+  const { data: lenderWallet } = await adminClient
+    .from("wallet_address")
+    .select("base_address")
+    .eq("user_id", approverId)
+    .single()
+
+  const { data: borrowerWallet } = await adminClient
+    .from("wallet_address")
+    .select("base_address")
+    .eq("user_id", loanRequest.user_id)
+    .single()
+
+  if (!lenderWallet?.base_address || !borrowerWallet?.base_address) {
+    return { success: false, error: "Wallet addresses not found" }
+  }
+
+  // Check lender balance (amount + fee + gas)
+  const { checkSufficientBalance } = await import("@/lib/utils/balance-checker")
+  const balanceCheck = await checkSufficientBalance({
+    walletAddress: lenderWallet.base_address,
+    amount: loanRequest.amount + lenderFeeAmount,
+    asset: "CNGN",
+    network: "BASE"
+  })
+
+  if (!balanceCheck.sufficient) {
+    return { 
+      success: false, 
+      error: `Insufficient funds. Required: ${balanceCheck.required}, Available: ${balanceCheck.balance}` 
+    }
+  }
+
+  // Execute three token withdrawals
+
+  // 1a. Main loan transfer (lender → borrower)
+  const loanTransferRes = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/stablesrail/token-withdrawal`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      transactionReference: loanRequestId,
+      userId: helperProfile.sr_user_id,
+      toAddress: borrowerWallet.base_address,
+      fromAddress: lenderWallet.base_address,
       amount: loanRequest.amount,
-      sourceAccountNumber: helperProfile.account_number,
-      destinationAccountNumber: requesterProfile.account_number,
-      narration: `Loan disbursement for request ${loanRequestId}`,
-      user_id: approverId,
+      asset: "CNGN",
+      network: "BASE"
     }),
-  });
-  const transferData = await transferRes.json();
-  if (transferData.status !== "success") {
-    return { success: false, error: transferData.message || transferData.error || "ALAT transfer failed" };
+  })
+
+  const loanTransferData = await loanTransferRes.json()
+  if (!loanTransferData.success) {
+    return { success: false, error: "Loan transfer failed: " + loanTransferData.error }
   }
 
-  // 1b. Debit lender admin charge (percentage of loan amount)
-  const lenderChargeReference = `${loanRequestId}-lender-admin-charge`;
-  const lenderChargeRes = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/api/alat/debit/process-transfer`, {
+  // 1b. Lender admin fee (lender → admin)
+  const lenderFeeRes = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/stablesrail/token-withdrawal`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      transactionReference: lenderChargeReference,
-      amount: lenderCharge,
-      sourceAccountNumber: helperProfile.account_number,
-      destinationAccountNumber: adminAccountNumber,
-      narration: `Lender admin charge for loan request ${loanRequestId}`,
-      user_id: approverId,
+      userId: helperProfile.sr_user_id,
+      toAddress: adminWalletAddress,
+      fromAddress: lenderWallet.base_address,
+      amount: lenderFeeAmount,
+      asset: "CNGN",
+      network: "BASE"
     }),
-  });
-  const lenderChargeData = await lenderChargeRes.json();
-  if (lenderChargeData.status !== "success") {
-    return { success: false, error: lenderChargeData.message || lenderChargeData.error || "Lender admin charge debit failed" };
+  })
+
+  const lenderFeeData = await lenderFeeRes.json()
+  if (!lenderFeeData.success) {
+    console.error("Lender fee collection failed:", lenderFeeData.error)
+    // Continue - main transfer succeeded
   }
 
-  // 1c. Debit borrower admin charge (percentage of loan amount)
-  const borrowerChargePercent = parseFloat(process.env.ADMIN_BORROWER_CHARGE_PERCENT || "1.5");
-  const borrowerCharge = Math.round((loanRequest.amount * borrowerChargePercent) / 100);
-  const borrowerChargeReference = `${loanRequestId}-borrower-admin-charge`;
-  const borrowerChargeRes = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/api/alat/debit/process-transfer`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      transactionReference: borrowerChargeReference,
-      amount: borrowerCharge,
-      sourceAccountNumber: requesterProfile.account_number,
-      destinationAccountNumber: adminAccountNumber,
-      narration: `Borrower admin charge for loan request ${loanRequestId}`,
-      user_id: loanRequest.user_id,
-    }),
-  });
-  const borrowerChargeData = await borrowerChargeRes.json();
-  if (borrowerChargeData.status !== "success") {
-    return { success: false, error: borrowerChargeData.message || borrowerChargeData.error || "Borrower admin charge debit failed" };
+  // 1c. Borrower admin fee (borrower → admin) - after they receive funds
+  // Check if borrower now has sufficient balance
+  const borrowerBalanceCheck = await checkSufficientBalance({
+    walletAddress: borrowerWallet.base_address,
+    amount: borrowerFeeAmount,
+    asset: "CNGN",
+    network: "BASE"
+  })
+
+  if (borrowerBalanceCheck.sufficient) {
+    const borrowerFeeRes = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/stablesrail/token-withdrawal`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: requesterProfile.sr_user_id,
+        toAddress: adminWalletAddress,
+        fromAddress: borrowerWallet.base_address,
+        amount: borrowerFeeAmount,
+        asset: "CNGN",
+        network: "BASE"
+      }),
+    })
+
+    const borrowerFeeData = await borrowerFeeRes.json()
+    if (!borrowerFeeData.success) {
+      console.error("Borrower fee collection failed:", borrowerFeeData.error)
+    }
+  } else {
+    console.warn("Borrower insufficient balance for fee")
   }
 
   // 2. Calculate repayment due date
@@ -470,10 +533,16 @@ export async function approveLoanRequest({ loanRequestId, pin, approverId }: { l
     updated_at: new Date().toISOString(),
   })
 
-  // 4. Update loan request status
+  // Update loan record with all transaction IDs
   const { error: updateError } = await adminClient
     .from("loan_requests")
-    .update({ status: "approved" })
+    .update({ 
+      status: "approved",
+      disbursement_tx_id: loanTransferData.data.transactionId,
+      disbursement_correlation_id: loanTransferData.data.correlationId,
+      lender_fee_tx_id: lenderFeeData.data?.transactionId,
+      borrower_fee_tx_id: borrowerFeeData.data?.transactionId
+    })
     .eq("id", loanRequestId)
   if (updateError) {
     return { success: false, error: "Failed to update loan status" }

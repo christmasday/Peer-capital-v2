@@ -41,6 +41,21 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
   const [showFundModal, setShowFundModal] = useState(false)
   const [fundAmount, setFundAmount] = useState("")
   const [isFunding, setIsFunding] = useState(false)
+  const [onrampTransactionId, setOnrampTransactionId] = useState<string | null>(null)
+  const [onrampCorrelationId, setOnrampCorrelationId] = useState<string | null>(null)
+  const [onrampStatus, setOnrampStatus] = useState<string>('pending')
+  const [showOnrampStatusModal, setShowOnrampStatusModal] = useState(false)
+  const [onrampDetails, setOnrampDetails] = useState<any>(null)
+  const [baseWalletBalance, setBaseWalletBalance] = useState<string | null>(null)
+  const [isLoadingBalance, setIsLoadingBalance] = useState(false)
+  const [balanceError, setBalanceError] = useState<string | null>(null)
+  const [showWithdrawalModal, setShowWithdrawalModal] = useState(false)
+  const [withdrawalAmount, setWithdrawalAmount] = useState("")
+  const [withdrawalBank, setWithdrawalBank] = useState("")
+  const [withdrawalAccountNumber, setWithdrawalAccountNumber] = useState("")
+  const [banks, setBanks] = useState<{ name: string; code: string }[]>([])
+  const [isLoadingBanks, setIsLoadingBanks] = useState(false)
+  const [isWithdrawing, setIsWithdrawing] = useState(false)
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-NG", {
@@ -79,6 +94,18 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
                 account_number: vaJson.data.account_number,
                 bank_name: vaJson.data.bank_name || 'Stablesrail',
               })
+              
+              // Fetch BASE wallet balance if virtual account exists
+              const walletResponse = await fetch('/api/stablesrail/wallet-address', {
+                credentials: 'include'
+              })
+              
+              if (walletResponse.ok) {
+                const walletData = await walletResponse.json()
+                if (walletData.success && walletData.walletAddresses?.base_address) {
+                  await fetchBaseWalletBalance(walletData.walletAddresses.base_address)
+                }
+              }
             }
           }
         } catch {}
@@ -86,6 +113,36 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
         setTimelineLoading(false)
       }
     })()
+  }, [])
+
+  // Fetch Nigerian banks for withdrawal from Stablesrail
+  useEffect(() => {
+    async function fetchBanks() {
+      setIsLoadingBanks(true)
+      try {
+        const res = await fetch('/api/stablesrail/get-bank-codes', {
+          credentials: 'include'
+        })
+        const data = await res.json()
+        
+        if (data.success && Array.isArray(data.data?.banks)) {
+          setBanks(data.data.banks.map((bank: any) => ({ 
+            name: bank.name, 
+            code: bank.code 
+          })))
+        }
+      } catch (error) {
+        console.error('Failed to fetch banks:', error)
+        toast({
+          title: "Error",
+          description: "Failed to load banks list",
+          variant: "destructive"
+        })
+      } finally {
+        setIsLoadingBanks(false)
+      }
+    }
+    fetchBanks()
   }, [])
 
   const handleFindLenders = async () => {
@@ -314,7 +371,7 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
     setIsFunding(true)
 
     try {
-      // First, get the user's wallet addresses
+      // Fetch BASE wallet address
       const walletResponse = await fetch('/api/stablesrail/wallet-address', {
         credentials: 'include'
       })
@@ -326,19 +383,18 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
       const walletData = await walletResponse.json()
 
       if (!walletData.success || !walletData.walletAddresses?.base_address) {
-        throw new Error('Base wallet address not found. Please create a virtual account first.')
+        throw new Error('BASE wallet address not found. Please create a virtual account first.')
       }
 
-      // Call the CNGN onramp API
+      // Call CNGN onramp with explicit BASE network
       const response = await fetch('/api/stablesrail/cngn-onramp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          owner: walletData.walletAddresses.base_address,
+          userId: userProfile.profile.sr_user_id,
           amount: Number(fundAmount),
-          assetSwap: "CNGN",
-          autoSwap: false,
-          userId: userProfile.profile.sr_user_id
+          walletAddress: walletData.walletAddresses.base_address,
+          network: "BASE" // Always use BASE network
         }),
         credentials: 'include'
       })
@@ -346,12 +402,26 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
       const data = await response.json()
 
       if (response.ok && data.success) {
-        toast({
-          title: "Funding Initiated",
-          description: `Funding request submitted successfully. Operation ID: ${data.data?.operationId || 'N/A'}`,
+        // Extract transaction details
+        setOnrampTransactionId(data.data.transactionId)
+        setOnrampCorrelationId(data.data.correlationId)
+        setOnrampStatus(data.data.status || 'pending')
+        setOnrampDetails({
+          amount: Number(fundAmount),
+          network: 'BASE',
+          walletAddress: walletData.walletAddresses.base_address,
+          estimatedCompletionTime: data.data.estimatedCompletionTime
         })
+        
+        // Close fund modal, open status modal
         setShowFundModal(false)
         setFundAmount("")
+        setShowOnrampStatusModal(true)
+        
+        // Start polling if not completed
+        if (data.data.status !== 'completed' && data.data.status !== 'failed') {
+          pollOnrampStatus(data.data.correlationId)
+        }
       } else {
         throw new Error(data.error || 'Failed to initiate funding')
       }
@@ -364,6 +434,187 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
       })
     } finally {
       setIsFunding(false)
+    }
+  }
+
+  const pollOnrampStatus = async (correlationId: string) => {
+    let attempts = 0
+    const maxAttempts = 60 // Poll for 5 minutes max (60 * 5 seconds)
+    
+    const poll = async () => {
+      if (attempts >= maxAttempts) {
+        toast({
+          title: "Status Check Timeout",
+          description: "Transaction is taking longer than expected. Please check back later.",
+          variant: "destructive"
+        })
+        return
+      }
+      
+      try {
+        const response = await fetch(
+          `/api/stablesrail/cngn-request-status?correlationId=${correlationId}`,
+          { credentials: 'include' }
+        )
+        
+        const data = await response.json()
+        
+        if (response.ok && data.success) {
+          setOnrampStatus(data.data.status)
+          
+          // Update details if transaction hash is available
+          if (data.data.transactionHash) {
+            setOnrampDetails((prev: any) => ({
+              ...prev,
+              transactionHash: data.data.transactionHash
+            }))
+          }
+          
+          // Stop polling if completed or failed
+          if (data.data.status === 'completed' || data.data.status === 'failed') {
+            if (data.data.status === 'completed') {
+              toast({
+                title: "Funding Completed",
+                description: "Your account has been funded successfully!",
+              })
+              
+              // Refresh balance after successful funding
+              const walletResponse = await fetch('/api/stablesrail/wallet-address', {
+                credentials: 'include'
+              })
+              if (walletResponse.ok) {
+                const walletData = await walletResponse.json()
+                if (walletData.success && walletData.walletAddresses?.base_address) {
+                  await fetchBaseWalletBalance(walletData.walletAddresses.base_address)
+                }
+              }
+            }
+            return
+          }
+          
+          // Continue polling
+          attempts++
+          setTimeout(poll, 5000) // Poll every 5 seconds
+        }
+      } catch (error) {
+        console.error('Error polling status:', error)
+        attempts++
+        setTimeout(poll, 5000)
+      }
+    }
+    
+    poll()
+  }
+
+  const fetchBaseWalletBalance = async (baseAddress: string) => {
+    setIsLoadingBalance(true)
+    setBalanceError(null)
+    
+    try {
+      const response = await fetch(
+        `/api/stablesrail/base-balance?address=${encodeURIComponent(baseAddress)}`,
+        { credentials: 'include' }
+      )
+      
+      const data = await response.json()
+      
+      if (response.ok && data.success) {
+        setBaseWalletBalance(data.balance)
+      } else {
+        throw new Error(data.error || 'Failed to fetch balance')
+      }
+    } catch (error) {
+      console.error('Error fetching BASE balance:', error)
+      setBalanceError(error instanceof Error ? error.message : 'Failed to fetch balance')
+      setBaseWalletBalance(null)
+    } finally {
+      setIsLoadingBalance(false)
+    }
+  }
+
+  const handleWithdrawal = async () => {
+    // Validation
+    if (!withdrawalAmount || Number(withdrawalAmount) <= 0) {
+      toast({
+        title: "Invalid Amount",
+        description: "Please enter a valid amount greater than 0.",
+        variant: "destructive"
+      })
+      return
+    }
+
+    if (!withdrawalBank) {
+      toast({
+        title: "Bank Required",
+        description: "Please select a destination bank.",
+        variant: "destructive"
+      })
+      return
+    }
+
+    if (!withdrawalAccountNumber || withdrawalAccountNumber.length !== 10) {
+      toast({
+        title: "Invalid Account Number",
+        description: "Please enter a valid 10-digit account number.",
+        variant: "destructive"
+      })
+      return
+    }
+
+    if (!userProfile.profile?.sr_user_id) {
+      toast({
+        title: "Account Required",
+        description: "Please complete your profile setup first.",
+        variant: "destructive"
+      })
+      return
+    }
+
+    setIsWithdrawing(true)
+
+    try {
+      // Find bank code from selected bank name
+      const selectedBank = banks.find(b => b.name === withdrawalBank)
+      if (!selectedBank) {
+        throw new Error('Bank not found')
+      }
+
+      // Call the CNGN offramp API (as shown in screenshot)
+      const response = await fetch('/api/stablesrail/cngn-offramp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: userProfile.profile.sr_user_id,
+          amount: Number(withdrawalAmount),
+          bankAccountNumber: withdrawalAccountNumber,
+          bankCode: selectedBank.code,
+        }),
+        credentials: 'include'
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        toast({
+          title: "Withdrawal Initiated",
+          description: `Withdrawal request submitted successfully. Transaction ID: ${data.data?.transactionId || 'N/A'}`,
+        })
+        setShowWithdrawalModal(false)
+        setWithdrawalAmount("")
+        setWithdrawalBank("")
+        setWithdrawalAccountNumber("")
+      } else {
+        throw new Error(data.error || 'Failed to initiate withdrawal')
+      }
+    } catch (error) {
+      console.error('❌ Withdrawal failed:', error)
+      toast({
+        title: "Withdrawal Failed",
+        description: error instanceof Error ? error.message : "Failed to process withdrawal",
+        variant: "destructive",
+      })
+    } finally {
+      setIsWithdrawing(false)
     }
   }
 
@@ -405,12 +656,56 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
                   <div className="mt-4">
                     <p className="text-blue-100 text-xs">Your Virtual Account:</p>
                     {userVirtualAccount?.account_number ? (
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg tracking-widest font-semibold">{userVirtualAccount.account_number}</span>
-                        {userVirtualAccount.bank_name && (
-                          <span className="text-blue-200 text-xs">{userVirtualAccount.bank_name}</span>
-                        )}
-                      </div>
+                      <>
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg tracking-widest font-semibold">{userVirtualAccount.account_number}</span>
+                          {userVirtualAccount.bank_name && (
+                            <span className="text-blue-200 text-xs">{userVirtualAccount.bank_name}</span>
+                          )}
+                        </div>
+                        
+                        {/* Balance Display */}
+                        <div className="mt-2 pt-2 border-t border-blue-400/30">
+                          <p className="text-blue-100 text-xs mb-1">BASE Wallet Balance:</p>
+                          {isLoadingBalance ? (
+                            <div className="flex items-center gap-2">
+                              <Loader2 className="h-3 w-3 animate-spin text-blue-200" />
+                              <span className="text-sm text-blue-200">Loading balance...</span>
+                            </div>
+                          ) : balanceError ? (
+                            <div className="flex items-center gap-2">
+                              <AlertCircle className="h-3 w-3 text-red-300" />
+                              <span className="text-xs text-red-200">{balanceError}</span>
+                            </div>
+                          ) : baseWalletBalance !== null ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xl font-bold">
+                                {baseWalletBalance} ETH
+                              </span>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={async () => {
+                                  const walletResponse = await fetch('/api/stablesrail/wallet-address', {
+                                    credentials: 'include'
+                                  })
+                                  if (walletResponse.ok) {
+                                    const walletData = await walletResponse.json()
+                                    if (walletData.success && walletData.walletAddresses?.base_address) {
+                                      await fetchBaseWalletBalance(walletData.walletAddresses.base_address)
+                                    }
+                                  }
+                                }}
+                                className="h-6 px-2 text-xs text-blue-200 hover:text-white hover:bg-blue-600"
+                              >
+                                Refresh
+                              </Button>
+                            </div>
+                          ) : (
+                            <span className="text-sm text-blue-200">—</span>
+                          )}
+                        </div>
+                      </>
                     ) : (
                       <div className="flex items-center gap-2">
                         <span className="text-lg tracking-widest font-semibold text-blue-200">— — — — — — — — —</span>
@@ -444,15 +739,10 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
                     <Button
                       variant="secondary"
                       className="w-full h-16 flex flex-col items-center justify-center gap-2 bg-white text-blue-600 hover:bg-gray-50"
-                      onClick={() =>
-                        toast({
-                          title: 'Unavailable',
-                          description: 'Transfers are currently disabled.',
-                        })
-                      }
+                      onClick={() => setShowWithdrawalModal(true)}
                     >
-                      <ArrowRightLeft className="h-6 w-6" />
-                      <span className="text-sm font-medium">Transfer</span>
+                      <ArrowDown className="h-6 w-6" />
+                      <span className="text-sm font-medium">Withdrawal</span>
                     </Button>
                     <Link href="/timeline" className="w-full">
                       <Button
@@ -746,6 +1036,216 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Withdrawal Modal */}
+      <Dialog open={showWithdrawalModal} onOpenChange={setShowWithdrawalModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Withdraw Funds</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {/* Amount Input */}
+            <div>
+              <label htmlFor="withdrawal-amount" className="text-sm font-medium text-gray-700 mb-2 block">
+                Amount (NGN)
+              </label>
+              <Input
+                id="withdrawal-amount"
+                type="number"
+                placeholder="Enter amount"
+                value={withdrawalAmount}
+                onChange={(e) => setWithdrawalAmount(e.target.value)}
+                disabled={isWithdrawing}
+              />
+            </div>
+
+            {/* Bank Selection Dropdown */}
+            <div>
+              <label htmlFor="withdrawal-bank" className="text-sm font-medium text-gray-700 mb-2 block">
+                Destination Bank
+              </label>
+              <select
+                id="withdrawal-bank"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                value={withdrawalBank}
+                onChange={(e) => setWithdrawalBank(e.target.value)}
+                disabled={isWithdrawing || isLoadingBanks}
+              >
+                <option value="">
+                  {isLoadingBanks ? 'Loading banks...' : 'Select bank'}
+                </option>
+                {banks.map((bank) => (
+                  <option key={bank.code} value={bank.name}>
+                    {bank.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Account Number Input */}
+            <div>
+              <label htmlFor="withdrawal-account" className="text-sm font-medium text-gray-700 mb-2 block">
+                Account Number
+              </label>
+              <Input
+                id="withdrawal-account"
+                type="text"
+                placeholder="Enter 10-digit account number"
+                value={withdrawalAccountNumber}
+                onChange={(e) => setWithdrawalAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                disabled={isWithdrawing}
+                maxLength={10}
+              />
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-3 pt-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  setShowWithdrawalModal(false)
+                  setWithdrawalAmount("")
+                  setWithdrawalBank("")
+                  setWithdrawalAccountNumber("")
+                }}
+                disabled={isWithdrawing}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="flex-1"
+                onClick={handleWithdrawal}
+                disabled={
+                  isWithdrawing || 
+                  !withdrawalAmount || 
+                  Number(withdrawalAmount) <= 0 ||
+                  !withdrawalBank ||
+                  withdrawalAccountNumber.length !== 10
+                }
+              >
+                {isWithdrawing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  "Withdraw"
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Transaction Status Modal */}
+      <Dialog open={showOnrampStatusModal} onOpenChange={setShowOnrampStatusModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Funding Transaction Status</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {/* Transaction ID */}
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-1 block">
+                Transaction ID
+              </label>
+              <p className="text-sm text-gray-900 font-mono bg-gray-50 p-2 rounded">
+                {onrampTransactionId || 'N/A'}
+              </p>
+            </div>
+
+            {/* Status */}
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-1 block">
+                Status
+              </label>
+              <div className="flex items-center gap-2">
+                {onrampStatus === 'pending' || onrampStatus === 'processing' ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                ) : onrampStatus === 'completed' ? (
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                ) : (
+                  <AlertCircle className="h-4 w-4 text-red-600" />
+                )}
+                <span className="text-sm font-medium capitalize">
+                  {onrampStatus}
+                </span>
+              </div>
+            </div>
+
+            {/* Amount */}
+            {onrampDetails && (
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-1 block">
+                  Amount
+                </label>
+                <p className="text-sm text-gray-900">
+                  ₦{onrampDetails.amount?.toLocaleString()}
+                </p>
+              </div>
+            )}
+
+            {/* Network */}
+            {onrampDetails && (
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-1 block">
+                  Network
+                </label>
+                <p className="text-sm text-gray-900 font-medium">
+                  {onrampDetails.network}
+                </p>
+              </div>
+            )}
+
+            {/* Wallet Address */}
+            {onrampDetails && (
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-1 block">
+                  Wallet Address
+                </label>
+                <p className="text-xs text-gray-900 font-mono bg-gray-50 p-2 rounded break-all">
+                  {onrampDetails.walletAddress}
+                </p>
+              </div>
+            )}
+
+            {/* Transaction Hash (if available) */}
+            {onrampDetails?.transactionHash && (
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-1 block">
+                  Transaction Hash
+                </label>
+                <p className="text-xs text-gray-900 font-mono bg-gray-50 p-2 rounded break-all">
+                  {onrampDetails.transactionHash}
+                </p>
+              </div>
+            )}
+
+            {/* Estimated Completion Time */}
+            {onrampDetails?.estimatedCompletionTime && (
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-1 block">
+                  Estimated Completion
+                </label>
+                <p className="text-sm text-gray-900">
+                  {onrampDetails.estimatedCompletionTime}
+                </p>
+              </div>
+            )}
+
+            {/* Close Button */}
+            <div className="pt-2">
+              <Button
+                className="w-full"
+                onClick={() => setShowOnrampStatusModal(false)}
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
