@@ -12,14 +12,19 @@ export async function GET(req: NextRequest) {
     const stablesrail = createStablesrailClient()
     const response = await stablesrail.getFees()
 
-    // Handle the case where Stablesrail returns an error or no data
-    if (!response || !response.data) {
+    console.log('🔵 [manage-fees GET] Stablesrail response:', JSON.stringify(response, null, 2))
+
+    // The client returns the data object directly, which contains feeConfiguration
+    // If no configuration exists yet, return a consistent 200 response
+    if (!response || (!response.feeConfiguration && !response.hasConfiguration)) {
+      console.log('🔵 [manage-fees GET] No configuration found, returning empty')
       return NextResponse.json({ 
-        success: false, 
-        error: "No fee configuration found" 
-      }, { status: 404 })
+        success: true,
+        fees: { hasConfiguration: false, feeConfiguration: {} }
+      })
     }
 
+    console.log('🔵 [manage-fees GET] Returning fees:', JSON.stringify({ success: true, fees: response }, null, 2))
     return NextResponse.json({ 
       success: true, 
       fees: response 

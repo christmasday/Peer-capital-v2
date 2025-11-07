@@ -5,11 +5,16 @@ import { createAdminClient } from "@/lib/supabase/admin"
 
 export async function POST(req: NextRequest) {
   try {
-    // Check authentication
-    const authResult = await checkAuth()
+    console.log('🔵 [create-virtual-account] Starting request')
+    
+    // Check authentication (prevent redirect in API routes)
+    const authResult = await checkAuth(true)
     if (!authResult.authenticated || !authResult.userId) {
+      console.error('🔴 [create-virtual-account] Authentication failed')
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
+
+    console.log('🔵 [create-virtual-account] User authenticated:', authResult.userId)
 
     const admin = createAdminClient()
     
@@ -20,11 +25,22 @@ export async function POST(req: NextRequest) {
       .eq('id', authResult.userId)
       .single()
 
-    if (profileError || !profile?.sr_user_id) {
+    if (profileError) {
+      console.error('🔴 [create-virtual-account] Profile error:', profileError)
+      return NextResponse.json({ 
+        error: "Failed to fetch user profile",
+        details: profileError.message
+      }, { status: 500 })
+    }
+
+    if (!profile?.sr_user_id) {
+      console.error('🔴 [create-virtual-account] No sr_user_id found for user:', authResult.userId)
       return NextResponse.json({ 
         error: "User not onboarded with Stablesrail. Please complete BVN verification first." 
       }, { status: 400 })
     }
+
+    console.log('🔵 [create-virtual-account] sr_user_id:', profile.sr_user_id)
 
     // Check if virtual account already exists
     const { data: existingVA } = await admin
@@ -52,17 +68,56 @@ export async function POST(req: NextRequest) {
 
     // Create virtual account with Stablesrail
     const stablesrail = createStablesrailClient()
-    const createResult: any = await stablesrail.createVirtualAccount({
+    const payload = {
       userId: profile.sr_user_id
-    })
-
-    if (!createResult?.success || !createResult?.data?.requestId) {
-      return NextResponse.json({ 
-        error: "Failed to create virtual account with Stablesrail" 
-      }, { status: 500 })
+    }
+    console.log('🔵 [create-virtual-account] Creating with Stablesrail, payload:', JSON.stringify(payload, null, 2))
+    
+    let createResult: any
+    try {
+      createResult = await stablesrail.createVirtualAccount(payload)
+      console.log('🔵 [create-virtual-account] Stablesrail response:', JSON.stringify(createResult, null, 2))
+    } catch (stablesrailError) {
+      console.error('🔴 [create-virtual-account] Stablesrail API error:', stablesrailError)
+      if (stablesrailError instanceof StablesrailError) {
+        return NextResponse.json(
+          { 
+            error: stablesrailError.message, 
+            code: stablesrailError.responseCode, 
+            details: stablesrailError.details 
+          },
+          { status: 400 }
+        )
+      }
+      throw stablesrailError
     }
 
-    const requestId = createResult.data.requestId
+    // The client returns just the data field, so check for requestId directly
+    // Handle various possible response structures
+    const requestId = 
+      createResult?.requestId || 
+      createResult?.data?.requestId ||
+      (typeof createResult === 'string' ? createResult : null)
+    
+    console.log('🔵 [create-virtual-account] Extracted requestId:', requestId)
+    console.log('🔵 [create-virtual-account] Full createResult structure:', JSON.stringify(createResult, null, 2))
+    
+    if (!requestId) {
+      console.error('🔴 [create-virtual-account] No requestId found in response')
+      console.error('🔴 [create-virtual-account] createResult type:', typeof createResult)
+      console.error('🔴 [create-virtual-account] createResult:', JSON.stringify(createResult, null, 2))
+      console.error('🔴 [create-virtual-account] createResult keys:', createResult && typeof createResult === 'object' ? Object.keys(createResult) : 'N/A')
+      
+      return NextResponse.json({ 
+        error: "Failed to create virtual account with Stablesrail: No requestId in response",
+        details: {
+          createResult,
+          createResultType: typeof createResult,
+          hasRequestId: !!createResult?.requestId,
+          hasDataRequestId: !!createResult?.data?.requestId
+        }
+      }, { status: 500 })
+    }
 
     // Persist requestId immediately as placeholder
     try {
@@ -70,8 +125,8 @@ export async function POST(req: NextRequest) {
         user_id: authResult.userId,
         account_number: '', // Will be updated when we get the actual VA
         account_name: '', // Will be updated when we get the actual VA
-        bank_name: 'Stablesrail',
-        bank_code: 'STABLESRAIL',
+        bank_name: '',
+        bank_code: '',
         currency: 'NGN',
         assigned: false, // Will be updated when we get the actual VA
         request_id: requestId,
@@ -161,6 +216,8 @@ export async function POST(req: NextRequest) {
     })
 
   } catch (error) {
+    console.error("🔴 [create-virtual-account] Unexpected error:", error)
+    
     if (error instanceof StablesrailError) {
       return NextResponse.json(
         { error: error.message, code: error.responseCode, details: error.details },
@@ -168,7 +225,14 @@ export async function POST(req: NextRequest) {
       )
     }
     
-    console.error("Error in create-virtual-account:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    const errorMessage = error instanceof Error ? error.message : "Internal server error"
+    const errorStack = error instanceof Error ? error.stack : undefined
+    
+    console.error("🔴 [create-virtual-account] Error details:", { errorMessage, errorStack })
+    
+    return NextResponse.json({ 
+      error: errorMessage,
+      details: process.env.NODE_ENV === 'development' ? errorStack : undefined
+    }, { status: 500 })
   }
 }

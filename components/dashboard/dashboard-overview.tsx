@@ -27,7 +27,6 @@ export function DashboardOverview() {
   const [userName, setUserName] = useState<string>("User")
   const [loading, setLoading] = useState(true)
   const [showBalance, setShowBalance] = useState(true)
-  const [creatingAccount, setCreatingAccount] = useState(false)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -59,15 +58,23 @@ export function DashboardOverview() {
         setUserName(fullName)
       }
       
-      // Fetch virtual account from database
+      // Fetch virtual account from database via Stablesrail
       console.log("🏦 Fetching virtual account from database...")
-      const virtualAccountRes = await fetch("/api/virtual-account")
+      const virtualAccountRes = await fetch("/api/stablesrail/virtual-account", {
+        credentials: 'include'
+      })
       console.log("🏦 Virtual account response status:", virtualAccountRes.status)
       if (virtualAccountRes.ok) {
         const virtualAccountData = await virtualAccountRes.json()
         console.log("🏦 Virtual account data:", virtualAccountData)
-        if (virtualAccountData.success && virtualAccountData.virtualAccount) {
-          setVirtualAccount(virtualAccountData.virtualAccount)
+        if (virtualAccountData.success && virtualAccountData.data) {
+          setVirtualAccount({
+            account_number: virtualAccountData.data.account_number || '',
+            account_name: virtualAccountData.data.account_name || '',
+            bank_name: virtualAccountData.data.bank_name || 'Stablesrail',
+            currency: virtualAccountData.data.currency || 'NGN',
+            assigned: virtualAccountData.data.assigned || false
+          })
         }
       } else {
         console.log("❌ Virtual account response not ok:", virtualAccountRes.status, virtualAccountRes.statusText)
@@ -100,42 +107,6 @@ export function DashboardOverview() {
       console.error("❌ Error fetching dashboard data:", error)
     } finally {
       setLoading(false)
-    }
-  }
-
-  const createVirtualAccount = async () => {
-    try {
-      setCreatingAccount(true)
-      // Still use Paystack API to create the account
-      const response = await fetch("/api/virtual-account", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      })
-      
-      const data = await response.json()
-      
-      if (data.success) {
-        toast({
-          title: "Success",
-          description: "Virtual account created successfully!",
-        })
-        // Refresh data to show the newly created account from database
-        fetchDashboardData()
-      } else {
-        toast({
-          title: "Error",
-          description: data.error || "Failed to create virtual account",
-          variant: "destructive",
-        })
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to create virtual account",
-        variant: "destructive",
-      })
-    } finally {
-      setCreatingAccount(false)
     }
   }
 

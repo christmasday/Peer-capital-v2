@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input"
 import { HelperCard } from "@/components/helpers/helper-card"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 
@@ -31,13 +32,6 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
   const [postContent, setPostContent] = useState("")
   const [accountBalance, setAccountBalance] = useState<{ balance: number; loan_balance: number } | null>(null)
   const [showBalance, setShowBalance] = useState(true)
-  const [userVirtualAccount, setUserVirtualAccount] = useState<{ account_number: string; bank_name: string } | null>(null)
-  const [isCreatingVA, setIsCreatingVA] = useState(false)
-  const [showOnboardingModal, setShowOnboardingModal] = useState(false)
-  const [onboardingStep, setOnboardingStep] = useState<'bvn' | 'otp' | 'complete'>('bvn')
-  const [onboardingRequestId, setOnboardingRequestId] = useState<string | null>(null)
-  const [otpInput, setOtpInput] = useState("")
-  const [isSendingBVN, setIsSendingBVN] = useState(false)
   const [showFundModal, setShowFundModal] = useState(false)
   const [fundAmount, setFundAmount] = useState("")
   const [isFunding, setIsFunding] = useState(false)
@@ -46,16 +40,26 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
   const [onrampStatus, setOnrampStatus] = useState<string>('pending')
   const [showOnrampStatusModal, setShowOnrampStatusModal] = useState(false)
   const [onrampDetails, setOnrampDetails] = useState<any>(null)
+  // New state for VA-based funding flow
+  const [fundingRequestId, setFundingRequestId] = useState<string | null>(null)
+  const [virtualAccountDetails, setVirtualAccountDetails] = useState<any>(null)
+  const [isPollingVA, setIsPollingVA] = useState(false)
+  const [hasConfirmedTransfer, setHasConfirmedTransfer] = useState(false)
+  const [isPollingCompletion, setIsPollingCompletion] = useState(false)
+  const [fundingCompleted, setFundingCompleted] = useState(false)
   const [baseWalletBalance, setBaseWalletBalance] = useState<string | null>(null)
   const [isLoadingBalance, setIsLoadingBalance] = useState(false)
   const [balanceError, setBalanceError] = useState<string | null>(null)
   const [showWithdrawalModal, setShowWithdrawalModal] = useState(false)
   const [withdrawalAmount, setWithdrawalAmount] = useState("")
-  const [withdrawalBank, setWithdrawalBank] = useState("")
-  const [withdrawalAccountNumber, setWithdrawalAccountNumber] = useState("")
-  const [banks, setBanks] = useState<{ name: string; code: string }[]>([])
-  const [isLoadingBanks, setIsLoadingBanks] = useState(false)
+  const [selectedBeneficiary, setSelectedBeneficiary] = useState<string>("")
+  const [beneficiaries, setBeneficiaries] = useState<any[]>([])
+  const [isLoadingBeneficiaries, setIsLoadingBeneficiaries] = useState(false)
+  const [beneficiariesError, setBeneficiariesError] = useState<string | null>(null)
   const [isWithdrawing, setIsWithdrawing] = useState(false)
+
+  // Lightweight delay helper for polling
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-NG", {
@@ -68,7 +72,7 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
   useEffect(() => {
     // Skip ALAT wallet fetching for now - we'll use database data instead
     setWalletLoading(false)
-    setWalletError(null)
+      setWalletError(null)
     // Load account balance and timeline
     ;(async () => {
       try {
@@ -80,32 +84,20 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
           credentials: 'include'
         })
         if (res.ok) {
-          const data = await res.json()
+        const data = await res.json()
           setTimeline(data.posts || [])
         }
 
-        // Fetch user's virtual account from DB via Stablesrail proxy
+        // Fetch BASE wallet balance if wallet address exists
         try {
-          const vaRes = await fetch('/api/stablesrail/virtual-account', { credentials: 'include' })
-          if (vaRes.ok) {
-            const vaJson = await vaRes.json()
-            if (vaJson?.data?.account_number) {
-              setUserVirtualAccount({
-                account_number: vaJson.data.account_number,
-                bank_name: vaJson.data.bank_name || 'Stablesrail',
-              })
-              
-              // Fetch BASE wallet balance if virtual account exists
-              const walletResponse = await fetch('/api/stablesrail/wallet-address', {
-                credentials: 'include'
-              })
-              
-              if (walletResponse.ok) {
-                const walletData = await walletResponse.json()
-                if (walletData.success && walletData.walletAddresses?.base_address) {
-                  await fetchBaseWalletBalance(walletData.walletAddresses.base_address)
-                }
-              }
+          const walletResponse = await fetch('/api/stablesrail/wallet-address', {
+            credentials: 'include'
+          })
+          
+          if (walletResponse.ok) {
+            const walletData = await walletResponse.json()
+            if (walletData.success && walletData.walletAddresses?.base_address) {
+              await fetchBaseWalletBalance(walletData.walletAddresses.base_address)
             }
           }
         } catch {}
@@ -115,35 +107,38 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
     })()
   }, [])
 
-  // Fetch Nigerian banks for withdrawal from Stablesrail
+  // Fetch beneficiaries when withdrawal modal opens
   useEffect(() => {
-    async function fetchBanks() {
-      setIsLoadingBanks(true)
-      try {
-        const res = await fetch('/api/stablesrail/get-bank-codes', {
-          credentials: 'include'
-        })
-        const data = await res.json()
-        
-        if (data.success && Array.isArray(data.data?.banks)) {
-          setBanks(data.data.banks.map((bank: any) => ({ 
-            name: bank.name, 
-            code: bank.code 
-          })))
+    if (showWithdrawalModal) {
+      async function fetchBeneficiaries() {
+        setIsLoadingBeneficiaries(true)
+        setBeneficiariesError(null)
+        try {
+          const res = await fetch('/api/beneficiaries', {
+            credentials: 'include'
+          })
+          const data = await res.json()
+          
+          if (data.success && Array.isArray(data.beneficiaries)) {
+            setBeneficiaries(data.beneficiaries)
+          } else {
+            setBeneficiariesError("Failed to load repayment accounts")
+          }
+        } catch (error) {
+          console.error('Failed to fetch beneficiaries:', error)
+          setBeneficiariesError("Failed to load repayment accounts")
+        } finally {
+          setIsLoadingBeneficiaries(false)
         }
-      } catch (error) {
-        console.error('Failed to fetch banks:', error)
-        toast({
-          title: "Error",
-          description: "Failed to load banks list",
-          variant: "destructive"
-        })
-      } finally {
-        setIsLoadingBanks(false)
       }
+      fetchBeneficiaries()
+    } else {
+      // Reset state when modal closes
+      setSelectedBeneficiary("")
+      setWithdrawalAmount("")
+      setBeneficiariesError(null)
     }
-    fetchBanks()
-  }, [])
+  }, [showWithdrawalModal])
 
   const handleFindLenders = async () => {
     setIsSearching(true)
@@ -211,151 +206,81 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
     setHasSearched(false)
   }
 
-  // Handle virtual account creation
-  const handleCreateVirtualAccount = async () => {
-    setIsCreatingVA(true)
+  const pollVirtualAccount = async (requestId: string) => {
+    // Prevent multiple polling instances
+    if (isPollingVA) {
+      console.warn('Polling already in progress, skipping duplicate call')
+      return
+    }
     
-    try {
-      // 1. Check if user has BVN
-      if (!userProfile.profile?.bvn) {
+    let attempts = 0
+    const maxAttempts = 20 // Poll for up to 40 seconds (20 * 2 seconds)
+    
+    setIsPollingVA(true)
+    
+    const poll = async () => {
+      if (attempts >= maxAttempts) {
+        setIsPollingVA(false)
         toast({
-          title: "Profile Incomplete",
-          description: "Please complete your profile and add your BVN, then try creating a virtual account again.",
-          variant: "destructive",
+          title: "Virtual Account Generation Timeout",
+          description: "Virtual account is taking longer than expected. Please try again later.",
+          variant: "destructive"
         })
         return
       }
       
-      // 2. Check if user has sr_user_id (already onboarded)
-      if (userProfile.profile?.sr_user_id) {
-        // User is onboarded, fetch details from user-details endpoint
-        const response = await fetch(`/api/stablesrail/user-details?userId=${userProfile.profile.sr_user_id}`, {
+      try {
+        const response = await fetch('/api/stablesrail/virtual-account', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ requestId }),
           credentials: 'include'
         })
         
         const data = await response.json()
         
-        if (data.success && data.data?.virtualAccount) {
-          // Update local state with fetched virtual account
-          setUserVirtualAccount({
-            account_number: data.data.virtualAccount.accountNumber,
-            bank_name: 'Stablesrail',
-          })
-          
-          toast({
-            title: "Success",
-            description: "Virtual account details retrieved successfully!",
-          })
-        } else {
-          throw new Error(data.error || 'Failed to fetch virtual account details')
+        if (response.ok && data.success && data.data?.virtualAccount) {
+          // VA details are available
+          setVirtualAccountDetails(data.data)
+          setIsPollingVA(false)
+          return
         }
-      } else {
-        // 3. User has BVN but no sr_user_id - need to onboard
-        // Show onboarding modal/flow
-        setShowOnboardingModal(true)
-      }
-    } catch (error) {
-      console.error('Error creating virtual account:', error)
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to process request",
-        variant: "destructive",
-      })
-    } finally {
-      setIsCreatingVA(false)
-    }
-  }
-
-  // Step 1: Onboard with BVN
-  const handleBVNOnboarding = async () => {
-    console.log('🔵 handleBVNOnboarding called')
-    console.log('🔵 User BVN:', userProfile.profile?.bvn)
-    
-    setIsSendingBVN(true)
-    
-    try {
-      console.log('🔵 Calling /api/stablesrail/onboard-user...')
-      
-      const response = await fetch('/api/stablesrail/onboard-user', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bvn: userProfile.profile.bvn }),
-        credentials: 'include'
-      })
-      
-      console.log('🔵 Response status:', response.status)
-      
-      const data = await response.json()
-      console.log('🔵 Response data:', data)
-      
-      if (response.ok && data.success && data.requestId) {
-        console.log('✅ BVN onboarding successful, requestId:', data.requestId)
-        setOnboardingRequestId(data.requestId)
-        setOnboardingStep('otp')
+        
+        // If we get a 400 error, stop polling and show error
+        if (!response.ok && response.status === 400) {
+          setIsPollingVA(false)
+          toast({
+            title: "Virtual Account Error",
+            description: data.error || "Failed to retrieve virtual account details. Please try again.",
+            variant: "destructive"
+          })
+          return
+        }
+        
+        // If VA not ready yet (but no error), continue polling
+        attempts++
+        if (attempts < maxAttempts) {
+          setTimeout(poll, 2000) // Poll every 2 seconds
+        } else {
+          setIsPollingVA(false)
+          toast({
+            title: "Virtual Account Generation Timeout",
+            description: "Virtual account is taking longer than expected. Please try again later.",
+            variant: "destructive"
+          })
+        }
+      } catch (error) {
+        console.error('Error polling VA:', error)
+        setIsPollingVA(false)
         toast({
-          title: "OTP Sent",
-          description: "Please check your phone for the verification code.",
+          title: "Network Error",
+          description: "Failed to check virtual account status. Please try again.",
+          variant: "destructive"
         })
-      } else {
-        console.error('❌ BVN onboarding failed:', data.error)
-        throw new Error(data.error || 'Failed to onboard')
       }
-    } catch (error) {
-      console.error('❌ Exception in handleBVNOnboarding:', error)
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to onboard",
-        variant: "destructive",
-      })
-    } finally {
-      setIsSendingBVN(false)
     }
-  }
-
-  // Step 2: Verify OTP
-  const handleOTPVerification = async (otp: string) => {
-    try {
-      const response = await fetch('/api/stablesrail/verify-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          sessionId: onboardingRequestId, 
-          otp 
-        }),
-        credentials: 'include'
-      })
-      
-      const data = await response.json()
-      
-      if (data.success && data.userId) {
-        // Save sr_user_id to profile
-        await fetch('/api/user-profile', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            sr_user_id: data.userId,
-            correlation_id: onboardingRequestId,
-            bvn_verified: true
-          }),
-          credentials: 'include'
-        })
-        
-        setOnboardingStep('complete')
-        
-        // Now create virtual account
-        await handleCreateVirtualAccount()
-        
-        setShowOnboardingModal(false)
-      } else {
-        throw new Error(data.error || 'Invalid OTP')
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to verify OTP",
-        variant: "destructive",
-      })
-    }
+    
+    poll()
   }
 
   const handleFund = async () => {
@@ -368,60 +293,49 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
       return
     }
 
+    if (!userProfile.profile.sr_user_id) {
+      toast({
+        title: "Stablesrail ID Missing",
+        description: "Please complete your profile verification first.",
+        variant: "destructive"
+      })
+      return
+    }
+
     setIsFunding(true)
+    setVirtualAccountDetails(null)
+    setFundingRequestId(null)
+    setHasConfirmedTransfer(false)
+    setFundingCompleted(false)
 
     try {
-      // Fetch BASE wallet address
-      const walletResponse = await fetch('/api/stablesrail/wallet-address', {
-        credentials: 'include'
-      })
-
-      if (!walletResponse.ok) {
-        throw new Error('Failed to fetch wallet addresses')
-      }
-
-      const walletData = await walletResponse.json()
-
-      if (!walletData.success || !walletData.walletAddresses?.base_address) {
-        throw new Error('BASE wallet address not found. Please create a virtual account first.')
-      }
-
-      // Call CNGN onramp with explicit BASE network
+      // Call CNGN onramp with userId and amount
       const response = await fetch('/api/stablesrail/cngn-onramp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: userProfile.profile.sr_user_id,
           amount: Number(fundAmount),
-          walletAddress: walletData.walletAddresses.base_address,
-          network: "BASE" // Always use BASE network
+          network: "BASE"
         }),
         credentials: 'include'
       })
 
       const data = await response.json()
 
-      if (response.ok && data.success) {
-        // Extract transaction details
-        setOnrampTransactionId(data.data.transactionId)
-        setOnrampCorrelationId(data.data.correlationId)
-        setOnrampStatus(data.data.status || 'pending')
-        setOnrampDetails({
-          amount: Number(fundAmount),
-          network: 'BASE',
-          walletAddress: walletData.walletAddresses.base_address,
-          estimatedCompletionTime: data.data.estimatedCompletionTime
+      if (response.ok && data.success && data.data?.requestId) {
+        const requestId = data.data.requestId
+        
+        // Store requestId and initial fee breakdown
+        setFundingRequestId(requestId)
+        
+        // Start polling for VA details
+        pollVirtualAccount(requestId)
+        
+        toast({
+          title: "Funding Request Initiated",
+          description: "Bank account generation in progress. Use requestId to get the bank account details for payment.",
         })
-        
-        // Close fund modal, open status modal
-        setShowFundModal(false)
-        setFundAmount("")
-        setShowOnrampStatusModal(true)
-        
-        // Start polling if not completed
-        if (data.data.status !== 'completed' && data.data.status !== 'failed') {
-          pollOnrampStatus(data.data.correlationId)
-        }
       } else {
         throw new Error(data.error || 'Failed to initiate funding')
       }
@@ -435,6 +349,114 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
     } finally {
       setIsFunding(false)
     }
+  }
+
+  const handleConfirmTransfer = () => {
+    setHasConfirmedTransfer(true)
+    setIsPollingCompletion(true)
+    
+    // Start polling for transaction completion
+    pollFundingCompletion()
+    
+    toast({
+      title: "Transfer Confirmed",
+      description: "Waiting for payment confirmation. This may take a few minutes.",
+    })
+  }
+
+  const pollFundingCompletion = async () => {
+    if (!fundingRequestId || !virtualAccountDetails) return
+    
+    // Get wallet address and request ID from VA details
+    const walletAddress = virtualAccountDetails.walletAddress
+    const requestId = virtualAccountDetails.requestId || fundingRequestId
+    
+    if (!walletAddress && !requestId) {
+      toast({
+        title: "Missing Information",
+        description: "Unable to check transaction status. Please try again.",
+        variant: "destructive"
+      })
+      setIsPollingCompletion(false)
+      return
+    }
+    
+    let attempts = 0
+    const maxAttempts = 150 // Poll for up to 5 minutes (150 * 2 seconds)
+    
+    const poll = async () => {
+      if (attempts >= maxAttempts) {
+        setIsPollingCompletion(false)
+        toast({
+          title: "Status Check Timeout",
+          description: "Transaction is taking longer than expected. Please check back later or contact support.",
+          variant: "destructive"
+        })
+        return
+      }
+      
+      try {
+        // Poll /cngnrampstatus endpoint with wallet address and request ID
+        const response = await fetch('/api/stablesrail/cngn-ramp-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            walletAddress,
+            requestId
+          }),
+          credentials: 'include'
+        })
+        
+        const data = await response.json()
+        
+        if (response.ok && data.success && data.data) {
+          // Check the status from the response
+          const status = data.data.status || data.data.data?.status
+          
+          // Check if funding is completed
+          if (status === 'completed' || status === 'success' || status === 'confirmed') {
+            setIsPollingCompletion(false)
+            setFundingCompleted(true)
+            
+            toast({
+              title: "Funding Completed!",
+              description: "Your payment has been confirmed and your account has been funded successfully.",
+            })
+            
+            // Optionally refresh balance or reload data
+            return
+          }
+          
+          // Check if transaction failed
+          if (status === 'failed' || status === 'error') {
+            setIsPollingCompletion(false)
+            toast({
+              title: "Transaction Failed",
+              description: data.data.message || "The transaction could not be completed. Please try again.",
+              variant: "destructive"
+            })
+            return
+          }
+        }
+        
+        attempts++
+        if (attempts < maxAttempts) {
+          setTimeout(poll, 2000) // Poll every 2 seconds
+        } else {
+          setIsPollingCompletion(false)
+        }
+      } catch (error) {
+        console.error('Error polling funding completion:', error)
+        attempts++
+        if (attempts < maxAttempts) {
+          setTimeout(poll, 2000) // Continue polling on error
+        } else {
+          setIsPollingCompletion(false)
+        }
+      }
+    }
+    
+    poll()
   }
 
   const pollOnrampStatus = async (correlationId: string) => {
@@ -543,19 +565,10 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
       return
     }
 
-    if (!withdrawalBank) {
+    if (!selectedBeneficiary) {
       toast({
-        title: "Bank Required",
-        description: "Please select a destination bank.",
-        variant: "destructive"
-      })
-      return
-    }
-
-    if (!withdrawalAccountNumber || withdrawalAccountNumber.length !== 10) {
-      toast({
-        title: "Invalid Account Number",
-        description: "Please enter a valid 10-digit account number.",
+        title: "Account Required",
+        description: "Please select a repayment account.",
         variant: "destructive"
       })
       return
@@ -570,24 +583,31 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
       return
     }
 
+    // Find selected beneficiary
+    const beneficiary = beneficiaries.find(b => b.id === selectedBeneficiary)
+    if (!beneficiary || !beneficiary.bank_code || !beneficiary.account_number || !beneficiary.account_name) {
+      toast({
+        title: "Invalid Account",
+        description: "Selected account is missing required information.",
+        variant: "destructive"
+      })
+      return
+    }
+
     setIsWithdrawing(true)
 
     try {
-      // Find bank code from selected bank name
-      const selectedBank = banks.find(b => b.name === withdrawalBank)
-      if (!selectedBank) {
-        throw new Error('Bank not found')
-      }
-
-      // Call the CNGN offramp API (as shown in screenshot)
+      // Call the CNGN offramp API with the correct payload structure
       const response = await fetch('/api/stablesrail/cngn-offramp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: userProfile.profile.sr_user_id,
           amount: Number(withdrawalAmount),
-          bankAccountNumber: withdrawalAccountNumber,
-          bankCode: selectedBank.code,
+          ticker: "CNGN",
+          bankCode: beneficiary.bank_code,
+          accountNumber: beneficiary.account_number,
+          accountName: beneficiary.account_name,
         }),
         credentials: 'include'
       })
@@ -597,12 +617,11 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
       if (response.ok && data.success) {
         toast({
           title: "Withdrawal Initiated",
-          description: `Withdrawal request submitted successfully. Transaction ID: ${data.data?.transactionId || 'N/A'}`,
+          description: `Withdrawal request submitted successfully. ${data.data?.message || 'Transaction processing...'}`,
         })
         setShowWithdrawalModal(false)
         setWithdrawalAmount("")
-        setWithdrawalBank("")
-        setWithdrawalAccountNumber("")
+        setSelectedBeneficiary("")
       } else {
         throw new Error(data.error || 'Failed to initiate withdrawal')
       }
@@ -610,7 +629,7 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
       console.error('❌ Withdrawal failed:', error)
       toast({
         title: "Withdrawal Failed",
-        description: error instanceof Error ? error.message : "Failed to process withdrawal",
+        description: error instanceof Error ? error.message : "Failed to process withdrawal. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -625,137 +644,52 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
     <div className="max-w-7xl mx-auto">
       <div className="px-4 sm:px-6 lg:px-8 py-6">
         {/* Welcome Section - Desktop */}
-        <div className="hidden lg:flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">
-            Welcome back, {userProfile.profile?.first_name || "User"}
-          </h1>
-          {/* Removed the notification button with Bell icon */}
-        </div>
-
         {/* Dashboard + Quick Loan Request */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-6 items-stretch">
           {/* Dashboard only (timeline removed) */}
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-              <div className="mb-5">
-                <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl p-5">
-                  <div className="flex justify-between items-start mb-2">
-                    <div className="text-center w-full">
-                      <p className="text-blue-100 text-xs">Account Balance</p>
-                      <div className="flex items-center justify-center gap-2">
-                        <span className="text-2xl font-bold">
-                          {showBalance ? `₦${(accountBalance?.balance ?? 0).toLocaleString()}` : '₦****'}
-                        </span>
-                        <button className="text-white/80" onClick={() => setShowBalance(!showBalance)}>
-                          {showBalance ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </button>
-                      </div>
-                      <p className="text-blue-200 text-xs mt-1">& Loan Balance ₦{(accountBalance?.loan_balance ?? 0).toLocaleString()}</p>
-                    </div>
-                  </div>
-                  <div className="mt-4">
-                    <p className="text-blue-100 text-xs">Your Virtual Account:</p>
-                    {userVirtualAccount?.account_number ? (
-                      <>
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg tracking-widest font-semibold">{userVirtualAccount.account_number}</span>
-                          {userVirtualAccount.bank_name && (
-                            <span className="text-blue-200 text-xs">{userVirtualAccount.bank_name}</span>
-                          )}
-                        </div>
-                        
-                        {/* Balance Display */}
-                        <div className="mt-2 pt-2 border-t border-blue-400/30">
-                          <p className="text-blue-100 text-xs mb-1">BASE Wallet Balance:</p>
-                          {isLoadingBalance ? (
-                            <div className="flex items-center gap-2">
-                              <Loader2 className="h-3 w-3 animate-spin text-blue-200" />
-                              <span className="text-sm text-blue-200">Loading balance...</span>
-                            </div>
-                          ) : balanceError ? (
-                            <div className="flex items-center gap-2">
-                              <AlertCircle className="h-3 w-3 text-red-300" />
-                              <span className="text-xs text-red-200">{balanceError}</span>
-                            </div>
-                          ) : baseWalletBalance !== null ? (
-                            <div className="flex items-center gap-2">
-                              <span className="text-xl font-bold">
-                                {baseWalletBalance} ETH
-                              </span>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={async () => {
-                                  const walletResponse = await fetch('/api/stablesrail/wallet-address', {
-                                    credentials: 'include'
-                                  })
-                                  if (walletResponse.ok) {
-                                    const walletData = await walletResponse.json()
-                                    if (walletData.success && walletData.walletAddresses?.base_address) {
-                                      await fetchBaseWalletBalance(walletData.walletAddresses.base_address)
-                                    }
-                                  }
-                                }}
-                                className="h-6 px-2 text-xs text-blue-200 hover:text-white hover:bg-blue-600"
-                              >
-                                Refresh
-                              </Button>
-                            </div>
-                          ) : (
-                            <span className="text-sm text-blue-200">—</span>
-                          )}
-                        </div>
-                      </>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg tracking-widest font-semibold text-blue-200">— — — — — — — — —</span>
-                        <Button
-                          size="sm"
-                          onClick={handleCreateVirtualAccount}
-                          disabled={isCreatingVA}
-                          className="bg-white text-blue-600 hover:bg-gray-50 text-xs px-3 py-1 h-auto"
-                        >
-                          {isCreatingVA ? (
-                            <>
-                              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                              Creating...
-                            </>
-                          ) : (
-                            'Create Virtual Account'
-                          )}
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-3 gap-4 mt-5">
-                    <Button
-                      variant="secondary"
-                      className="w-full h-16 flex flex-col items-center justify-center gap-2 bg-white text-blue-600 hover:bg-gray-50"
-                      onClick={() => setShowFundModal(true)}
-                    >
-                      <Plus className="h-6 w-6" />
-                      <span className="text-sm font-medium">Fund</span>
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      className="w-full h-16 flex flex-col items-center justify-center gap-2 bg-white text-blue-600 hover:bg-gray-50"
-                      onClick={() => setShowWithdrawalModal(true)}
-                    >
-                      <ArrowDown className="h-6 w-6" />
-                      <span className="text-sm font-medium">Withdrawal</span>
-                    </Button>
-                    <Link href="/timeline" className="w-full">
-                      <Button
-                        variant="secondary"
-                        className="w-full h-16 flex flex-col items-center justify-center gap-2 bg-white text-blue-600 hover:bg-gray-50"
-                      >
-                        <TrendingUp className="h-6 w-6" />
-                        <span className="text-sm font-medium">Timeline</span>
-                      </Button>
-                    </Link>
-                  </div>
+          <div className="lg:col-span-2 h-full">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-0 h-full flex flex-col">
+              <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl h-full w-full flex flex-col items-center justify-center p-10">
+                <div className="flex flex-col items-center justify-center w-full">
+                  <p className="text-blue-100 text-lg mb-2">Account Balance</p>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-4xl font-bold">
+                      {showBalance ? `₦${(accountBalance?.balance ?? 0).toLocaleString()}` : '₦****'}
+                    </span>
+                    <button className="text-white/80" onClick={() => setShowBalance(!showBalance)}>
+                      {showBalance ? <EyeOff className="h-6 w-6" /> : <Eye className="h-6 w-6" />}
+                  </button>
                 </div>
-              </div>
+                  <p className="text-blue-200 text-lg">& Loan Balance ₦{(accountBalance?.loan_balance ?? 0).toLocaleString()}</p>
+                </div>
+                <div className="grid grid-cols-3 gap-8 w-full mt-10">
+                  <Button
+                    variant="secondary"
+                    className="w-full h-24 flex flex-col items-center justify-center gap-2 bg-white text-blue-600 hover:bg-gray-50 text-lg"
+                    onClick={() => setShowFundModal(true)}
+                  >
+                    <Plus className="h-8 w-8" />
+                    <span className="font-medium">Fund</span>
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    className="w-full h-24 flex flex-col items-center justify-center gap-2 bg-white text-blue-600 hover:bg-gray-50 text-lg"
+                    onClick={() => setShowWithdrawalModal(true)}
+                  >
+                    <ArrowDown className="h-8 w-8" />
+                    <span className="font-medium">Withdrawal</span>
+                  </Button>
+                  <Link href="/timeline" className="w-full">
+                    <Button
+                      variant="secondary"
+                      className="w-full h-24 flex flex-col items-center justify-center gap-2 bg-white text-blue-600 hover:bg-gray-50 text-lg"
+                    >
+                      <TrendingUp className="h-8 w-8" />
+                      <span className="font-medium">Timeline</span>
+                    </Button>
+                  </Link>
+                    </div>
+                    </div>
             </div>
           </div>
 
@@ -913,136 +847,210 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
         </div>
       </div>
 
-      {/* Onboarding Modal */}
-      {showOnboardingModal && (
-        <Dialog open={showOnboardingModal} onOpenChange={setShowOnboardingModal}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>
-                {onboardingStep === 'bvn' && 'Verify Your BVN'}
-                {onboardingStep === 'otp' && 'Enter OTP'}
-                {onboardingStep === 'complete' && 'Verification Complete'}
-              </DialogTitle>
-            </DialogHeader>
-            
-            {onboardingStep === 'bvn' && (
-              <div className="space-y-4">
-                <p className="text-sm text-gray-600">
-                  We need to verify your BVN with Stablesrail before creating your virtual account.
-                </p>
-                <p className="text-sm font-medium">BVN: {userProfile.profile?.bvn}</p>
-                <Button 
-                  onClick={handleBVNOnboarding} 
-                  disabled={isSendingBVN}
-                  className="w-full"
-                >
-                  {isSendingBVN ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Sending Code...
-                    </>
-                  ) : (
-                    'Send Verification Code'
-                  )}
-                </Button>
-              </div>
-            )}
-            
-            {onboardingStep === 'otp' && (
-              <div className="space-y-4">
-                <p className="text-sm text-gray-600">
-                  Enter the 6-digit code sent to your phone.
-                </p>
-                <Input
-                  type="text"
-                  placeholder="Enter OTP"
-                  maxLength={6}
-                  value={otpInput}
-                  onChange={(e) => setOtpInput(e.target.value)}
-                />
-                <Button 
-                  onClick={() => handleOTPVerification(otpInput)} 
-                  className="w-full"
-                  disabled={otpInput.length !== 6}
-                >
-                  Verify OTP
-                </Button>
-              </div>
-            )}
-            
-            {onboardingStep === 'complete' && (
-              <div className="text-center space-y-4">
-                <CheckCircle className="w-12 h-12 text-green-500 mx-auto" />
-                <p className="text-sm text-gray-600">
-                  Your BVN has been verified successfully!
-                </p>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
-      )}
-
+      {/* Modals */}
       {/* Fund Modal */}
       {showFundModal && (
-        <Dialog open={showFundModal} onOpenChange={setShowFundModal}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Fund Account</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <p className="text-sm text-gray-600">
-                Fund your account with CNGN via Base network
-              </p>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Amount (NGN)
-                </label>
-                <Input
-                  type="number"
-                  placeholder="Enter amount"
-                  value={fundAmount}
-                  onChange={(e) => setFundAmount(e.target.value)}
-                  min="1"
-                  step="0.01"
-                />
+        <Dialog open={showFundModal} onOpenChange={(open) => {
+          setShowFundModal(open)
+          if (!open) {
+            // Reset state when modal closes
+            setFundAmount("")
+            setVirtualAccountDetails(null)
+            setFundingRequestId(null)
+            setHasConfirmedTransfer(false)
+            setFundingCompleted(false)
+            setIsPollingVA(false)
+            setIsPollingCompletion(false)
+          }
+        }}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Fund Account</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                {!virtualAccountDetails ? (
+                  // Show amount input form
+                  <>
+                    <p className="text-sm text-gray-600">
+                      Fund your account with CNGN via Base network
+                    </p>
+                    {isPollingVA && (
+                      <div className="flex items-center gap-2 text-sm text-blue-600">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Bank account generation in progress...</span>
+                      </div>
+                    )}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Amount (NGN)
+                      </label>
+                      <Input
+                        type="number"
+                        placeholder="Enter amount"
+                        value={fundAmount}
+                        onChange={(e) => setFundAmount(e.target.value)}
+                        min="1"
+                        step="0.01"
+                        disabled={isFunding || isPollingVA}
+                      />
+                    </div>
+                    <div className="flex gap-3">
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setShowFundModal(false)
+                          setFundAmount("")
+                        }}
+                        className="flex-1"
+                        disabled={isFunding || isPollingVA}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleFund}
+                        disabled={isFunding || isPollingVA || !fundAmount || Number(fundAmount) <= 0}
+                        className="flex-1"
+                      >
+                        {isFunding ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Initiating...
+                          </>
+                        ) : (
+                          'Fund Account'
+                        )}
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  // Show VA details
+                  <>
+                    <p className="text-sm text-yellow-600 bg-yellow-50 p-3 rounded-md">
+                      Virtual account amount is before gateway fee. User must pay total amount including all fees.
+                    </p>
+                    
+                    {fundingCompleted ? (
+                      <div className="text-center py-6">
+                        <div className="text-green-600 mb-2">✓</div>
+                        <h3 className="font-semibold text-lg mb-2">Funding Completed!</h3>
+                        <p className="text-sm text-gray-600 mb-4">
+                          Your account has been funded successfully.
+                        </p>
+                        <Button
+                          onClick={() => {
+                            setShowFundModal(false)
+                            setFundAmount("")
+                            setVirtualAccountDetails(null)
+                            setFundingRequestId(null)
+                            setHasConfirmedTransfer(false)
+                            setFundingCompleted(false)
+                          }}
+                          className="w-full"
+                        >
+                          Close
+                        </Button>
+                      </div>
+                    ) : hasConfirmedTransfer ? (
+                      <div className="text-center py-6">
+                        <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
+                        <h3 className="font-semibold text-lg mb-2">Waiting for Confirmation</h3>
+                        <p className="text-sm text-gray-600">
+                          We're waiting for your payment to be confirmed. This may take a few minutes.
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="space-y-4">
+                          <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-gray-600">Account Number:</span>
+                              <span className="font-mono text-sm font-semibold">
+                                {virtualAccountDetails.virtualAccount?.accountNumber}
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-gray-600">Bank Name:</span>
+                              <span className="text-sm font-medium">
+                                {virtualAccountDetails.virtualAccount?.bankName}
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-gray-600">Account Name:</span>
+                              <span className="text-sm font-medium">
+                                {virtualAccountDetails.virtualAccount?.accountName}
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center border-t pt-3">
+                              <span className="text-sm font-medium text-gray-700">Amount to Transfer:</span>
+                              <span className="text-lg font-bold text-blue-600">
+                                ₦{virtualAccountDetails.virtualAccount?.totalAmountWithFee?.toLocaleString('en-NG', { minimumFractionDigits: 2 }) || '0.00'}
+                              </span>
+                            </div>
+                            {virtualAccountDetails.virtualAccount?.feeBreakdown && (
+                              <div className="pt-3 border-t">
+                                <p className="text-xs text-gray-500 mb-2">Fee Breakdown:</p>
+                                <div className="space-y-1 text-xs">
+                                  <div className="flex justify-between">
+                                    <span>Requested Amount:</span>
+                                    <span>₦{virtualAccountDetails.virtualAccount.feeBreakdown.userRequestedAmount?.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span>Fintech Fee ({virtualAccountDetails.virtualAccount.feeBreakdown.fintechFeePercentage}%):</span>
+                                    <span>₦{virtualAccountDetails.virtualAccount.feeBreakdown.fintechFeeAmount?.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span>Gateway Fee ({virtualAccountDetails.virtualAccount.feeBreakdown.gatewayFeePercentage}%):</span>
+                                    <span>₦{virtualAccountDetails.virtualAccount.feeBreakdown.gatewayFeeAmount?.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span>Stablesrail Fee ({virtualAccountDetails.virtualAccount.feeBreakdown.stablesRailFeePercentage}%):</span>
+                                    <span>₦{virtualAccountDetails.virtualAccount.feeBreakdown.stablesRailFeeAmount?.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</span>
+                                  </div>
+                                  <div className="flex justify-between font-semibold pt-1 border-t">
+                                    <span>Total Fee:</span>
+                                    <span>₦{virtualAccountDetails.virtualAccount.feeBreakdown.totalFeeAmount?.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        
+                        <Button
+                          onClick={handleConfirmTransfer}
+                          className="w-full"
+                          size="lg"
+                        >
+                          I have made the transfer
+                        </Button>
+                        
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setShowFundModal(false)
+                            setFundAmount("")
+                            setVirtualAccountDetails(null)
+                            setFundingRequestId(null)
+                          }}
+                          className="w-full"
+                        >
+                          Cancel
+                        </Button>
+                      </>
+                    )}
+                  </>
+                )}
               </div>
-              <div className="flex gap-3">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setShowFundModal(false)
-                    setFundAmount("")
-                  }}
-                  className="flex-1"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleFund}
-                  disabled={isFunding || !fundAmount || Number(fundAmount) <= 0}
-                  className="flex-1"
-                >
-                  {isFunding ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Funding...
-                    </>
-                  ) : (
-                    'Fund Account'
-                  )}
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
+            </DialogContent>
+          </Dialog>
+        )}
 
       {/* Withdrawal Modal */}
       <Dialog open={showWithdrawalModal} onOpenChange={setShowWithdrawalModal}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Withdraw Funds</DialogTitle>
-          </DialogHeader>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Withdraw Funds</DialogTitle>
+            </DialogHeader>
           <div className="space-y-4 py-4">
             {/* Amount Input */}
             <div>
@@ -1056,46 +1064,39 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
                 value={withdrawalAmount}
                 onChange={(e) => setWithdrawalAmount(e.target.value)}
                 disabled={isWithdrawing}
+                min="1"
               />
             </div>
 
-            {/* Bank Selection Dropdown */}
+            {/* Beneficiary Selection Dropdown */}
             <div>
-              <label htmlFor="withdrawal-bank" className="text-sm font-medium text-gray-700 mb-2 block">
-                Destination Bank
+              <label htmlFor="withdrawal-beneficiary" className="text-sm font-medium text-gray-700 mb-2 block">
+                Repayment Account
               </label>
-              <select
-                id="withdrawal-bank"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                value={withdrawalBank}
-                onChange={(e) => setWithdrawalBank(e.target.value)}
-                disabled={isWithdrawing || isLoadingBanks}
+              {beneficiariesError ? (
+                <div className="text-sm text-red-600 mb-2">{beneficiariesError}</div>
+              ) : null}
+              <Select
+                value={selectedBeneficiary}
+                onValueChange={setSelectedBeneficiary}
+                disabled={isWithdrawing || isLoadingBeneficiaries}
               >
-                <option value="">
-                  {isLoadingBanks ? 'Loading banks...' : 'Select bank'}
-                </option>
-                {banks.map((bank) => (
-                  <option key={bank.code} value={bank.name}>
-                    {bank.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Account Number Input */}
-            <div>
-              <label htmlFor="withdrawal-account" className="text-sm font-medium text-gray-700 mb-2 block">
-                Account Number
-              </label>
-              <Input
-                id="withdrawal-account"
-                type="text"
-                placeholder="Enter 10-digit account number"
-                value={withdrawalAccountNumber}
-                onChange={(e) => setWithdrawalAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                disabled={isWithdrawing}
-                maxLength={10}
-              />
+                <SelectTrigger id="withdrawal-beneficiary" className="w-full">
+                  <SelectValue placeholder={isLoadingBeneficiaries ? "Loading repayment accounts..." : beneficiaries.length === 0 ? "No repayment accounts found" : "Select repayment account"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {beneficiaries.map((beneficiary) => (
+                    <SelectItem key={beneficiary.id} value={beneficiary.id}>
+                      {beneficiary.account_name} - {beneficiary.bank_name} ({beneficiary.account_number})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {beneficiaries.length === 0 && !isLoadingBeneficiaries && !beneficiariesError && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Add a repayment account in your profile settings first.
+                </p>
+              )}
             </div>
 
             {/* Action Buttons */}
@@ -1106,8 +1107,7 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
                 onClick={() => {
                   setShowWithdrawalModal(false)
                   setWithdrawalAmount("")
-                  setWithdrawalBank("")
-                  setWithdrawalAccountNumber("")
+                  setSelectedBeneficiary("")
                 }}
                 disabled={isWithdrawing}
               >
@@ -1120,8 +1120,8 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
                   isWithdrawing || 
                   !withdrawalAmount || 
                   Number(withdrawalAmount) <= 0 ||
-                  !withdrawalBank ||
-                  withdrawalAccountNumber.length !== 10
+                  !selectedBeneficiary ||
+                  beneficiaries.length === 0
                 }
               >
                 {isWithdrawing ? (
@@ -1136,14 +1136,14 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
             </div>
           </div>
         </DialogContent>
-      </Dialog>
+        </Dialog>
 
       {/* Transaction Status Modal */}
       <Dialog open={showOnrampStatusModal} onOpenChange={setShowOnrampStatusModal}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Funding Transaction Status</DialogTitle>
-          </DialogHeader>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Funding Transaction Status</DialogTitle>
+            </DialogHeader>
           <div className="space-y-4 py-4">
             {/* Transaction ID */}
             <div>
@@ -1245,7 +1245,7 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
             </div>
           </div>
         </DialogContent>
-      </Dialog>
+        </Dialog>
     </div>
-  )
+  );
 }

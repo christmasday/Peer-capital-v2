@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
-import { Briefcase, GraduationCap, MapPin, Phone, Mail, Heart, Calendar, User, Info, Edit, Wallet, Plus, Wallet as WalletIcon } from "lucide-react"
+import { Briefcase, GraduationCap, MapPin, Phone, Mail, Heart, Calendar, User, Info, Edit, Wallet, Plus, Wallet as WalletIcon, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { updateSocialMedia } from "@/lib/actions/profile"
@@ -39,11 +39,10 @@ declare global {
 interface ProfileAboutProps {
   profile: any
   isCurrentUser?: boolean
-  virtualAccount?: any
   initialSection?: string
 }
 
-export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: initialVirtualAccount, initialSection }: ProfileAboutProps) {
+export function ProfileAbout({ profile, isCurrentUser = false, initialSection }: ProfileAboutProps) {
   const router = useRouter()
   const [activeSection, setActiveSection] = useState(initialSection || "overview")
   const [isEditingContact, setIsEditingContact] = useState(false)
@@ -96,10 +95,6 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
   const [isSavingLoanHelper, setIsSavingLoanHelper] = useState(false)
   const [loanHelperError, setLoanHelperError] = useState<string | null>(null)
   const [loanHelperLoaded, setLoanHelperLoaded] = useState(false)
-  const [virtualAccount, setVirtualAccount] = useState<any>(initialVirtualAccount || null)
-  const [isLoadingVA, setIsLoadingVA] = useState(false)
-  const [vaError, setVaError] = useState<string | null>(null)
-  const [isCreatingVA, setIsCreatingVA] = useState(false)
   // Add state for BVN editing and verification
   const [isEditingBvn, setIsEditingBvn] = useState(false);
   const [bvnText, setBvnText] = useState(profile.bvn || "");
@@ -123,8 +118,6 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
   const [lastNameText, setLastNameText] = useState(profile.last_name || "");
   const [isSavingFullName, setIsSavingFullName] = useState(false);
   const [fullNameError, setFullNameError] = useState<string | null>(null);
-  // Add state for Paystack response
-  const [paystackResponse, setPaystackResponse] = useState<any>(null);
   const { toast } = useToast();
   const [isVerifyingCustomer, setIsVerifyingCustomer] = useState(false);
   const [customerVerificationMsg, setCustomerVerificationMsg] = useState<string | null>(null);
@@ -139,14 +132,17 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false)
   const [accountBank, setAccountBank] = useState("")
   const [accountBanks, setAccountBanks] = useState<{ name: string; code: string }[]>([])
-  const [isResolvingAccount, setIsResolvingAccount] = useState(false)
-  const [resolveAccountError, setResolveAccountError] = useState("")
+  const [isLoadingAccountBanks, setIsLoadingAccountBanks] = useState(false)
   const [isAddingAccount, setIsAddingAccount] = useState(false)
   const [addAccountError, setAddAccountError] = useState("")
   const [isLoadingAccounts, setIsLoadingAccounts] = useState(false)
   const [accountsError, setAccountsError] = useState("")
   const [removingAccountId, setRemovingAccountId] = useState<string | null>(null)
   const [removeAccountError, setRemoveAccountError] = useState("")
+  // Wallets state
+  const [wallets, setWallets] = useState<any[]>([])
+  const [isLoadingWallets, setIsLoadingWallets] = useState(false)
+  const [walletsError, setWalletsError] = useState<string | null>(null)
   // Add state for all address fields
   const [buildingNumber, setBuildingNumber] = useState(profile.buildingNumber || "");
   const [apartment, setApartment] = useState(profile.apartment || "");
@@ -215,9 +211,9 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
     { id: "contact", name: "Contact and basic info", icon: Phone },
     { id: "details", name: "Details about you", icon: User },
     { id: "lending-licence", name: "Lending Licence", icon: Briefcase },
+    { id: "wallets", name: "Wallets", icon: Wallet },
     { id: "bank", name: "Repayment Account", icon: Briefcase },
     { id: "loan-helper", name: "Loan helper settings", icon: Briefcase },
-    // Wallet removed per request
   ]
 
   useEffect(() => {
@@ -731,19 +727,6 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
     setLoanHelperError(null);
   };
 
-  const handleCreateVirtualAccount = async () => {
-    setIsCreatingVA(true)
-    setVaError(null)
-    setPaystackResponse(null)
-    const res = await createVirtualAccount()
-    setPaystackResponse(res)
-    if (res.virtualAccount) {
-      setVirtualAccount(res.virtualAccount)
-    } else if (res.error) {
-      setVaError(res.error)
-    }
-    setIsCreatingVA(false)
-  }
 
   // Add these implementations at the top level of the component (not inside another function)
   async function uploadLendingLicense(file: File): Promise<string> {
@@ -1199,55 +1182,166 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
     setFullNameError(null);
   };
 
-  // Fetch banks on mount
+  // Fetch banks on mount from Stablesrail
   useEffect(() => {
     async function fetchBanks() {
+      setIsLoadingAccountBanks(true)
       try {
-        const res = await fetch("https://api.paystack.co/bank", {
-          headers: { Authorization: `Bearer ${process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || ""}` },
+        const res = await fetch("/api/stablesrail/get-bank-codes", {
+          credentials: 'include'
         })
         const data = await res.json()
-        if (data.status && Array.isArray(data.data)) {
-          setAccountBanks(data.data.map((bank: any) => ({ name: bank.name, code: bank.code })))
+        console.log('🔵 [Profile] Bank codes response:', JSON.stringify(data, null, 2))
+        
+        if (data.success && data.data?.banks && Array.isArray(data.data.banks)) {
+          // API now normalizes the data structure, so we can use it directly
+          const banks = data.data.banks.map((bank: any) => ({ 
+            name: bank.name || '', 
+            code: bank.code || ''
+          })).filter((bank: { name: string; code: string }) => bank.name && bank.code)
+          
+          // Sort banks alphabetically by name (case-insensitive)
+          banks.sort((a: { name: string; code: string }, b: { name: string; code: string }) => 
+            a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+          )
+          
+          console.log('🔵 [Profile] Processed banks:', banks.length, 'banks')
+          if (banks.length > 0) {
+            setAccountBanks(banks)
+          } else {
+            console.error('🔴 [Profile] No valid banks found after processing')
+          }
+        } else {
+          console.error('🔴 [Profile] Invalid bank data structure:', data)
         }
-      } catch {}
+      } catch (error) {
+        console.error("🔴 [Profile] Failed to fetch banks from Stablesrail:", error)
+      } finally {
+        setIsLoadingAccountBanks(false)
+      }
     }
     fetchBanks()
   }, [])
 
-  // Resolve account name
+  // Note: Stablesrail doesn't provide account resolution, so account name must be entered manually
+  // The account name field is now editable and users can enter it manually
+
+  // Fetch wallets from DB or Stablesrail
   useEffect(() => {
-    async function resolveAccount() {
-      if (accountBank && accountNumber.length === 10) {
-        setIsResolvingAccount(true)
-        setResolveAccountError("")
-        try {
-          const bankCode = accountBanks.find(b => b.name === accountBank)?.code
-          const res = await fetch("/api/paystack/resolve-account", {
+    if (activeSection !== "wallets") return
+    
+    async function fetchWallets() {
+      setIsLoadingWallets(true)
+      setWalletsError(null)
+      
+      try {
+        // First, try to fetch from database
+        const dbRes = await fetch("/api/stablesrail/wallet-address", {
+          credentials: 'include'
+        })
+        
+        if (dbRes.ok) {
+          const dbData = await dbRes.json()
+          if (dbData.success && dbData.walletAddresses) {
+            // Convert wallet_address record to display format
+            const walletAddresses = []
+            if (dbData.walletAddresses.base_address) {
+              walletAddresses.push({
+                walletAddress: dbData.walletAddresses.base_address,
+                chain: "Base",
+                status: "active"
+              })
+            }
+            if (dbData.walletAddresses.ethereum_address) {
+              walletAddresses.push({
+                walletAddress: dbData.walletAddresses.ethereum_address,
+                chain: "Ethereum",
+                status: "active"
+              })
+            }
+            if (dbData.walletAddresses.polygon_address) {
+              walletAddresses.push({
+                walletAddress: dbData.walletAddresses.polygon_address,
+                chain: "Polygon",
+                status: "active"
+              })
+            }
+            if (dbData.walletAddresses.bnb_address) {
+              walletAddresses.push({
+                walletAddress: dbData.walletAddresses.bnb_address,
+                chain: "BNB Chain",
+                status: "active"
+              })
+            }
+            
+            if (walletAddresses.length > 0) {
+              setWallets(walletAddresses)
+              return
+            }
+          }
+        }
+        
+        // If no wallets in DB, check if user has Stablesrail ID
+        if (profile.sr_user_id) {
+          // Call Stablesrail to get wallets
+          const stablesrailRes = await fetch("/api/stablesrail/list-user-wallets", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ account_number: accountNumber, bank_code: bankCode }),
+            body: JSON.stringify({ userId: profile.sr_user_id }),
+            credentials: 'include'
           })
-          const data = await res.json()
-          if (data.status && data.data && data.data.account_name) {
-            setAccountName(data.data.account_name)
+          
+          if (stablesrailRes.ok) {
+            const stablesrailData = await stablesrailRes.json()
+            
+            if (stablesrailData.success && stablesrailData.data?.wallets && Array.isArray(stablesrailData.data.wallets) && stablesrailData.data.wallets.length > 0) {
+              // Save wallets to database
+              const saveRes = await fetch("/api/stablesrail/save-wallets", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ wallets: stablesrailData.data.wallets }),
+                credentials: 'include'
+              })
+              
+              if (saveRes.ok) {
+                // Convert Stablesrail wallets to display format
+                const formattedWallets = stablesrailData.data.wallets.map((w: any) => ({
+                  walletAddress: w.walletAddress,
+                  status: w.status,
+                  createdAt: w.createdAt,
+                  chain: "Base" // Default to Base since addresses are 0x format
+                }))
+                setWallets(formattedWallets)
+              } else {
+                // Even if save fails, display the wallets we got from Stablesrail
+                const formattedWallets = stablesrailData.data.wallets.map((w: any) => ({
+                  walletAddress: w.walletAddress,
+                  status: w.status,
+                  createdAt: w.createdAt,
+                  chain: "Base"
+                }))
+                setWallets(formattedWallets)
+              }
+            } else {
+              setWallets([])
+            }
           } else {
-            setResolveAccountError("Could not resolve account name")
-            setAccountName("")
+            setWallets([])
           }
-        } catch {
-          setResolveAccountError("Could not resolve account name")
-          setAccountName("")
-        } finally {
-          setIsResolvingAccount(false)
+        } else {
+          setWallets([])
         }
-      } else {
-        setAccountName("")
-        setResolveAccountError("")
+      } catch (error) {
+        console.error("Error fetching wallets:", error)
+        setWalletsError("Failed to fetch wallets")
+        setWallets([])
+      } finally {
+        setIsLoadingWallets(false)
       }
     }
-    resolveAccount()
-  }, [accountBank, accountNumber])
+    
+    fetchWallets()
+  }, [activeSection, profile.sr_user_id])
 
   // Fetch accounts (beneficiaries) on mount and when modal closes
   useEffect(() => {
@@ -1269,22 +1363,19 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
     setIsAddingAccount(true)
     setAddAccountError("")
     try {
-      // Call Paystack transferrecipient API
+      // Get bank code from selected bank
       const bankCode = accountBanks.find(b => b.name === accountBank)?.code
-      const res = await fetch("/api/paystack/transferrecipient", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: "nuban",
-          name: accountName,
-          account_number: accountNumber,
-          bank_code: bankCode,
-          currency: "NGN",
-        }),
-      })
-      const data = await res.json()
-      if (!data.status || !data.data?.recipient_code) throw new Error(data.message || "Failed to add account")
-      // Save account in DB
+      
+      if (!bankCode) {
+        throw new Error("Please select a valid bank")
+      }
+
+      // Validate required fields
+      if (!accountName || !accountNumber || !accountBank) {
+        throw new Error("Please fill in all required fields")
+      }
+
+      // Save account directly to DB (no Paystack call needed)
       const saveRes = await fetch("/api/beneficiaries", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1293,18 +1384,20 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
           account_number: accountNumber,
           bank_name: accountBank,
           bank_code: bankCode,
-          recipient_code: data.data.recipient_code,
         }),
         credentials: "include",
       })
+      
       if (!saveRes.ok) {
         const errData = await saveRes.json()
         throw new Error(errData.error || "Failed to save account")
       }
+      
       setIsAccountModalOpen(false)
       setAccountNumber("")
       setAccountBank("")
       setAccountName("")
+      
       // Refresh accounts list
       setIsLoadingAccounts(true)
       fetch("/api/beneficiaries", { credentials: "include" })
@@ -2611,18 +2704,16 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
                     </div>
                       <div>
                         <label>Bank</label>
-                        <select value={accountBank} onChange={e => setAccountBank(e.target.value)} className="w-full border p-2 rounded">
-                          <option value="">Select Bank</option>
+                        <select value={accountBank} onChange={e => setAccountBank(e.target.value)} disabled={isLoadingAccountBanks} className="w-full border p-2 rounded disabled:bg-gray-100 disabled:cursor-not-allowed">
+                          <option value="">{isLoadingAccountBanks ? "Loading banks..." : "Select Bank"}</option>
                           {accountBanks.map(bank => <option key={bank.code} value={bank.name}>{bank.name}</option>)}
                         </select>
                   </div>
                     <div>
                         <label>Account Name</label>
-                        <input type="text" value={accountName} disabled className="w-full border p-2 rounded bg-gray-100" />
-                        {isResolvingAccount && <div className="text-xs text-blue-500 mt-1">Resolving account name...</div>}
-                        {resolveAccountError && <div className="text-xs text-red-500 mt-1">{resolveAccountError}</div>}
+                        <input type="text" value={accountName} onChange={e => setAccountName(e.target.value)} placeholder="Enter account name" className="w-full border p-2 rounded" />
                       </div>
-                      <Button onClick={handleAddAccount} disabled={isAddingAccount || !accountName || isResolvingAccount} className="w-full">
+                      <Button onClick={handleAddAccount} disabled={isAddingAccount || !accountName || !accountNumber || accountNumber.length !== 10 || !accountBank} className="w-full">
                         {isAddingAccount ? "Adding..." : "Add Account"}
                       </Button>
                       {addAccountError && <div className="text-xs text-red-500 mt-1 text-red-600">{addAccountError}</div>}
@@ -2665,6 +2756,64 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
           <LendingLicenceSection profile={profile} onUpdate={handleUpdate} uploadLendingLicense={uploadLendingLicense} />
         )}
 
+        {activeSection === "wallets" && (
+          <div className="space-y-6">
+            <h2 className="text-xl font-medium">Your Wallets</h2>
+            
+            {isLoadingWallets ? (
+              <div className="text-center py-8">
+                <div className="inline-flex items-center gap-2 text-gray-500">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <span>Loading wallets...</span>
+                </div>
+              </div>
+            ) : walletsError ? (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <p className="text-red-600 text-sm">{walletsError}</p>
+              </div>
+            ) : wallets.length === 0 ? (
+              <div className="text-center py-12">
+                <WalletIcon className="h-16 w-16 mx-auto text-gray-400 mb-4" />
+                <p className="text-lg font-medium text-gray-700 mb-2">No wallets yet</p>
+                <p className="text-sm text-gray-500">Your digital pockets are empty! 💼✨</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {wallets.map((wallet, index) => (
+                  <Card key={index} className="border border-gray-200">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <WalletIcon className="h-5 w-5 text-blue-600" />
+                            <span className="font-semibold text-gray-900">{wallet.chain || "Base"}</span>
+                            {wallet.status && (
+                              <Badge 
+                                variant={wallet.status === "funded" ? "default" : "secondary"}
+                                className="text-xs"
+                              >
+                                {wallet.status}
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-sm font-mono text-gray-700 break-all">
+                            {wallet.walletAddress}
+                          </p>
+                          {wallet.createdAt && (
+                            <p className="text-xs text-gray-500 mt-2">
+                              Created: {new Date(wallet.createdAt).toLocaleDateString()}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {activeSection === "loan-helper" && (
           <div className={`space-y-8 ${!profile.lending_license_url && loanAmount ? 'opacity-50 pointer-events-none select-none' : ''}`}>
             <h2 className="text-xl font-medium flex items-center justify-between">
@@ -2701,64 +2850,6 @@ export function ProfileAbout({ profile, isCurrentUser = false, virtualAccount: i
               <CardTitle className="text-lg">Wallet</CardTitle>
             </CardHeader>
             <CardContent>
-              {/* Paystack Virtual Account Details */}
-              <div className="mb-6">
-                <h3 className="text-md font-semibold mb-3">Virtual Account Details</h3>
-                {virtualAccount ? (
-                  <div className="space-y-3 p-4 bg-gray-50 rounded-lg">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Account Number:</span>
-                      <span className="font-mono text-sm font-medium">{virtualAccount.account_number}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Account Name:</span>
-                      <span className="text-sm font-medium">{virtualAccount.account_name}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Bank:</span>
-                      <span className="text-sm font-medium">{virtualAccount.bank_name}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Currency:</span>
-                      <span className="text-sm font-medium">{virtualAccount.currency}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Status:</span>
-                      <Badge className={virtualAccount.assigned ? "bg-green-500" : "bg-yellow-500"}>
-                        {virtualAccount.assigned ? "Active" : "Pending"}
-                      </Badge>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center p-6 bg-gray-50 rounded-lg">
-                    <Wallet className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                    <p className="text-gray-600 mb-3">No virtual account found</p>
-                    <Button
-                                             onClick={async () => {
-                         try {
-                           const res = await fetch("/api/paystack/virtual-account", {
-                             method: "POST",
-                             headers: { "Content-Type": "application/json" },
-                           });
-                           const data = await res.json();
-                           if (data.success) {
-                             toast({ title: "Success", description: "Virtual account created successfully!" });
-                             // Refresh the page to show the new virtual account
-                             window.location.reload();
-                           } else {
-                             toast({ title: "Error", description: data.error || "Failed to create virtual account", variant: "destructive" });
-                           }
-                         } catch (error) {
-                           toast({ title: "Error", description: "Failed to create virtual account", variant: "destructive" });
-                         }
-                       }}
-                      className="w-full"
-                    >
-                      Create Virtual Account
-                    </Button>
-                  </div>
-                )}
-              </div>
 
               {/* BVN Display and Inline Edit */}
               <div className="mb-4">

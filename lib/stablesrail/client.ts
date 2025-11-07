@@ -99,18 +99,92 @@ export class StablesrailClient {
       next: { revalidate: 0 },
     })
 
-    const json = (await res.json().catch(() => ({}))) as
-      | StablesrailSuccessResponse<T>
-      | StablesrailErrorResponse
+    console.log(`🔵 [StablesrailClient] ${method} ${path} - HTTP Status:`, res.status, res.statusText)
+
+    // Get response text first to handle both JSON and non-JSON responses
+    const responseText = await res.text()
+    console.log(`🔵 [StablesrailClient] ${method} ${path} - Raw response:`, responseText.substring(0, 1000))
+
+    // Check if response is HTML (likely an error page or API documentation)
+    if (responseText.trim().startsWith('<!DOCTYPE') || responseText.trim().startsWith('<html')) {
+      const errorMsg = `Endpoint ${path} returned HTML instead of JSON. This endpoint may not exist or may require different parameters.`
+      console.error(`🔴 [StablesrailClient] ${method} ${path} - HTML response detected:`, errorMsg)
+      throw new StablesrailError(
+        errorMsg,
+        res.status,
+        { 
+          rawResponse: responseText.substring(0, 500),
+          isHtmlResponse: true,
+          endpoint: path
+        }
+      )
+    }
+
+    let json: any
+    try {
+      json = responseText ? JSON.parse(responseText) : {}
+    } catch (e) {
+      console.error('🔴 [StablesrailClient] JSON parse error:', e, 'Response text:', responseText.substring(0, 200))
+      // If status is not 2xx, this is likely an error
+      if (!res.ok) {
+        throw new StablesrailError(
+          `HTTP ${res.status}: ${responseText || res.statusText}`,
+          res.status,
+          { rawResponse: responseText.substring(0, 500) }
+        )
+      }
+      throw new Error(`Failed to parse response as JSON: ${e instanceof Error ? e.message : String(e)}`)
+    }
+
+    console.log(`🔵 [StablesrailClient] ${method} ${path} - Parsed JSON:`, JSON.stringify(json, null, 2))
+
+    // Check HTTP status code - even if JSON parses, non-2xx might indicate error
+    if (!res.ok && res.status >= 400) {
+      const errorMessage = json?.message || json?.error || responseText || `HTTP ${res.status} ${res.statusText}`
+      const errorCode = json?.response_code || json?.code || res.status
+      console.error('🔴 [StablesrailClient] HTTP error response:', { status: res.status, json })
+      throw new StablesrailError(errorMessage, errorCode, json?.data || json)
+    }
+
+    // Handle empty response
+    if (!json || Object.keys(json).length === 0) {
+      console.warn(`⚠️ [StablesrailClient] ${method} ${path} - Empty response from Stablesrail`)
+      // Return empty object as data to avoid undefined
+      return {} as T
+    }
 
     // The API uses a status field to indicate success/error
-    if ((json as StablesrailErrorResponse).status === "error") {
+    // Check for error status (case-insensitive)
+    const status = (json as any)?.status?.toLowerCase?.() || (json as any)?.status
+    if (status === "error") {
       const err = json as StablesrailErrorResponse
+      console.error('🔴 [StablesrailClient] Error response:', err)
       throw new StablesrailError(err.message || "Stablesrail API error", err.response_code, err.data)
     }
 
-    const ok = json as StablesrailSuccessResponse<T>
-    return ok.data
+    // Handle various success status formats
+    if (status === "success" || status === "Success") {
+      const ok = json as StablesrailSuccessResponse<T>
+      const data = ok.data
+      if (data === undefined) {
+        console.warn(`⚠️ [StablesrailClient] ${method} ${path} - Success status but data is undefined, returning empty object`)
+        return {} as T
+      }
+      console.log(`🔵 [StablesrailClient] ${method} ${path} - Returning data:`, JSON.stringify(data, null, 2))
+      return data
+    }
+
+    // If response has data field but status doesn't match, try to extract data anyway
+    if ((json as any)?.data !== undefined) {
+      const data = (json as any).data
+      console.log(`🔵 [StablesrailClient] ${method} ${path} - Returning data from response (status: ${status}):`, JSON.stringify(data, null, 2))
+      return data
+    }
+
+    // Log unexpected response format but return the json anyway
+    console.warn(`⚠️ [StablesrailClient] ${method} ${path} - Unexpected response format (status: ${status}), returning entire response`)
+    console.warn(`⚠️ [StablesrailClient] Response keys:`, Object.keys(json))
+    return json as unknown as T
   }
 
   // ============ User Management & Authentication ==========
@@ -121,12 +195,12 @@ export class StablesrailClient {
     return this.request<unknown>("onboarduser", { method: "POST", body: payload })
   }
 
-  verifyOtp(payload: { userId?: string; otp?: string; [key: string]: unknown }) {
+  verifyOtp(payload: { sessionId?: string; code?: string; [key: string]: unknown }) {
     return this.request<unknown>("verifyotp", { method: "POST", body: payload })
   }
 
-  getOnboardStatus(query: { userId?: string; reference?: string }) {
-    return this.request<unknown>("onboardstatus", { method: "GET", query })
+  getOnboardStatus(payload: { requestId: string }) {
+    return this.request<unknown>("onboardstatus", { method: "POST", body: payload })
   }
 
   getUserDetails(query: { userId: string }) {
@@ -156,9 +230,10 @@ export class StablesrailClient {
     return this.request<unknown>("cngnofframp", { method: "POST", body: payload })
   }
 
-  // Transaction status by correlationId
+  // Transaction status by correlationId (deprecated - use cngnRampStatus instead)
   getCngnRequestStatus(query: { correlationId: string }) {
-    return this.request<unknown>("cngnrequeststatus", { method: "GET", query })
+    // Try POST method as GET might not be supported
+    return this.request<unknown>("cngnrequeststatus", { method: "POST", body: query })
   }
 
   withdrawAsset(payload: { [key: string]: unknown }) {
@@ -236,8 +311,9 @@ export class StablesrailClient {
     return this.request<unknown>("updateassets", { method: "POST", body: payload })
   }
 
+  // Alias for getCngnRequestStatus (deprecated - use cngnRampStatus instead)
   cngnRequestStatus(query: { correlationId: string }) {
-    return this.request<unknown>("cngnrequeststatus", { method: "GET", query })
+    return this.getCngnRequestStatus(query)
   }
 
   cngnRampStatus(payload: { walletAddress?: string; requestId?: string; [key: string]: unknown }) {

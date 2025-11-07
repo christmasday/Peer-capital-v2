@@ -173,23 +173,55 @@ async function handleVirtualAccountCreated(payload: any) {
 async function handlePaymentsConfirmed(payload: any) {
   try {
     const admin = createAdminClient()
-    const { txRef, reference, amount, currency, status, confirmedAt, metadata } = payload
+    const { txRef, reference, amount, currency, status, confirmedAt, metadata, requestId } = payload
     
-    console.log('🟢 [WEBHOOK] Payment Confirmed:', { txRef, amount, currency, status })
+    console.log('🟢 [WEBHOOK] Payment Confirmed:', { txRef, reference, amount, currency, status, requestId })
     
-    // TODO: Add specific business logic here, such as:
-    // - Update transaction status in database
-    // - Credit user's wallet balance
-    // - Send payment confirmation notification
-    // - Update analytics/reporting
-    // - Trigger any post-payment workflows
-    
+    // Store webhook event
     await admin.from('webhook_events').insert({
       event_type: 'payments.confirmed',
       payload: payload,
       processed: true,
       created_at: new Date().toISOString()
     })
+    
+    // If requestId is present, match it to a funding transaction
+    if (requestId || reference) {
+      const matchingRequestId = requestId || reference
+      
+      // Try to find the virtual account by requestId to get the user_id
+      const { data: vaData } = await admin
+        .from('virtual_accounts')
+        .select('user_id, request_id')
+        .eq('request_id', matchingRequestId)
+        .maybeSingle()
+      
+      if (vaData?.user_id) {
+        console.log('🟢 [WEBHOOK] Matched payment to user:', vaData.user_id)
+        // Store additional metadata linking payment to user
+        // Note: We already inserted the event, so we'll update the most recent one
+        const { data: recentEvent } = await admin
+          .from('webhook_events')
+          .select('id')
+          .eq('event_type', 'payments.confirmed')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single()
+        
+        if (recentEvent) {
+          const updatedPayload = typeof payload === 'object' ? { ...payload, matchedUserId: vaData.user_id } : payload
+          await admin.from('webhook_events').update({
+            payload: updatedPayload
+          }).eq('id', recentEvent.id)
+        }
+      }
+    }
+    
+    // TODO: Add specific business logic here, such as:
+    // - Credit user's wallet balance
+    // - Send payment confirmation notification
+    // - Update analytics/reporting
+    // - Trigger any post-payment workflows
   } catch (error) {
     console.error('🔴 [WEBHOOK] Error handling payments.confirmed:', error)
   }
@@ -199,9 +231,58 @@ async function handlePaymentsConfirmed(payload: any) {
 async function handleWalletFundingCompleted(payload: any) {
   try {
     const admin = createAdminClient()
-    const { walletAddress, amount, tokenAddress, transactionHash, completedAt, fundingSource, metadata } = payload
+    const { walletAddress, amount, tokenAddress, transactionHash, completedAt, fundingSource, metadata, requestId } = payload
     
-    console.log('🟢 [WEBHOOK] Wallet Funding Completed:', { walletAddress, amount, tokenAddress, transactionHash })
+    console.log('🟢 [WEBHOOK] Wallet Funding Completed:', { walletAddress, amount, tokenAddress, transactionHash, requestId })
+    
+    // Store webhook event
+    await admin.from('webhook_events').insert({
+      event_type: 'wallet.funding.completed',
+      payload: payload,
+      processed: true,
+      created_at: new Date().toISOString()
+    })
+    
+    // If requestId is present, match it to a funding transaction
+    if (requestId) {
+      // Try to find the virtual account by requestId to get the user_id
+      const { data: vaData } = await admin
+        .from('virtual_accounts')
+        .select('user_id, request_id')
+        .eq('request_id', requestId)
+        .maybeSingle()
+      
+      if (vaData?.user_id) {
+        console.log('🟢 [WEBHOOK] Matched wallet funding to user:', vaData.user_id)
+        // Store additional metadata linking funding to user
+        // Note: We already inserted the event, so we'll update the most recent one
+        const { data: recentEvent } = await admin
+          .from('webhook_events')
+          .select('id')
+          .eq('event_type', 'wallet.funding.completed')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single()
+        
+        if (recentEvent) {
+          const updatedPayload = typeof payload === 'object' ? { ...payload, matchedUserId: vaData.user_id } : payload
+          await admin.from('webhook_events').update({
+            payload: updatedPayload
+          }).eq('id', recentEvent.id)
+        }
+      }
+    } else if (walletAddress) {
+      // Try to match by wallet address
+      const { data: walletData } = await admin
+        .from('wallet_address')
+        .select('user_id')
+        .or(`base_address.eq.${walletAddress},ethereum_address.eq.${walletAddress}`)
+        .maybeSingle()
+      
+      if (walletData?.user_id) {
+        console.log('🟢 [WEBHOOK] Matched wallet funding by address to user:', walletData.user_id)
+      }
+    }
     
     // TODO: Add specific business logic here, such as:
     // - Update wallet balance in database
@@ -209,13 +290,6 @@ async function handleWalletFundingCompleted(payload: any) {
     // - Update user's asset holdings
     // - Send funding confirmation notification
     // - Update portfolio analytics
-    
-    await admin.from('webhook_events').insert({
-      event_type: 'wallet.funding.completed',
-      payload: payload,
-      processed: true,
-      created_at: new Date().toISOString()
-    })
   } catch (error) {
     console.error('🔴 [WEBHOOK] Error handling wallet.funding.completed:', error)
   }

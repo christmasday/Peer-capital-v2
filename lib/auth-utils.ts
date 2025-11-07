@@ -5,7 +5,7 @@ import { createServerClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 // Function to check authentication on server components
-export async function checkAuth() {
+export async function checkAuth(preventRedirect = false) {
   const { cookies } = await import("next/headers")
   const { getJWTFromCookies, verifyJWT } = await import("@/lib/jwt")
   const { createServerClient } = await import("@/lib/supabase/server")
@@ -21,8 +21,7 @@ export async function checkAuth() {
 
   // Try Supabase session as fallback
   try {
-    const cookieStore = await cookies()
-    const supabase = createServerClient(cookieStore)
+    const supabase = createServerClient()
     const { data } = await supabase.auth.getSession()
 
     if (data.session) {
@@ -45,6 +44,9 @@ export async function checkAuth() {
   }
 
   // If we get here, user is not authenticated
+  if (preventRedirect) {
+    return { authenticated: false, userId: null }
+  }
   redirect("/?from=auth-check")
 }
 
@@ -70,8 +72,7 @@ export async function getCurrentUserId() {
     }
 
     // If no JWT, try to get from Supabase session
-    const cookieStore = await cookies()
-    const supabase = createServerClient(cookieStore)
+    const supabase = createServerClient()
     const {
       data: { session },
     } = await supabase.auth.getSession()
@@ -84,7 +85,8 @@ export async function getCurrentUserId() {
     }
 
     // If no Supabase session, try to get from custom auth token
-    const customAuthToken = cookieStore.get("custom-auth-token")?.value
+    const cookieStoreForAuth = await cookies()
+    const customAuthToken = cookieStoreForAuth.get("custom-auth-token")?.value
     if (customAuthToken) {
       const { createAdminClient } = await import("@/lib/supabase/admin")
       const adminClient = createAdminClient()
@@ -103,7 +105,7 @@ export async function getCurrentUserId() {
     }
 
     // If no auth token, try to get from auth-status cookie
-    const authStatus = cookieStore.get("auth-status")?.value
+    const authStatus = cookieStoreForAuth.get("auth-status")?.value
     if (authStatus === "authenticated") {
       // We know the user is authenticated, but we don't know their ID
       // This is a fallback case - we should log this situation

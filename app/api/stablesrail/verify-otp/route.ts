@@ -12,19 +12,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 })
     }
 
-    // Validate required fields
-    if (!body.sessionId) {
-      return NextResponse.json({ error: "Session ID is required" }, { status: 400 })
+    // Accept both naming conventions: { code, sessionId } or { otp, requestId }
+    const sessionId: string | undefined = body.sessionId || body.requestId
+    const code: string | undefined = body.code || body.otp
+    if (!sessionId) {
+      return NextResponse.json({ error: "sessionId is required" }, { status: 400 })
     }
-    if (!body.otp) {
-      return NextResponse.json({ error: "OTP is required" }, { status: 400 })
+    if (!code) {
+      return NextResponse.json({ error: "code is required" }, { status: 400 })
     }
-    if (!/^\d{6}$/.test(body.otp)) {
-      return NextResponse.json({ error: "OTP must be exactly 6 digits" }, { status: 400 })
+    if (!/^\d{6}$/.test(code)) {
+      return NextResponse.json({ error: "code must be exactly 6 digits" }, { status: 400 })
     }
 
     const stablesrail = createStablesrailClient()
-    const result: any = await stablesrail.verifyOtp(body)
+    // Forward exactly what Stablesrail expects
+    const result: any = await stablesrail.verifyOtp({ code, sessionId })
 
     // Extract userId from response
     const userId = result?.userId || result?.data?.userId

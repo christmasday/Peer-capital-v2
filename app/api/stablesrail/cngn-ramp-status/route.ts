@@ -2,31 +2,33 @@ import { NextRequest, NextResponse } from "next/server"
 import { createStablesrailClient, StablesrailError } from "@/lib/stablesrail/client"
 import { checkAuth } from "@/lib/auth-utils"
 
-export async function GET(req: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
-    const auth = await checkAuth()
+    const auth = await checkAuth(true)
     if (!auth.authenticated || !auth.userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { searchParams } = new URL(req.url)
-    const correlationId = searchParams.get('correlationId')
-    
-    if (!correlationId) {
-      return NextResponse.json({ error: "correlationId is required" }, { status: 400 })
+    const body = await req.json().catch(() => null)
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 })
+    }
+
+    const { walletAddress, requestId } = body
+
+    if (!walletAddress && !requestId) {
+      return NextResponse.json({ error: "Either walletAddress or requestId is required" }, { status: 400 })
     }
 
     const stablesrail = createStablesrailClient()
-    const result: any = await stablesrail.getCngnRequestStatus({ correlationId })
+    const result: any = await stablesrail.cngnRampStatus({
+      walletAddress,
+      requestId
+    })
     
     return NextResponse.json({ 
       success: true, 
-      data: {
-        status: result?.status || result?.data?.status,
-        transactionHash: result?.transactionHash || result?.data?.transactionHash,
-        amount: result?.amount || result?.data?.amount,
-        failureReason: result?.failureReason || result?.data?.failureReason
-      }
+      data: result
     })
   } catch (error) {
     if (error instanceof StablesrailError) {
@@ -35,7 +37,8 @@ export async function GET(req: NextRequest) {
         { status: 400 },
       )
     }
-    console.error("Error fetching transaction status:", error)
+    console.error("Error in cngn-ramp-status:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
+

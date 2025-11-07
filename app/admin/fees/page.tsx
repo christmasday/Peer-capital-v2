@@ -20,10 +20,13 @@ export default function AdminFeesPage() {
   const [offrampCap, setOfframpCap] = useState("")
   const [offrampEnabled, setOfframpEnabled] = useState(true)
   const [savingStablesrail, setSavingStablesrail] = useState(false)
+  const [adminWalletAddress, setAdminWalletAddress] = useState("")
+  const [savingWallet, setSavingWallet] = useState(false)
 
   useEffect(() => {
     fetchFees()
     fetchStablesrailFees()
+    fetchAdminWalletAddress()
   }, [])
 
   const fetchFees = async () => {
@@ -56,22 +59,32 @@ export default function AdminFeesPage() {
       })
       const data = await res.json()
       
-      if (data.success && data.fees?.data?.feeConfiguration) {
-        const config = data.fees.data.feeConfiguration
+      console.log('🔵 [Admin Fees] Full response:', JSON.stringify(data, null, 2))
+      
+      // The API returns: { success: true, fees: { feeConfiguration: {...} } }
+      // where fees is the data object from Stablesrail
+      const config = data.fees?.feeConfiguration || data.fees?.data?.feeConfiguration
+      
+      if (data.success && config) {
+        console.log('🔵 [Admin Fees] Fee configuration found:', config)
+        
+        // Handle onramp fee
         if (config.onrampFee) {
-          setOnrampPercentage(config.onrampFee.percentageFee.toString())
-          setOnrampCap(config.onrampFee.capFee.toString())
-          setOnrampEnabled(config.onrampFee.enabled)
+          setOnrampPercentage(config.onrampFee.percentageFee?.toString() || "0")
+          setOnrampCap(config.onrampFee.capFee?.toString() || "0")
+          setOnrampEnabled(config.onrampFee.enabled !== false)
         } else {
           // Set default values if no onramp fee is configured
           setOnrampPercentage("0")
           setOnrampCap("500")
           setOnrampEnabled(true)
         }
+        
+        // Handle offramp fee
         if (config.offrampFee) {
-          setOfframpPercentage(config.offrampFee.percentageFee.toString())
-          setOfframpCap(config.offrampFee.capFee.toString())
-          setOfframpEnabled(config.offrampFee.enabled)
+          setOfframpPercentage(config.offrampFee.percentageFee?.toString() || "0")
+          setOfframpCap(config.offrampFee.capFee?.toString() || "0")
+          setOfframpEnabled(config.offrampFee.enabled !== false)
         } else {
           // Set default values if no offramp fee is configured
           setOfframpPercentage("2.0")
@@ -80,7 +93,7 @@ export default function AdminFeesPage() {
         }
       } else if (data.success === false) {
         // No fee configuration found, clear fields to show no configuration
-        console.log("No fee configuration found in Stablesrail")
+        console.log("🔴 [Admin Fees] No fee configuration found in Stablesrail")
         setOnrampPercentage("")
         setOnrampCap("")
         setOnrampEnabled(true)
@@ -88,10 +101,23 @@ export default function AdminFeesPage() {
         setOfframpCap("")
         setOfframpEnabled(true)
       } else {
-        console.error("Unexpected response format:", data)
+        console.error("🔴 [Admin Fees] Unexpected response format:", data)
+        // Try to extract anyway
+        if (config) {
+          if (config.onrampFee) {
+            setOnrampPercentage(config.onrampFee.percentageFee?.toString() || "0")
+            setOnrampCap(config.onrampFee.capFee?.toString() || "0")
+            setOnrampEnabled(config.onrampFee.enabled !== false)
+          }
+          if (config.offrampFee) {
+            setOfframpPercentage(config.offrampFee.percentageFee?.toString() || "0")
+            setOfframpCap(config.offrampFee.capFee?.toString() || "0")
+            setOfframpEnabled(config.offrampFee.enabled !== false)
+          }
+        }
       }
     } catch (error) {
-      console.error("Failed to fetch Stablesrail fees:", error)
+      console.error("🔴 [Admin Fees] Failed to fetch Stablesrail fees:", error)
       // Clear fields on error to indicate no configuration
       setOnrampPercentage("")
       setOnrampCap("")
@@ -99,6 +125,76 @@ export default function AdminFeesPage() {
       setOfframpPercentage("")
       setOfframpCap("")
       setOfframpEnabled(true)
+    }
+  }
+
+  const fetchAdminWalletAddress = async () => {
+    try {
+      const res = await fetch('/api/admin/wallet-address', {
+        credentials: 'include'
+      })
+      const data = await res.json()
+      
+      if (data.success && data.walletAddress) {
+        setAdminWalletAddress(data.walletAddress)
+      }
+    } catch (error) {
+      console.error("Failed to fetch admin wallet address:", error)
+    }
+  }
+
+  const handleSaveWalletAddress = async () => {
+    // Basic validation - wallet address should be a valid Ethereum-style address (0x followed by 40 hex chars)
+    const walletAddressTrimmed = adminWalletAddress.trim()
+    
+    if (!walletAddressTrimmed) {
+      toast({
+        title: "Invalid Wallet Address",
+        description: "Wallet address cannot be empty",
+        variant: "destructive"
+      })
+      return
+    }
+
+    // Basic format validation (0x followed by 40 hex characters)
+    if (!/^0x[a-fA-F0-9]{40}$/.test(walletAddressTrimmed)) {
+      toast({
+        title: "Invalid Wallet Address",
+        description: "Wallet address must be a valid Ethereum-style address (0x followed by 40 hexadecimal characters)",
+        variant: "destructive"
+      })
+      return
+    }
+
+    setSavingWallet(true)
+    try {
+      const res = await fetch('/api/admin/wallet-address', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          walletAddress: walletAddressTrimmed
+        })
+      })
+      
+      const data = await res.json()
+      
+      if (data.success) {
+        toast({
+          title: "Success",
+          description: "Admin wallet address updated successfully"
+        })
+      } else {
+        throw new Error(data.error)
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update wallet address",
+        variant: "destructive"
+      })
+    } finally {
+      setSavingWallet(false)
     }
   }
 
@@ -385,6 +481,40 @@ export default function AdminFeesPage() {
               className="w-full"
             >
               {savingStablesrail ? "Saving..." : "Save Configuration"}
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>Admin Wallet Address</CardTitle>
+            <CardDescription>
+              Set the wallet address where collected fees will be sent
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="adminWalletAddress">Wallet Address</Label>
+              <Input
+                id="adminWalletAddress"
+                type="text"
+                value={adminWalletAddress}
+                onChange={(e) => setAdminWalletAddress(e.target.value)}
+                placeholder="0x..."
+                disabled={loading || savingWallet}
+                className="font-mono"
+              />
+              <p className="text-sm text-gray-500">
+                Ethereum-style wallet address (0x followed by 40 hexadecimal characters)
+              </p>
+            </div>
+
+            <Button
+              onClick={handleSaveWalletAddress}
+              disabled={loading || savingWallet || !adminWalletAddress.trim()}
+              className="w-full"
+            >
+              {savingWallet ? "Saving..." : "Save Wallet Address"}
             </Button>
           </CardContent>
         </Card>

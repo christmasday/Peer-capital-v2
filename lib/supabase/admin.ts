@@ -46,9 +46,29 @@ function createMockClient(): SupabaseClient<Database> {
         }
       },
       insert: async () => ({ data: null, error: null }),
-      update: async () => ({ data: null, error: null }),
+      update: function (_data: any) {
+        // Return a query builder that supports .eq() chaining (thenable)
+        const createQueryBuilder = (): any => ({
+          eq: function (_column: string, _value: any) {
+            return createQueryBuilder()
+          },
+          then: async (resolve: any) => resolve({ data: null, error: null }),
+          catch: async (reject: any) => reject({ data: null, error: null })
+        })
+        return createQueryBuilder()
+      },
       upsert: async () => ({ data: null, error: null }),
-      delete: async () => ({ data: null, error: null }),
+      delete: function () {
+        // Return a query builder that supports .eq() chaining (thenable)
+        const createQueryBuilder = (): any => ({
+          eq: function (_column: string, _value: any) {
+            return createQueryBuilder()
+          },
+          then: async (resolve: any) => resolve({ data: null, error: null }),
+          catch: async (reject: any) => reject({ data: null, error: null })
+        })
+        return createQueryBuilder()
+      },
     }),
     auth: {
       admin: {

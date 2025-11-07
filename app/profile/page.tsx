@@ -41,7 +41,6 @@ import { updateProfile } from "@/lib/actions/profile"
 import { LoanRequestsList } from "@/components/loans/LoanRequestsList"
 import { getAllLoanRequests } from "@/lib/actions/loans"
 // Removed Paystack virtual account integration
-import { BeneficiariesList } from "@/components/profile/beneficiaries-list"
 
 export const dynamic = "force-dynamic"
 export const revalidate = 0
@@ -202,7 +201,6 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
             {[
               { name: "About", href: "/profile?tab=about", active: activeTab === "about" },
               { name: "Friends", href: "/profile/?tab=friends", active: activeTab === "friends" },
-              { name: "Transfer Beneficiaries", href: "/profile?tab=beneficiaries", active: activeTab === "beneficiaries" },
               { name: "Loan Requests", href: "/profile?tab=loan-requests", active: activeTab === "loan-requests" },
             ].map((tab) => (
               <Link
@@ -231,8 +229,6 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
             initialFollowersCount={followersCount}
             initialFollowingCount={followingCount}
           />
-        ) : activeTab === "beneficiaries" ? (
-          <BeneficiariesList userId={user.id} />
         ) : activeTab === "about" ? (
           <ProfileAbout profile={profile} isCurrentUser={true} virtualAccount={null} initialSection="about" />
         ) : activeTab === "loan-requests" ? (

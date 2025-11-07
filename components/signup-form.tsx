@@ -151,9 +151,6 @@ function OTPVerificationStep({
       <div className="text-center">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Verify OTP</h2>
         <p className="text-gray-600">Enter the 6-digit OTP sent to your registered phone number</p>
-        {requestId && (
-          <p className="text-sm text-gray-500 mt-2">Reference: {requestId.slice(-8)}</p>
-        )}
       </div>
 
       <div className="space-y-4">
@@ -529,6 +526,7 @@ export function SignupForm() {
     setError(null)
     
     try {
+      // 1. Call /onboarduser with BVN
       const response = await fetch('/api/stablesrail/onboard-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -537,24 +535,61 @@ export function SignupForm() {
       
       const data = await response.json()
       
-      if (data.success && data.data) {
-        const requestId = data.data.requestId || data.data.data?.requestId
-        if (requestId) {
-          setRequestId(requestId)
-          saveToSession('requestId', requestId)
-          saveToSession('step', '2')
-          setStep(2)
-          toast({
-            title: "BVN Verification Initiated",
-            description: "Please check your phone for the OTP code.",
+      if (!response.ok || !data.success) {
+        setError(data.error || "Failed to initiate BVN verification")
+        return
+      }
+
+      // Extract requestId from response
+      const requestId = data.requestId || data.data?.requestId
+      if (!requestId) {
+        setError("Invalid response from verification service")
+        return
+      }
+
+      setRequestId(requestId)
+      saveToSession('requestId', requestId)
+
+      // 2. Poll /onboardstatus to get sessionID
+      let sessionId: string | null = null
+      const maxAttempts = 8 // ~10 seconds at 1.2s interval
+      
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        await new Promise(resolve => setTimeout(resolve, 1200)) // Wait 1.2 seconds
+        
+        try {
+          const statusResponse = await fetch('/api/stablesrail/onboard-status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ requestId })
           })
-        } else {
-          setError("Invalid response from verification service")
+          
+          const statusData = await statusResponse.json()
+          
+          if (statusResponse.ok && statusData.success && statusData.data?.sessionId) {
+            sessionId = statusData.data.sessionId
+            break
+          }
+        } catch (pollError) {
+          console.warn(`Polling attempt ${attempt} failed:`, pollError)
         }
+      }
+
+      if (sessionId) {
+        // Save sessionId to requestId state (will be used for OTP verification)
+        setRequestId(sessionId)
+        saveToSession('requestId', sessionId)
+        saveToSession('step', '2')
+        setStep(2)
+        toast({
+          title: "BVN Verification Initiated",
+          description: "Please check your phone for the OTP code.",
+        })
       } else {
-        setError(data.error || "Failed to verify BVN")
+        setError("Failed to get verification session. Please try again.")
       }
     } catch (err) {
+      console.error('BVN verification error:', err)
       setError("Network error. Please try again.")
     } finally {
       setLoading(false)
@@ -564,7 +599,7 @@ export function SignupForm() {
   // Step 2: OTP Verification
   const handleOTPVerification = async () => {
     if (!requestId) {
-      setError("Request ID not found. Please start over.")
+      setError("Session ID not found. Please start over.")
       return
     }
     
@@ -572,37 +607,63 @@ export function SignupForm() {
     setError(null)
     
     try {
+      // 3. Call /verifyotp with sessionID (from onboardstatus) and code
       const response = await fetch('/api/stablesrail/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId: requestId, otp })
+        body: JSON.stringify({ 
+          sessionId: requestId, // This is the sessionID from onboardstatus
+          code: otp 
+        })
       })
       
       const data = await response.json()
       
-      if (data.success && data.data) {
-        const userId = data.data.userId || data.data.data?.userId
-        if (userId) {
-          setSrUserId(userId)
-          saveToSession('srUserId', userId)
-          saveToSession('step', '3')
-          
-          toast({
-            title: "BVN Verified Successfully",
-            description: "Your BVN has been verified. Please complete your profile.",
-          })
-          
-          // Show success message for 2 seconds then move to next step
-          setTimeout(() => {
-            setStep(3)
-          }, 2000)
-        } else {
-          setError("Invalid response from verification service")
-        }
-      } else {
+      if (!response.ok || !data.success) {
         setError(data.error || "Invalid OTP. Please try again.")
+        return
       }
+
+      // Extract userId from response
+      const userId = data.userId || data.data?.userId || data.data?.data?.userId
+      if (!userId) {
+        setError("Invalid response from verification service")
+        return
+      }
+
+      // 4. Save sr_user_id to database
+      try {
+        const saveResponse = await fetch('/api/user-profile', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            sr_user_id: userId,
+            bvn_verified: true
+          }),
+          credentials: 'include'
+        })
+
+        if (!saveResponse.ok) {
+          console.warn('Failed to save sr_user_id, but continuing with signup')
+        }
+      } catch (saveError) {
+        console.warn('Error saving sr_user_id:', saveError)
+        // Continue anyway - will be saved during account creation
+      }
+
+      setSrUserId(userId)
+      saveToSession('srUserId', userId)
+      saveToSession('step', '3')
+      
+      toast({
+        title: "BVN Verified Successfully",
+        description: "Your BVN has been verified. Please complete your profile.",
+      })
+      
+      // Move to next step immediately
+      setStep(3)
     } catch (err) {
+      console.error('OTP verification error:', err)
       setError("Network error. Please try again.")
     } finally {
       setLoading(false)
@@ -611,7 +672,7 @@ export function SignupForm() {
 
   // Step 3: Account Creation
   const handleAccountCreation = async () => {
-    if (!requestId || !srUserId) {
+    if (!srUserId) {
       setError("Verification data not found. Please start over.")
       return
     }
@@ -625,9 +686,11 @@ export function SignupForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...userDetails,
+          bvn: bvn, // Include BVN in signup
           sr_user_id: srUserId,
-          correlation_id: requestId
-        })
+          bvn_verified: true
+        }),
+        credentials: 'include'
       })
       
       const data = await response.json()
@@ -649,6 +712,7 @@ export function SignupForm() {
         setError(data.error || "Failed to create account")
       }
     } catch (err) {
+      console.error('Account creation error:', err)
       setError("Network error. Please try again.")
     } finally {
       setLoading(false)
@@ -696,7 +760,7 @@ export function SignupForm() {
           onBack={handleBack}
           loading={loading}
           error={error}
-          requestId={requestId}
+          requestId={requestId} // This is actually sessionID now
         />
       )}
 
