@@ -44,9 +44,13 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
   const [fundingRequestId, setFundingRequestId] = useState<string | null>(null)
   const [virtualAccountDetails, setVirtualAccountDetails] = useState<any>(null)
   const [isPollingVA, setIsPollingVA] = useState(false)
+  const [virtualAccountError, setVirtualAccountError] = useState<string | null>(null)
+  const [vaRetryCount, setVaRetryCount] = useState(0)
+  const VA_MAX_RETRIES = 3
   const [hasConfirmedTransfer, setHasConfirmedTransfer] = useState(false)
   const [isPollingCompletion, setIsPollingCompletion] = useState(false)
   const [fundingCompleted, setFundingCompleted] = useState(false)
+  const [onrampWalletAddress, setOnrampWalletAddress] = useState<string | null>(null)
   const [baseWalletBalance, setBaseWalletBalance] = useState<string | null>(null)
   const [isLoadingBalance, setIsLoadingBalance] = useState(false)
   const [balanceError, setBalanceError] = useState<string | null>(null)
@@ -214,22 +218,47 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
     }
     
     let attempts = 0
-    const maxAttempts = 20 // Poll for up to 40 seconds (20 * 2 seconds)
+    const maxAttempts = 10 // Poll for up to 30 seconds (10 * 3 seconds)
+    let lastError: string | null = null
     
     setIsPollingVA(true)
+    console.log(`[pollVirtualAccount] Starting to poll for requestId: ${requestId}`)
     
     const poll = async () => {
-      if (attempts >= maxAttempts) {
+      attempts++
+      console.log(`[pollVirtualAccount] Attempt ${attempts}/${maxAttempts} for requestId: ${requestId}`)
+      
+      if (attempts > maxAttempts) {
+        console.log(`[pollVirtualAccount] Max attempts reached, stopping polling`)
         setIsPollingVA(false)
+        // If automatic retries remain, schedule another poll
+        if (vaRetryCount < VA_MAX_RETRIES) {
+          const nextRetry = vaRetryCount + 1
+          setVaRetryCount(nextRetry)
+          console.log(`[pollVirtualAccount] Scheduling automatic retry ${nextRetry}/${VA_MAX_RETRIES}`)
+          toast({
+            title: 'Retrying Virtual Account Generation',
+            description: `Attempt ${nextRetry} of ${VA_MAX_RETRIES}...`,
+          })
+          setTimeout(() => {
+            setVirtualAccountError(null)
+            pollVirtualAccount(requestId)
+          }, 2000)
+          return
+        }
+
+        // No retries left — surface final timeout
         toast({
           title: "Virtual Account Generation Timeout",
-          description: "Virtual account is taking longer than expected. Please try again later.",
+          description: lastError || "Virtual account is taking longer than expected. Please try again later.",
           variant: "destructive"
         })
+        setVirtualAccountError(lastError)
         return
       }
       
       try {
+        console.log(`[pollVirtualAccount] Calling /api/stablesrail/virtual-account with requestId: ${requestId}`)
         const response = await fetch('/api/stablesrail/virtual-account', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -237,46 +266,82 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
           credentials: 'include'
         })
         
+        console.log(`[pollVirtualAccount] Response status: ${response.status}, ok: ${response.ok}`)
         const data = await response.json()
+        console.log(`[pollVirtualAccount] Response data:`, data)
         
+        // If the response is a 4xx, this is likely a transient "not ready yet" state — retry automatically
+        if (!response.ok && response.status >= 400 && response.status < 500) {
+          lastError = data.error || data.message || data.details?.error || `HTTP ${response.status}`
+          const friendly = `Virtual account not ready yet — retrying automatically (attempt ${attempts}/${maxAttempts})...`
+          setVirtualAccountError(friendly)
+          console.log(`[pollVirtualAccount] Received ${response.status} — will retry immediately (short delay). Error: ${lastError}`)
+          // Immediate short retry (500ms) to reduce wait when backend returns quick 4xx
+          if (attempts < maxAttempts) {
+            setTimeout(() => poll(), 500)
+            return
+          }
+          // else fall through to exhaustion handling below
+        }
+
         if (response.ok && data.success && data.data?.virtualAccount) {
           // VA details are available
+          console.log(`[pollVirtualAccount] Virtual account found!`, data.data)
           setVirtualAccountDetails(data.data)
+          setVirtualAccountError(null)
           setIsPollingVA(false)
           return
         }
-        
-        // If we get a 400 error, stop polling and show error
-        if (!response.ok && response.status === 400) {
+
+        // Capture last error but continue polling until maxAttempts
+        lastError = data.error || data.message || data.details?.error || lastError || "Virtual account not ready yet. Still checking..."
+        // Show a friendly retrying message with attempt counts so user understands we're retrying
+        const friendly = `Virtual account not ready yet — still checking (attempt ${attempts}/${maxAttempts})...`
+        setVirtualAccountError(friendly)
+        console.log(`[pollVirtualAccount] VA not ready yet. Error: ${lastError}. Will continue polling...`)
+
+        if (attempts < maxAttempts) {
+          setTimeout(() => {
+            poll()
+          }, 3000) // Poll every 3 seconds
+        } // else handled at top of loop
+      } catch (error) {
+        console.error('[pollVirtualAccount] Error polling VA:', error)
+        lastError = error instanceof Error ? error.message : 'Network error while polling virtual account.'
+        // Show friendly retrying message if we will retry
+        if (attempts < maxAttempts) {
+          const friendly = `Network error while checking virtual account — retrying (attempt ${attempts + 1}/${maxAttempts})...`
+          setVirtualAccountError(friendly)
+          console.log(`[pollVirtualAccount] Network error, scheduling next poll in 3 seconds (attempt ${attempts + 1}/${maxAttempts})`)
+          setTimeout(() => {
+            console.log(`[pollVirtualAccount] Executing scheduled poll after error (attempt ${attempts + 1})`)
+            poll()
+          }, 3000)
+        } else {
+          console.log(`[pollVirtualAccount] Max attempts reached after error, stopping polling`)
           setIsPollingVA(false)
+          // If retries remain, schedule automatic retry
+          if (vaRetryCount < VA_MAX_RETRIES) {
+            const nextRetry = vaRetryCount + 1
+            setVaRetryCount(nextRetry)
+            toast({
+              title: 'Retrying Virtual Account Generation',
+              description: `Attempt ${nextRetry} of ${VA_MAX_RETRIES} after error...`,
+            })
+            setTimeout(() => {
+              setVirtualAccountError(null)
+              pollVirtualAccount(requestId)
+            }, 2000)
+            return
+          }
+
+          setVirtualAccountError(lastError)
           toast({
             title: "Virtual Account Error",
-            description: data.error || "Failed to retrieve virtual account details. Please try again.",
-            variant: "destructive"
-          })
-          return
-        }
-        
-        // If VA not ready yet (but no error), continue polling
-        attempts++
-        if (attempts < maxAttempts) {
-          setTimeout(poll, 2000) // Poll every 2 seconds
-        } else {
-          setIsPollingVA(false)
-          toast({
-            title: "Virtual Account Generation Timeout",
-            description: "Virtual account is taking longer than expected. Please try again later.",
+            description: lastError || "Failed to check virtual account status. Please try again.",
             variant: "destructive"
           })
         }
-      } catch (error) {
-        console.error('Error polling VA:', error)
-        setIsPollingVA(false)
-        toast({
-          title: "Network Error",
-          description: "Failed to check virtual account status. Please try again.",
-          variant: "destructive"
-        })
       }
     }
     
@@ -316,7 +381,8 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
         body: JSON.stringify({
           userId: userProfile.profile.sr_user_id,
           amount: Number(fundAmount),
-          network: "BASE"
+          network: "BASE",
+          ownerid: ""
         }),
         credentials: 'include'
       })
@@ -328,8 +394,17 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
         
         // Store requestId and initial fee breakdown
         setFundingRequestId(requestId)
-        
-        // Start polling for VA details
+        // Capture wallet address from onramp response if present — use this for status polling
+        if (data.data.walletAddress) {
+          setOnrampWalletAddress(data.data.walletAddress)
+        } else if (data.data.walletAddresses?.base_address) {
+          setOnrampWalletAddress(data.data.walletAddresses.base_address)
+        }
+        // Clear any previous VA error and reset retry counter, then wait 4 seconds before polling
+        setVirtualAccountError(null)
+        setVaRetryCount(0)
+        await sleep(4000)
+        // Start polling for VA details (will retry automatically up to VA_MAX_RETRIES)
         pollVirtualAccount(requestId)
         
         toast({
@@ -364,25 +439,31 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
     })
   }
 
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(String(text))
+      toast({ title: 'Copied', description: 'Copied to clipboard.' })
+    } catch (e) {
+      console.error('Copy failed', e)
+      toast({ title: 'Copy Failed', description: 'Could not copy to clipboard.', variant: 'destructive' })
+    }
+  }
+
   const pollFundingCompletion = async () => {
-    if (!fundingRequestId || !virtualAccountDetails) return
-    
-    // Get wallet address and request ID from VA details
-    const walletAddress = virtualAccountDetails.walletAddress
-    const requestId = virtualAccountDetails.requestId || fundingRequestId
-    
-    if (!walletAddress && !requestId) {
+    // Use only the wallet address returned from the initial /cngn-onramp response
+    if (!onrampWalletAddress) {
       toast({
-        title: "Missing Information",
-        description: "Unable to check transaction status. Please try again.",
+        title: "Missing Wallet Address",
+        description: "Cannot check transaction status because the onramp response did not include a wallet address.",
         variant: "destructive"
       })
       setIsPollingCompletion(false)
       return
     }
+    const walletAddress = onrampWalletAddress
     
     let attempts = 0
-    const maxAttempts = 150 // Poll for up to 5 minutes (150 * 2 seconds)
+    const maxAttempts = 100 // Poll for up to ~5 minutes (100 * 3 seconds)
     
     const poll = async () => {
       if (attempts >= maxAttempts) {
@@ -400,10 +481,7 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
         const response = await fetch('/api/stablesrail/cngn-ramp-status', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            walletAddress,
-            requestId
-          }),
+          body: JSON.stringify({ walletAddress }),
           credentials: 'include'
         })
         
@@ -432,7 +510,7 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
             setIsPollingCompletion(false)
             toast({
               title: "Transaction Failed",
-              description: data.data.message || "The transaction could not be completed. Please try again.",
+              description: data.data.message || data.error || "The transaction could not be completed. Please try again.",
               variant: "destructive"
             })
             return
@@ -441,15 +519,20 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
         
         attempts++
         if (attempts < maxAttempts) {
-          setTimeout(poll, 2000) // Poll every 2 seconds
+          setTimeout(poll, 3000) // Poll every 3 seconds
         } else {
           setIsPollingCompletion(false)
+          toast({
+            title: 'Status Check Timeout',
+            description: 'We could not confirm the payment within the expected time. Please check with your bank or try again later.',
+            variant: 'destructive'
+          })
         }
       } catch (error) {
         console.error('Error polling funding completion:', error)
         attempts++
         if (attempts < maxAttempts) {
-          setTimeout(poll, 2000) // Continue polling on error
+          setTimeout(poll, 3000) // Continue polling on error
         } else {
           setIsPollingCompletion(false)
         }
@@ -533,8 +616,11 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
     setBalanceError(null)
     
     try {
+      // Include CNGN contract address from env as a query param when available
+      const cngnContract = process.env.NEXT_PUBLIC_CNGN_CONTRACT_ADDRESS || process.env.CNGN_CONTRACT_ADDRESS || ''
+      const contractQuery = cngnContract ? `&contract=${encodeURIComponent(cngnContract)}` : ''
       const response = await fetch(
-        `/api/stablesrail/base-balance?address=${encodeURIComponent(baseAddress)}`,
+        `/api/stablesrail/base-balance?address=${encodeURIComponent(baseAddress)}${contractQuery}`,
         { credentials: 'include' }
       )
       
@@ -542,6 +628,10 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
       
       if (response.ok && data.success) {
         setBaseWalletBalance(data.balance)
+        // Keep the account balance displayed in the blue card in sync
+        // with the on-chain wallet balance we just fetched.
+        const parsed = Number.parseFloat(String(data.balance)) || 0
+        setAccountBalance((prev) => ({ balance: parsed, loan_balance: prev?.loan_balance ?? 0 }))
       } else {
         throw new Error(data.error || 'Failed to fetch balance')
       }
@@ -662,33 +752,33 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
                 </div>
                   <p className="text-blue-200 text-lg">& Loan Balance ₦{(accountBalance?.loan_balance ?? 0).toLocaleString()}</p>
                 </div>
-                <div className="grid grid-cols-3 gap-8 w-full mt-10">
+                <div className="grid grid-cols-3 gap-2 sm:gap-4 md:gap-8 w-full mt-6 sm:mt-10 px-2 sm:px-0">
                   <Button
                     variant="secondary"
-                    className="w-full h-24 flex flex-col items-center justify-center gap-2 bg-white text-blue-600 hover:bg-gray-50 text-lg"
+                    className="w-full h-16 sm:h-20 md:h-24 flex flex-col items-center justify-center gap-1 sm:gap-2 bg-white text-blue-600 hover:bg-gray-50 text-xs sm:text-sm md:text-lg"
                     onClick={() => setShowFundModal(true)}
                   >
-                    <Plus className="h-8 w-8" />
+                    <Plus className="h-5 w-5 sm:h-6 sm:w-6 md:h-8 md:w-8" />
                     <span className="font-medium">Fund</span>
                   </Button>
                   <Button
                     variant="secondary"
-                    className="w-full h-24 flex flex-col items-center justify-center gap-2 bg-white text-blue-600 hover:bg-gray-50 text-lg"
+                    className="w-full h-16 sm:h-20 md:h-24 flex flex-col items-center justify-center gap-1 sm:gap-2 bg-white text-blue-600 hover:bg-gray-50 text-xs sm:text-sm md:text-lg"
                     onClick={() => setShowWithdrawalModal(true)}
                   >
-                    <ArrowDown className="h-8 w-8" />
+                    <ArrowDown className="h-5 w-5 sm:h-6 sm:w-6 md:h-8 md:w-8" />
                     <span className="font-medium">Withdrawal</span>
                   </Button>
                   <Link href="/timeline" className="w-full">
                     <Button
                       variant="secondary"
-                      className="w-full h-24 flex flex-col items-center justify-center gap-2 bg-white text-blue-600 hover:bg-gray-50 text-lg"
+                      className="w-full h-16 sm:h-20 md:h-24 flex flex-col items-center justify-center gap-1 sm:gap-2 bg-white text-blue-600 hover:bg-gray-50 text-xs sm:text-sm md:text-lg"
                     >
-                      <TrendingUp className="h-8 w-8" />
+                      <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 md:h-8 md:w-8" />
                       <span className="font-medium">Timeline</span>
                     </Button>
                   </Link>
-                    </div>
+                </div>
                     </div>
             </div>
           </div>
@@ -877,7 +967,12 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
                     {isPollingVA && (
                       <div className="flex items-center gap-2 text-sm text-blue-600">
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        <span>Bank account generation in progress...</span>
+                        <span>Generating account... this may take a few seconds.</span>
+                      </div>
+                    )}
+                    {virtualAccountError && (
+                      <div className="text-sm text-red-600 mt-2">
+                        {virtualAccountError}
                       </div>
                     )}
                     <div>
@@ -921,6 +1016,7 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
                         )}
                       </Button>
                     </div>
+                    {/* Manual retry button removed - automatic retries are handled programmatically */}
                   </>
                 ) : (
                   // Show VA details
@@ -964,9 +1060,19 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
                           <div className="bg-gray-50 p-4 rounded-lg space-y-3">
                             <div className="flex justify-between items-center">
                               <span className="text-sm text-gray-600">Account Number:</span>
-                              <span className="font-mono text-sm font-semibold">
-                                {virtualAccountDetails.virtualAccount?.accountNumber}
-                              </span>
+                              <div className="flex items-center">
+                                <span className="font-mono text-sm font-semibold">
+                                  {virtualAccountDetails.virtualAccount?.accountNumber}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => copyToClipboard(virtualAccountDetails.virtualAccount?.accountNumber)}
+                                  className="ml-3 text-sm text-blue-600 hover:underline"
+                                  title="Copy account number"
+                                >
+                                  Copy
+                                </button>
+                              </div>
                             </div>
                             <div className="flex justify-between items-center">
                               <span className="text-sm text-gray-600">Bank Name:</span>
@@ -982,9 +1088,19 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
                             </div>
                             <div className="flex justify-between items-center border-t pt-3">
                               <span className="text-sm font-medium text-gray-700">Amount to Transfer:</span>
-                              <span className="text-lg font-bold text-blue-600">
-                                ₦{virtualAccountDetails.virtualAccount?.totalAmountWithFee?.toLocaleString('en-NG', { minimumFractionDigits: 2 }) || '0.00'}
-                              </span>
+                              <div className="flex items-center">
+                                <span className="text-lg font-bold text-blue-600">
+                                  ₦{virtualAccountDetails.virtualAccount?.totalAmountWithFee?.toLocaleString('en-NG', { minimumFractionDigits: 2 }) || '0.00'}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => copyToClipboard(virtualAccountDetails.virtualAccount?.totalAmountWithFee)}
+                                  className="ml-3 text-sm text-blue-600 hover:underline"
+                                  title="Copy amount"
+                                >
+                                  Copy
+                                </button>
+                              </div>
                             </div>
                             {virtualAccountDetails.virtualAccount?.feeBreakdown && (
                               <div className="pt-3 border-t">
@@ -1020,8 +1136,16 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
                           onClick={handleConfirmTransfer}
                           className="w-full"
                           size="lg"
+                          disabled={isPollingCompletion}
                         >
-                          I have made the transfer
+                          {isPollingCompletion ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Waiting for confirmation...
+                            </>
+                          ) : (
+                            'I have made the transfer'
+                          )}
                         </Button>
                         
                         <Button

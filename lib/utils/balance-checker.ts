@@ -21,8 +21,10 @@ export async function checkSufficientBalance({
 }> {
   try {
     // 1. Fetch wallet balance using BASE RPC
+    const contractEnv = process.env.NEXT_PUBLIC_CNGN_CONTRACT_ADDRESS || process.env.CNGN_CONTRACT_ADDRESS || ''
+    const contractQuery = contractEnv ? `&contract=${encodeURIComponent(contractEnv)}` : ''
     const balanceRes = await fetch(
-      `/api/stablesrail/base-balance?address=${walletAddress}`
+      `/api/stablesrail/base-balance?address=${walletAddress}${contractQuery}`
     )
     const balanceData = await balanceRes.json()
     

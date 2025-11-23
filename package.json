@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@emotion/is-prop-valid": "latest",
+    "@farcaster/miniapp-sdk": "^0.2.1",
     "@hookform/resolvers": "latest",
     "@jest/globals": "latest",
     "@radix-ui/react-accordion": "1.2.2",
@@ -43,6 +44,7 @@
     "@supabase/supabase-js": "latest",
     "@testing-library/dom": "latest",
     "@testing-library/react": "latest",
+    "@coinbase/cdp-sdk": "latest",
     "@types/dompurify": "^3.2.0",
     "@vercel/analytics": "^1.5.0",
     "autoprefixer": "^10.4.21",
