@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     }
 
     const cookieStore = cookies()
-    const supabase = createServerClient(cookieStore)
+    const supabase = await createServerClient(cookieStore)
 
     // Get current user
     const currentUserId = await getCurrentUserId()

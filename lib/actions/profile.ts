@@ -17,7 +17,7 @@ function isOfflineMode(): boolean {
 async function getCurrentUserId() {
   try {
     const cookieStore = cookies()
-    const supabase = createServerClient()
+    const supabase = await createServerClient()
     const adminClient = createAdminClient()
 
     // Method 1: Try to get user from Supabase session
@@ -221,7 +221,7 @@ export async function updateProfile(input: UpdateProfileInput, userIdOverride?: 
       // Return a mock success response, adjust as needed based on expected behavior
       return { success: true, data: {} };
     }
-    const supabase = createServerClient()
+    const supabase = await createServerClient()
     const adminClient = createAdminClient()
 
     // Use the override if provided
@@ -494,7 +494,7 @@ export async function uploadIdDocument(file: File) {
       // Return a mock success response with a placeholder URL
       return { success: true, url: "/placeholder-id.svg" }
     }
-    const supabase = createServerClient()
+    const supabase = await createServerClient()
     const adminClient = createAdminClient()
 
     // Try multiple methods to get the user ID
@@ -590,7 +590,7 @@ export async function uploadBannerImage(file: File) {
       return { success: true, url: "/placeholder-banner.svg" }
     }
     const cookieStore = cookies()
-    const supabase = createServerClient()
+    const supabase = await createServerClient()
     const adminClient = createAdminClient()
 
     // Get current user ID with enhanced method
@@ -750,7 +750,7 @@ export async function uploadProfilePicture(file: File) {
       // Return a mock success response with a placeholder URL
       return { success: true, url: "/placeholder-avatar.svg" }
     }
-    const supabase = createServerClient()
+    const supabase = await createServerClient()
     const adminClient = createAdminClient()
 
     // Try multiple methods to get the user ID

@@ -20,7 +20,7 @@ export async function checkAuth(preventRedirect = false) {
 
   // Try Supabase session as fallback
   try {
-    const supabase = createServerClient()
+    const supabase = await createServerClient()
     const { data } = await supabase.auth.getSession()
 
     if (data.session) {
@@ -79,7 +79,7 @@ export async function getCurrentUserId() {
     }
 
     // If no JWT, try to get from Supabase session
-    const supabase = createServerClient()
+    const supabase = await createServerClient()
     const {
       data: { session },
     } = await supabase.auth.getSession()

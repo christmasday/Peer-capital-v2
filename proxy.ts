@@ -3,8 +3,7 @@ import type { NextRequest } from "next/server"
 import { createAdminClient, isOfflineMode } from "@/lib/supabase/admin"
 import { verifyJWT, JWT_COOKIE_NAME } from "@/lib/jwt"
 
-export async function middleware(req: NextRequest) {
-
+export async function proxy(req: NextRequest) {
   // Skip auth checks for public routes and static assets
   const publicPaths = [
     "/",
@@ -21,10 +20,10 @@ export async function middleware(req: NextRequest) {
     "/about-us",
     "/risk-disclosure",
     "/aml-policy",
-    "/kyc-policy"
+    "/kyc-policy",
   ]
 
-  // API routes that do NOT require middleware auth (they handle their own or are public)
+  // API routes that do NOT require proxy auth (they handle their own or are public)
   const publicApiPaths = [
     "/api/auth/refresh",
     "/api/auth/signup",
@@ -102,7 +101,7 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(url)
   } catch (error) {
     // Fail-closed: on error, deny access and redirect to login
-    console.error("[middleware] Auth error, denying access:", error instanceof Error ? error.message : String(error))
+    console.error("[proxy] Auth error, denying access:", error instanceof Error ? error.message : String(error))
     const url = req.nextUrl.clone()
     url.pathname = "/"
     url.searchParams.set("redirectedFrom", req.nextUrl.pathname)
@@ -117,7 +116,6 @@ async function checkSupabaseSession(req: NextRequest) {
     const customAuthToken = req.cookies.get("custom-auth-token")?.value
 
     if (customAuthToken) {
-
       // If SKIP_SUPABASE_PING is set, don't actually check with database
       if (process.env.SKIP_SUPABASE_PING === "true") {
         return { valid: true, fallback: true }
@@ -131,11 +129,7 @@ async function checkSupabaseSession(req: NextRequest) {
 
       try {
         // Check if the token exists in our auth_users table
-        const { data, error } = await supabase
-          .from("auth_users")
-          .select("id")
-          .eq("access_token", customAuthToken)
-          .single()
+        const { data, error } = await supabase.from("auth_users").select("id").eq("access_token", customAuthToken).single()
 
         clearTimeout(timeoutId)
 

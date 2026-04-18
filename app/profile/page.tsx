@@ -59,7 +59,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
   const user = userProfile.user
 
   const cookieStore = cookies()
-  const supabase = createServerClient()
+  const supabase = await createServerClient()
   const adminClient = createAdminClient()
 
   // Get account balance

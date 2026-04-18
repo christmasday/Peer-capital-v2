@@ -67,7 +67,7 @@ export async function getTransactionById(id: string) {
 
     // If no userId from JWT, try Supabase session
     if (!userId) {
-      const supabase = createServerClient()
+      const supabase = await createServerClient()
       const { data: sessionData } = await supabase.auth.getSession()
 
       if (sessionData.session?.user) {

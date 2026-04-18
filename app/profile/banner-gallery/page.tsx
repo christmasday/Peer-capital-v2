@@ -15,7 +15,7 @@ export default async function BannerGalleryPage() {
   await checkAuth()
 
   const cookieStore = cookies()
-  const supabase = createServerClient(cookieStore)
+  const supabase = await createServerClient(cookieStore)
 
   // Get current user session
   const {

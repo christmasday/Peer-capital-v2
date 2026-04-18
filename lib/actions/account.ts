@@ -14,7 +14,7 @@ export type FundAccountData = {
 
 export async function fundAccount(data: FundAccountData) {
   try {
-    const supabase = createServerClient()
+    const supabase = await createServerClient()
     const adminClient = createAdminClient()
 
     // Get the current user

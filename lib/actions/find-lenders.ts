@@ -36,7 +36,7 @@ export async function findLenders({ loanAmount, loanDuration }: LenderSearchPara
     }
 
     // Create Supabase client
-    const supabase = createServerClient()
+    const supabase = await createServerClient()
 
     // Get the current user's ID using checkAuth
     const { checkAuth } = await import("@/lib/auth-utils");

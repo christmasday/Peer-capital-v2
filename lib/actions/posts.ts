@@ -12,7 +12,7 @@ import { getBlockedUsers } from "@/lib/actions/connections"
 async function getCurrentUserId() {
   try {
     const cookieStore = cookies()
-    const supabase = createServerClient(cookieStore)
+    const supabase = await createServerClient(cookieStore)
 
     // Try to get user from Supabase session
     const { data: sessionData } = await supabase.auth.getSession()
@@ -299,7 +299,7 @@ export async function deletePost(postId: string) {
     if (post.image_url) {
       try {
         const cookieStore = cookies()
-        const supabase = createServerClient(cookieStore)
+        const supabase = await createServerClient(cookieStore)
 
         // Extract the path from the URL
         const url = new URL(post.image_url)

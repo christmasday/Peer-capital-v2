@@ -1594,7 +1594,7 @@ export async function resetPasswordWithToken(token: string, newPassword: string)
 // Change password for authenticated user
 export async function changePassword(currentPassword: string, newPassword: string) {
   try {
-    const supabase = createServerClient()
+    const supabase = await createServerClient()
     const adminClient = createAdminClient()
 
     // Get the current user

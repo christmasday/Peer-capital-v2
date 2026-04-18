@@ -8,7 +8,7 @@ import { getBlockedUsers } from "@/lib/actions/connections"
 export async function searchUsers(query: string) {
   try {
     const cookieStore = cookies()
-    const supabase = createServerClient(cookieStore)
+    const supabase = await createServerClient(cookieStore)
 
     // For debugging - log the search query
 

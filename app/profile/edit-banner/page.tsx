@@ -12,14 +12,14 @@ export const dynamic = "force-dynamic"
 
 export default async function EditBannerPage() {
   // Ensure authentication is properly maintained
-  const supabase = createServerClient()
+  const supabase = await createServerClient()
   const {
     data: { session },
   } = await supabase.auth.getSession()
 
   // Add fallback authentication check using JWT
   if (!session) {
-    const jwt = cookies().get("jwt-token")?.value
+    const jwt = (await cookies()).get("jwt-token")?.value
     // If no valid authentication is found, handle gracefully without redirecting
     if (!jwt) {
       // We'll continue rendering the page and let the client-side auth in MainLayout handle redirects if needed
@@ -29,8 +29,8 @@ export default async function EditBannerPage() {
   // Check authentication
   await checkAuth()
 
-  const cookieStore = cookies()
-  // const supabase = createServerClient(cookieStore) // moved up
+  const cookieStore = await cookies()
+  // const supabase = await createServerClient(cookieStore) // moved up
 
   // Get current user session
   // const {

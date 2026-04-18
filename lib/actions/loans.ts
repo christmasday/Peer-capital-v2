@@ -66,7 +66,7 @@ export async function createLoanRequest({
   interestRate: number
 }) {
   try {
-    const supabase = createServerClient() as SupabaseClient<Database>
+    const supabase = await createServerClient() as SupabaseClient<Database>
     const adminClient = createAdminClient() as SupabaseClient<Database>
 
     // Verify userId matches the authenticated session
@@ -190,7 +190,7 @@ export async function getUserLoanRequests() {
 
     // If no userId from JWT, try Supabase session
     if (!userId) {
-      const supabase = createServerClient() as SupabaseClient<Database>
+      const supabase = await createServerClient() as SupabaseClient<Database>
       const { data: sessionData } = await supabase.auth.getSession()
 
       if (sessionData.session?.user) {
@@ -206,7 +206,7 @@ export async function getUserLoanRequests() {
     }
 
     // Get all loan requests for the user
-    const supabase = createServerClient() as SupabaseClient<Database>
+    const supabase = await createServerClient() as SupabaseClient<Database>
     const { data, error } = await supabase
       .from("loan_requests")
       .select(`
@@ -233,7 +233,7 @@ export async function getUserLoanRequests() {
 
 export async function cancelLoanRequest(loanRequestId: string) {
   try {
-    const supabase = createServerClient() as SupabaseClient<Database>
+    const supabase = await createServerClient() as SupabaseClient<Database>
     const adminClient = createAdminClient() as SupabaseClient<Database>
 
     // Get the current user

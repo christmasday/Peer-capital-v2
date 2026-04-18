@@ -24,7 +24,7 @@ export default async function AccountStatusPage() {
   const user = userProfile.user
 
   const cookieStore = cookies()
-  const supabase = createServerClient()
+  const supabase = await createServerClient()
   const adminClient = createAdminClient()
 
   // Get virtual account details
