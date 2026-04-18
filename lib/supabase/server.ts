@@ -9,7 +9,9 @@ let clientCount = 0
 let connectionFailures = 0
 const MAX_FAILURES = 3
 
-export const createServerClient = () => {
+type CookieStore = Awaited<ReturnType<typeof cookies>>
+
+export const createServerClient = async (cookieStoreInput?: CookieStore | Promise<CookieStore>) => {
   try {
     // Check if we're in offline mode
     if (isOfflineMode()) {
@@ -23,7 +25,7 @@ export const createServerClient = () => {
       serverClientCreated = true
     }
 
-    const cookieStore = cookies()
+    const cookieStore = cookieStoreInput ? await cookieStoreInput : await cookies()
     return createServerComponentClient<Database>({
       cookies: () => cookieStore,
       options: {

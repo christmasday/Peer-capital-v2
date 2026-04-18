@@ -11,7 +11,7 @@ import { createProfileActivityNotification } from "./activity-notifications"
 async function getCurrentUserId() {
   try {
     const cookieStore = cookies()
-    const supabase = createServerClient(cookieStore)
+    const supabase = await createServerClient(cookieStore)
 
     // Try to get user from Supabase session
     const { data: sessionData } = await supabase.auth.getSession()
@@ -22,7 +22,7 @@ async function getCurrentUserId() {
     // If session method fails, try JWT
     try {
       const { getJWTFromCookies, verifyJWT } = await import("@/lib/jwt")
-      const jwt = getJWTFromCookies()
+      const jwt = await getJWTFromCookies()
       if (jwt) {
         const { payload, error } = await verifyJWT(jwt)
         if (!error && payload && (payload.userId || payload.sub)) {
@@ -292,7 +292,7 @@ export async function deletePost(postId: string) {
     if (post.image_url) {
       try {
         const cookieStore = cookies()
-        const supabase = createServerClient(cookieStore)
+        const supabase = await createServerClient(cookieStore)
 
         // Extract the path from the URL
         const url = new URL(post.image_url)

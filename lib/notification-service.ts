@@ -11,17 +11,64 @@ export interface NotificationEvent {
   metadata?: Record<string, any>
 }
 
+async function resolveSessionUserId(adminClient: ReturnType<typeof createAdminClient>, userId: string): Promise<string | null> {
+  try {
+    const { data, error } = await adminClient
+      .from("auth_users")
+      .select("id")
+      .eq("id", userId)
+      .maybeSingle()
+
+    if (!error && data?.id) {
+      return userId
+    }
+  } catch {
+    // Fall through to email-based resolution.
+  }
+
+  try {
+    const { data: profile } = await adminClient
+      .from("profiles")
+      .select("email")
+      .eq("id", userId)
+      .maybeSingle()
+
+    const profileEmail = (profile?.email || "").toLowerCase().trim()
+    if (!profileEmail) {
+      return null
+    }
+
+    const { data: authUserByEmail, error: authByEmailError } = await adminClient
+      .from("auth_users")
+      .select("id")
+      .eq("email", profileEmail)
+      .maybeSingle()
+
+    if (!authByEmailError && authUserByEmail?.id) {
+      return authUserByEmail.id
+    }
+  } catch {
+    return null
+  }
+
+  return null
+}
+
 /**
  * Check if a user has an active session
  */
 export async function isUserLoggedIn(userId: string): Promise<boolean> {
   try {
     const adminClient = createAdminClient()
+    const resolvedUserId = await resolveSessionUserId(adminClient, userId)
+    if (!resolvedUserId) {
+      return false
+    }
     
     const { data: activeSessions, error } = await adminClient
       .from("user_sessions")
       .select("id")
-      .eq("user_id", userId)
+      .eq("user_id", resolvedUserId)
       .eq("is_active", true)
       .gte("expires_at", new Date().toISOString())
       .limit(1)
@@ -183,13 +230,17 @@ export async function sendNotificationEmail(event: NotificationEvent): Promise<b
 export async function trackUserSession(userId: string, action: 'login' | 'logout', sessionToken?: string, userAgent?: string, ipAddress?: string) {
   try {
     const adminClient = createAdminClient()
+    const resolvedUserId = await resolveSessionUserId(adminClient, userId)
+    if (!resolvedUserId) {
+      return
+    }
     
     if (action === 'login') {
       // Create new session
       const { error } = await adminClient
         .from("user_sessions")
         .insert({
-          user_id: userId,
+          user_id: resolvedUserId,
           session_token: sessionToken || `session_${Date.now()}`,
           is_active: true,
           user_agent: userAgent,
@@ -205,7 +256,7 @@ export async function trackUserSession(userId: string, action: 'login' | 'logout
       const { error } = await adminClient
         .from("user_sessions")
         .update({ is_active: false })
-        .eq("user_id", userId)
+        .eq("user_id", resolvedUserId)
         .eq("is_active", true)
 
       if (error) {
@@ -223,6 +274,10 @@ export async function trackUserSession(userId: string, action: 'login' | 'logout
 export async function updateSessionActivity(userId: string, sessionToken: string) {
   try {
     const adminClient = createAdminClient()
+    const resolvedUserId = await resolveSessionUserId(adminClient, userId)
+    if (!resolvedUserId) {
+      return
+    }
     
     const { error } = await adminClient
       .from("user_sessions")
@@ -230,7 +285,7 @@ export async function updateSessionActivity(userId: string, sessionToken: string
         last_activity: new Date().toISOString(),
         expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // Extend by 24 hours
       })
-      .eq("user_id", userId)
+      .eq("user_id", resolvedUserId)
       .eq("session_token", sessionToken)
       .eq("is_active", true)
 

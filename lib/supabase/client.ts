@@ -1,25 +1,35 @@
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import type { Database } from "@/lib/supabase/database.types"
 
-// Create a single supabase client for the entire client-side application
-let supabaseInstance: ReturnType<typeof createClientComponentClient<Database>> | null = null
-let instanceCount = 0
+type BrowserSupabaseClient = ReturnType<typeof createClientComponentClient<Database>>
+
+declare global {
+  var __peerCapitalSupabaseClient: BrowserSupabaseClient | undefined
+  var __peerCapitalSupabaseClientCreations: number | undefined
+}
 
 export const createBrowserClient = () => {
-  instanceCount++
-
-  // Log a warning if multiple instances are being created
-  if (instanceCount > 1) {
-    console.warn(`Warning: createBrowserClient called ${instanceCount} times. This may cause issues with authentication.`);
+  // Browser-only helper; return a safe fallback on the server.
+  if (typeof window === "undefined") {
+    return createDummyClient()
   }
 
-  if (!supabaseInstance) {
+  if (!globalThis.__peerCapitalSupabaseClient) {
+    const creations = (globalThis.__peerCapitalSupabaseClientCreations || 0) + 1
+    globalThis.__peerCapitalSupabaseClientCreations = creations
+
+    if (creations > 1) {
+      console.warn(
+        `Warning: createBrowserClient created ${creations} client instances. This may cause auth instability.`,
+      )
+    }
+
     try {
-      supabaseInstance = createClientComponentClient<Database>({
+      globalThis.__peerCapitalSupabaseClient = createClientComponentClient<Database>({
         options: {
           global: {
             headers: {
-              "x-client-info": `@supabase/auth-helpers-nextjs/client-${instanceCount}`,
+              "x-client-info": "@supabase/auth-helpers-nextjs/client",
             },
           },
         },
@@ -48,10 +58,9 @@ export const createBrowserClient = () => {
       // Return a dummy client that won't throw errors
       return createDummyClient()
     }
-  } else {
   }
 
-  return supabaseInstance
+  return globalThis.__peerCapitalSupabaseClient
 }
 
 // Create a dummy client for error cases
@@ -72,10 +81,10 @@ const createDummyClient = () => {
 
 // Reset the instance (useful for testing or when signing out)
 export const resetBrowserClient = () => {
-  if (supabaseInstance) {
+  if (globalThis.__peerCapitalSupabaseClient) {
     try {
       // Try to sign out before resetting, but don't wait for it
-      const signOutPromise = supabaseInstance.auth.signOut({ scope: "global" })
+      const signOutPromise = globalThis.__peerCapitalSupabaseClient.auth.signOut({ scope: "global" })
 
       // Add a timeout to prevent hanging
       const timeoutPromise = new Promise((resolve) => {
@@ -92,6 +101,6 @@ export const resetBrowserClient = () => {
   }
 
   // Reset the instance regardless of signout success
-  supabaseInstance = null
-  instanceCount = 0
+  globalThis.__peerCapitalSupabaseClient = undefined
+  globalThis.__peerCapitalSupabaseClientCreations = 0
 }

@@ -1,31 +1,37 @@
-import { createServerComponentClient } from "@supabase/auth-helpers-nextjs"
-import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
-import AccountBalanceDisplay from "@/components/account-balance-display"
-import { FinancialDisclaimer } from "@/components/disclaimers/financial-disclaimer"
+import { MainLayout } from "@/components/layouts/main-layout"
+import { DashboardOverview } from "@/components/dashboard/dashboard-overview"
+import { getUserProfile } from "@/lib/actions/auth"
 import { checkAuth } from "@/lib/auth-utils"
+import { FinancialDisclaimer } from "@/components/disclaimers/financial-disclaimer"
 
+// Force dynamic rendering to prevent static generation issues
+export const dynamic = 'force-dynamic'
 
 export default async function DashboardPage() {
-  const supabase = createServerComponentClient({ cookies })
+  // Check authentication
+  await checkAuth()
 
-  // Check if user is authenticated
- await checkAuth()
- 
-  if (!session) {
-    redirect("/login")
+  // Get user profile
+  const userProfile = await getUserProfile()
+
+  if (!userProfile) {
+    redirect("/")
   }
 
+  const fullName = `${userProfile.profile.first_name || ""} ${userProfile.profile.last_name || ""}`.trim() || userProfile.user.email || "User"
+
   return (
-    <div className="container mx-auto py-8">
-      <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
-      <div className="mb-6">
-        <FinancialDisclaimer />
+    <MainLayout
+      userName={fullName}
+      userImage={userProfile.profile.profile_picture_url || ""}
+    >
+      <div className="container mx-auto py-8">
+        <DashboardOverview />
+        <div className="mt-8">
+          <FinancialDisclaimer />
+        </div>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <AccountBalanceDisplay />
-        {/* Other dashboard components can go here */}
-      </div>
-    </div>
+    </MainLayout>
   )
 }

@@ -58,7 +58,24 @@ export function TransferForm({ currentBalance }: TransferFormProps) {
   const [beneficiariesLoading, setBeneficiariesLoading] = useState(true)
   const [beneficiariesError, setBeneficiariesError] = useState<string | null>(null)
 
-  // Fetch beneficiaries from API
+  // Banks
+  const [banks, setBanks] = useState<any[]>([])
+  const [banksLoading, setBanksLoading] = useState(false)
+  const [banksError, setBanksError] = useState<string | null>(null)
+
+  // Account validation
+  const [accountName, setAccountName] = useState<string>("")
+  const [accountValidationLoading, setAccountValidationLoading] = useState(false)
+  const [accountValidationError, setAccountValidationError] = useState<string | null>(null)
+
+  // NIP Charges
+  const [nipCharge, setNipCharge] = useState<number | null>(null)
+  const [nipChargeLoading, setNipChargeLoading] = useState(false)
+  const [nipChargeError, setNipChargeError] = useState<string | null>(null)
+
+  // Removed ALAT wallet state; transfers are processed via Paystack
+
+  // Fetch beneficiaries
   useEffect(() => {
     async function fetchBeneficiaries() {
       setBeneficiariesLoading(true)
@@ -77,13 +94,23 @@ export function TransferForm({ currentBalance }: TransferFormProps) {
     fetchBeneficiaries()
   }, [])
 
-  // Format currency
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-NG", {
-      style: "currency",
-      currency: "NGN",
-      minimumFractionDigits: 2,
-    }).format(amount)
+  // Fetch banks
+  const fetchBanks = async () => {
+    setBanksLoading(true)
+    setBanksError(null)
+    try {
+      // ALAT endpoint removed: disable banks fetch
+      const res = new Response(JSON.stringify({ banks: [] }), { status: 200 }) as any
+      if (!res.ok) throw new Error("Failed to fetch banks")
+      const data = await res.json()
+      // Map the API response to the expected format (include logo)
+      const banksList = (data.result || []).map((b: any) => ({ name: b.bankName, code: b.bankCode, logo: b.bankLogo }))
+      setBanks(banksList)
+    } catch (err) {
+      setBanksError("Could not load banks list")
+    } finally {
+      setBanksLoading(false)
+    }
   }
 
   // Initialize form
@@ -99,20 +126,48 @@ export function TransferForm({ currentBalance }: TransferFormProps) {
   // Watch amount for fee calculation
   const amount = form.watch("amount")
 
-  // Calculate transfer fee based on new pricing structure
-  const calculateFee = () => {
-    if (!amount) return 0
-    if (amount <= 5000) return 10
-    if (amount <= 50000) return 25
-    return 50
-  }
+  // Validate account when account number and bank are set
+  useEffect(() => {
+    if (mode === "manual" && accountNumber && bankCode && accountNumber.length >= 10) {
+      setAccountValidationLoading(true)
+      setAccountValidationError(null)
+      setAccountName("")
+      // ALAT endpoint removed: skip destination enquiry
+      Promise.resolve({ ok: true })
+        .then(async (res) => {
+          const data = await res.json()
+          if (res.ok && data.accountName) {
+            setAccountName(data.accountName)
+          } else {
+            setAccountValidationError(data.message || data.error || "Account validation failed")
+          }
+        })
+        .catch(() => setAccountValidationError("Account validation failed"))
+        .finally(() => setAccountValidationLoading(false))
+    }
+  }, [mode, accountNumber, bankCode])
 
-  const fee = calculateFee()
-  const totalAmount = amount ? amount + fee : 0
+  // Fetch NIP charge when amount is set
+  useEffect(() => {
+    if (amount && amount > 0) {
+      setNipChargeLoading(true)
+      setNipChargeError(null)
+      // ALAT endpoint removed: skip nip charges
+      Promise.resolve({ ok: true })
+        .then(async (res) => {
+          const data = await res.json()
+          if (res.ok && data.charge) {
+            setNipCharge(data.charge)
+          } else {
+            setNipChargeError(data.message || data.error || "Failed to get NIP charge")
+          }
+        })
+        .catch(() => setNipChargeError("Failed to get NIP charge"))
+        .finally(() => setNipChargeLoading(false))
+    }
+  }, [amount])
 
-  // Find selected beneficiary
-  const beneficiaryId = form.watch("beneficiaryId")
-  const selectedBeneficiary = beneficiaries.find(b => b.id === beneficiaryId)
+  // Removed ALAT wallet fetch effect
 
   // Handle form submission
   async function onSubmit(values: FormValues) {
@@ -126,52 +181,82 @@ export function TransferForm({ currentBalance }: TransferFormProps) {
         return
       }
 
-      if (!selectedBeneficiary) {
-        setError("Please select a beneficiary")
+      // Determine destination details from mode
+      let destinationAccountNumber = ""
+      let destinationBankCode = ""
+      let destinationBankName = ""
+      let destinationAccountName = ""
+
+      if (mode === "beneficiary") {
+        const beneficiary = beneficiaries.find(b => b.id === values.beneficiaryId)
+        if (!beneficiary) {
+          setError("Please select a beneficiary")
+          setIsSubmitting(false)
+          return
+        }
+        destinationAccountNumber = beneficiary.account_number
+        destinationBankCode = beneficiary.bank_code
+        destinationBankName = beneficiary.bank_name
+        destinationAccountName = beneficiary.account_name
+      } else {
+        if (!accountName) {
+          setError("Please validate the account number and bank")
+          setIsSubmitting(false)
+          return
+        }
+        destinationAccountNumber = values.accountNumber || ""
+        destinationBankCode = values.bankCode || ""
+        destinationBankName = banks.find(b => b.code === destinationBankCode)?.name || ""
+        destinationAccountName = accountName
+      }
+
+      // Create/ensure Paystack transfer recipient
+      const recipientRes = await fetch("/api/virtual-account", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "nuban",
+          name: destinationAccountName,
+          account_number: destinationAccountNumber,
+          bank_code: destinationBankCode,
+          currency: "NGN",
+        }),
+      })
+      const recipientData = await recipientRes.json()
+      if (!recipientRes.ok || recipientData.status === false) {
+        setError(recipientData.message || recipientData.error || "Failed to create transfer recipient")
+        setIsSubmitting(false)
+        return
+      }
+      const recipientCode = recipientData.data?.recipient_code || recipientData.recipient_code
+      if (!recipientCode) {
+        setError("Could not obtain recipient code from payment provider")
+        setIsSubmitting(false)
         return
       }
 
-      // Submit transfer request via API route
-      const res = await fetch("/api/transfer", {
+      // Initiate Paystack transfer via our API
+      const transferRes = await fetch("/api/transfer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({
-        amount: values.amount,
-        bankName: selectedBeneficiary.bank_name,
-        accountNumber: selectedBeneficiary.account_number,
-        accountName: selectedBeneficiary.account_name,
-        recipientCode: selectedBeneficiary.recipient_code,
+          amount: values.amount,
+          bankName: destinationBankName,
+          accountNumber: destinationAccountNumber,
+          accountName: destinationAccountName,
+          recipientCode,
           reason: values.reason,
         }),
       })
-      const result = await res.json()
-
-      if (!res.ok || result.error) {
-        setError(result.error || "Transfer failed")
+      const transferData = await transferRes.json()
+      if (!transferRes.ok || transferData.error) {
+        setError(transferData.message || transferData.error || "Transfer failed")
+        setIsSubmitting(false)
         return
       }
 
-      // Show success message
       setSuccess(true)
-      setTransactionDetails({
-        id: result.transactionId || "",
-        reference: result.reference || "",
-        amount: values.amount,
-        type: "transfer",
-        description: `Transfer to ${selectedBeneficiary.bank_name} - ${selectedBeneficiary.account_number} (${selectedBeneficiary.account_name})`,
-        status: "pending",
-        created_at: new Date().toISOString(),
-        newBalance: result.newBalance || 0,
-        recipient: {
-          bankName: selectedBeneficiary.bank_name,
-          accountNumber: selectedBeneficiary.account_number,
-          accountName: selectedBeneficiary.account_name,
-        },
-        fee: fee,
-      })
-
-      // Reset form
+      setTransactionDetails(transferData)
       form.reset()
     } catch (err) {
       setError("An unexpected error occurred. Please try again.")
@@ -183,6 +268,7 @@ export function TransferForm({ currentBalance }: TransferFormProps) {
   return (
     <Card className="w-full">
       <CardHeader>
+        {/* Removed ALAT wallet info/error header */}
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8">
             <ArrowLeft className="h-4 w-4" />

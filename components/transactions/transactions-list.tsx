@@ -29,8 +29,14 @@ export function TransactionsList() {
       setError(null)
       try {
         const res = await fetch("/api/transactions", { credentials: "include" })
-        if (!res.ok) throw new Error("Failed to fetch transactions")
         const data = await res.json()
+
+        if (!res.ok) {
+          setError(data.error || "Failed to fetch transactions")
+          setTransactions([])
+          return
+        }
+
         setTransactions(data.transactions || [])
       } catch (err: any) {
         setError(err.message || "Failed to fetch transactions")

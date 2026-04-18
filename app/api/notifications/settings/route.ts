@@ -6,7 +6,7 @@ import { getCurrentUserId } from "@/lib/auth-utils"
 export async function GET() {
   try {
     const cookieStore = cookies()
-    const supabase = createServerClient(cookieStore)
+    const supabase = await createServerClient(cookieStore)
     
     const currentUserId = await getCurrentUserId()
     if (!currentUserId) {
@@ -96,7 +96,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const cookieStore = cookies()
-    const supabase = createServerClient(cookieStore)
+    const supabase = await createServerClient(cookieStore)
     
     const currentUserId = await getCurrentUserId()
     if (!currentUserId) {

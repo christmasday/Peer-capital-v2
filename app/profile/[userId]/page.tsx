@@ -30,7 +30,6 @@ import {
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { FollowButton } from "@/components/profile/follow-button"
-import { useState } from "react"
 import { isFollowingUser } from "@/lib/actions/connections"
 
 // Import the PostItem component and getUserPosts function
@@ -65,7 +64,7 @@ export default async function UserProfilePage({
   }
 
   const cookieStore = cookies()
-  const supabase = createServerClient()
+  const supabase = await createServerClient()
   const adminClient = createAdminClient()
 
   // Get current user session to determine if viewing own profile

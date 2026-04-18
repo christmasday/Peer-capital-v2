@@ -23,7 +23,7 @@ export async function getAccountBalance(userId: string) {
 
 export async function getCurrentUserAccountBalance() {
   try {
-    const supabase = createServerClient()
+    const supabase = await createServerClient()
 
     // Get the current user
     const {

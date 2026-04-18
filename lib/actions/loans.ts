@@ -5,7 +5,6 @@ import { createAdminClient, isOfflineMode } from "@/lib/supabase/admin"
 import { revalidatePath } from "next/cache"
 import { v4 as uuidv4 } from "uuid"
 import { getJWTFromCookies, verifyJWT } from "@/lib/jwt"
-import fetch from 'node-fetch'
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/lib/supabase/database.types"
 import { createNotification } from "@/lib/actions/notifications"
@@ -66,8 +65,15 @@ export async function createLoanRequest({
   interestRate: number
 }) {
   try {
-    const supabase = createServerClient() as SupabaseClient<Database>
+    const supabase = await createServerClient() as SupabaseClient<Database>
     const adminClient = createAdminClient() as SupabaseClient<Database>
+
+    // Verify userId matches the authenticated session
+    const { getCurrentUserId } = await import("@/lib/auth-utils")
+    const sessionUserId = await getCurrentUserId()
+    if (!sessionUserId || sessionUserId !== userId) {
+      return { error: "User ID does not match authenticated session." }
+    }
 
     // Fetch borrower's profile for validation
     const { data: borrowerProfile, error: borrowerProfileError } = await supabase
@@ -78,10 +84,10 @@ export async function createLoanRequest({
     if (borrowerProfileError) {
       return { error: "Could not fetch your profile. Please try again." }
     }
-   // const isProfileComplete = borrowerProfile && borrowerProfile.first_name && borrowerProfile.last_name && borrowerProfile.phone_number && borrowerProfile.address && borrowerProfile.city && borrowerProfile.state && borrowerProfile.bank_name && borrowerProfile.account_number && borrowerProfile.bvn && borrowerProfile.date_of_birth
-   // if (!isProfileComplete) {
-   //   return { error: "You must complete your profile before requesting a loan." }
-   // }
+    const isProfileComplete = borrowerProfile && borrowerProfile.first_name && borrowerProfile.last_name && borrowerProfile.phone_number && borrowerProfile.address && borrowerProfile.city && borrowerProfile.state && borrowerProfile.bank_name && borrowerProfile.account_number && borrowerProfile.bvn && borrowerProfile.date_of_birth
+    if (!isProfileComplete) {
+      return { error: "You must complete your profile before requesting a loan." }
+    }
 
     const loanId = uuidv4()
 
@@ -166,7 +172,7 @@ export async function createLoanRequest({
 export async function getUserLoanRequests() {
   try {
     // Check for JWT first
-    const jwt = getJWTFromCookies()
+    const jwt = await getJWTFromCookies()
     let userId = null
 
     if (jwt) {
@@ -183,7 +189,7 @@ export async function getUserLoanRequests() {
 
     // If no userId from JWT, try Supabase session
     if (!userId) {
-      const supabase = createServerClient() as SupabaseClient<Database>
+      const supabase = await createServerClient() as SupabaseClient<Database>
       const { data: sessionData } = await supabase.auth.getSession()
 
       if (sessionData.session?.user) {
@@ -192,14 +198,14 @@ export async function getUserLoanRequests() {
       }
     }
 
-    // If still no userId, return mock data
+    // If still no userId, return error (not mock data)
     if (!userId) {
-      console.log("No authenticated user found, returning mock loan requests")
-      return { loanRequests: mockLoanRequests }
+      console.warn("No authenticated user found for getUserLoanRequests")
+      return { error: "Authentication required", loanRequests: [] }
     }
 
     // Get all loan requests for the user
-    const supabase = createServerClient() as SupabaseClient<Database>
+    const supabase = await createServerClient() as SupabaseClient<Database>
     const { data, error } = await supabase
       .from("loan_requests")
       .select(`
@@ -214,21 +220,19 @@ export async function getUserLoanRequests() {
 
     if (error) {
       console.error("Error fetching loan requests:", error)
-      // Return mock data as fallback
-      return { loanRequests: mockLoanRequests }
+      return { error: error.message, loanRequests: [] }
     }
 
     return { success: true, loanRequests: data }
   } catch (error) {
     console.error("Unexpected error fetching loan requests:", error)
-    // Return mock data as fallback
-    return { loanRequests: mockLoanRequests }
+    return { error: "An unexpected error occurred", loanRequests: [] }
   }
 }
 
 export async function cancelLoanRequest(loanRequestId: string) {
   try {
-    const supabase = createServerClient() as SupabaseClient<Database>
+    const supabase = await createServerClient() as SupabaseClient<Database>
     const adminClient = createAdminClient() as SupabaseClient<Database>
 
     // Get the current user
@@ -327,11 +331,10 @@ export async function getAllLoanRequests() {
       borrower: profilesMap[r.user_id] || null,
     }));
 
-    return { success: true, loanRequests: enriched };
-
     // Filter out requests from blocked users
     const { blocked } = await getBlockedUsers();
-    const filtered = data?.filter((req: any) => !blocked.includes(req.user_id)) || [];
+    const filtered = enriched.filter((req: any) => !blocked.includes(req.user_id));
+
     return { success: true, loanRequests: filtered };
 
   } catch (error) {
@@ -356,19 +359,30 @@ export async function approveLoanRequest({ loanRequestId, pin, approverId }: { l
   if (loanError || !loanRequest) {
     return { success: false, error: "Loan request not found" }
   }
+  // Verify loan is still pending
+  if (loanRequest.status !== "pending") {
+    return { success: false, error: `Loan request cannot be approved — current status: ${loanRequest.status}` }
+  }
+  // Verify the approver is the designated helper
+  if (loanRequest.helper_id !== approverId) {
+    return { success: false, error: "You are not authorized to approve this loan request" }
+  }
   // Fetch approver (helper) and requester profiles for virtual account details
   const { data: helperProfile } = await adminClient
     .from("profiles")
-    .select("id, first_name, last_name, bank_name, account_number")
+    .select("id, first_name, last_name, bank_name, account_number, sr_user_id")
     .eq("id", approverId)
     .single()
   const { data: requesterProfile } = await adminClient
     .from("profiles")
-    .select("id, first_name, last_name, bank_name, account_number")
+    .select("id, first_name, last_name, bank_name, account_number, sr_user_id")
     .eq("id", loanRequest.user_id)
     .single()
   if (!helperProfile || !requesterProfile) {
     return { success: false, error: "Could not fetch user bank details" }
+  }
+  if (!helperProfile.sr_user_id) {
+    return { success: false, error: "Lender StablesRail account not found. Please complete account setup." }
   }
 
   // Fetch lender's account balance
@@ -380,70 +394,130 @@ export async function approveLoanRequest({ loanRequestId, pin, approverId }: { l
   if (lenderAccountError || !lenderAccount) {
     return { success: false, error: "Could not fetch lender's account balance" };
   }
-  // Calculate lender admin charge
-  const lenderChargePercent = parseFloat(process.env.ADMIN_LENDER_CHARGE_PERCENT || "1.5");
-  const lenderCharge = Math.round((loanRequest.amount * lenderChargePercent) / 100);
-  const totalRequired = loanRequest.amount + lenderCharge;
-  if (lenderAccount.balance < totalRequired) {
-    return { success: false, error: `Insufficient funds. You need at least ₦${totalRequired} to approve this loan (including admin charge).` };
+  // Fetch configurable admin fees
+  const { data: lenderFeeConfig } = await adminClient
+    .from("admin_fees")
+    .select("percentage")
+    .eq("fee_type", "lender_fee")
+    .single()
+
+  const { data: borrowerFeeConfig } = await adminClient
+    .from("admin_fees")
+    .select("percentage")
+    .eq("fee_type", "borrower_fee")
+    .single()
+
+  const lenderFeePercent = lenderFeeConfig?.percentage || 1.5
+  const borrowerFeePercent = borrowerFeeConfig?.percentage || 1.5
+  const lenderFeeAmount = (loanRequest.amount * lenderFeePercent) / 100
+  const borrowerFeeAmount = (loanRequest.amount * borrowerFeePercent) / 100
+
+  // Get admin wallet address
+  const adminWalletAddress = process.env.ADMIN_WALLET_ADDRESS
+  if (!adminWalletAddress) {
+    return { success: false, error: "Admin wallet not configured" }
   }
 
-  // 1. Initiate ALAT debit/process-transfer for loan amount
-  const transferRes = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/api/alat/debit/process-transfer`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      transactionReference: loanRequestId,
+  // Fetch wallet addresses
+  const { data: lenderWallet } = await adminClient
+    .from("wallet_address")
+    .select("base_address")
+    .eq("user_id", approverId)
+    .single()
+
+  const { data: borrowerWallet } = await adminClient
+    .from("wallet_address")
+    .select("base_address")
+    .eq("user_id", loanRequest.user_id)
+    .single()
+
+  if (!lenderWallet?.base_address || !borrowerWallet?.base_address) {
+    return { success: false, error: "Wallet addresses not found" }
+  }
+
+  // Check lender balance (amount + fee + gas)
+  const { checkSufficientBalance } = await import("@/lib/utils/balance-checker")
+  const balanceCheck = await checkSufficientBalance({
+    walletAddress: lenderWallet.base_address,
+    amount: loanRequest.amount + lenderFeeAmount,
+    asset: "CNGN",
+    network: "BASE"
+  })
+
+  if (!balanceCheck.sufficient) {
+    return { 
+      success: false, 
+      error: `Insufficient funds. Required: ${balanceCheck.required}, Available: ${balanceCheck.balance}` 
+    }
+  }
+
+  // Execute token withdrawals via StablesRail client directly
+  const { createStablesrailClient } = await import("@/lib/stablesrail/client")
+  const stablesrail = createStablesrailClient()
+
+  // 1a. Main loan transfer (lender → borrower)
+  let loanTransferData: any
+  try {
+    const result = await stablesrail.tokenWithdrawal({
+      userId: helperProfile.sr_user_id!,
+      internalWallet: lenderWallet.base_address,
+      destinationWallet: borrowerWallet.base_address,
       amount: loanRequest.amount,
-      sourceAccountNumber: helperProfile.account_number,
-      destinationAccountNumber: requesterProfile.account_number,
-      narration: `Loan disbursement for request ${loanRequestId}`,
-      user_id: approverId,
-    }),
-  });
-  const transferData = await transferRes.json();
-  if (transferData.status !== "success") {
-    return { success: false, error: transferData.message || transferData.error || "ALAT transfer failed" };
+      ticker: "CNGN",
+      network: "BASE"
+    })
+    loanTransferData = { success: true, data: result }
+  } catch (e: any) {
+    return { success: false, error: "Loan transfer failed: " + (e.message || String(e)) }
   }
 
-  // 1b. Debit lender admin charge (percentage of loan amount)
-  const lenderChargeReference = `${loanRequestId}-lender-admin-charge`;
-  const lenderChargeRes = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/api/alat/debit/process-transfer`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      transactionReference: lenderChargeReference,
-      amount: lenderCharge,
-      sourceAccountNumber: helperProfile.account_number,
-      destinationAccountNumber: adminAccountNumber,
-      narration: `Lender admin charge for loan request ${loanRequestId}`,
-      user_id: approverId,
-    }),
-  });
-  const lenderChargeData = await lenderChargeRes.json();
-  if (lenderChargeData.status !== "success") {
-    return { success: false, error: lenderChargeData.message || lenderChargeData.error || "Lender admin charge debit failed" };
+  // 1b. Lender admin fee (lender → admin)
+  let lenderFeeData: any = { success: false, data: null }
+  try {
+    const result = await stablesrail.tokenWithdrawal({
+      userId: helperProfile.sr_user_id!,
+      internalWallet: lenderWallet.base_address,
+      destinationWallet: adminWalletAddress,
+      amount: lenderFeeAmount,
+      ticker: "CNGN",
+      network: "BASE"
+    })
+    lenderFeeData = { success: true, data: result }
+  } catch (e) {
+    console.error("Lender fee collection failed:", e)
+    // Continue - main transfer succeeded
   }
 
-  // 1c. Debit borrower admin charge (percentage of loan amount)
-  const borrowerChargePercent = parseFloat(process.env.ADMIN_BORROWER_CHARGE_PERCENT || "1.5");
-  const borrowerCharge = Math.round((loanRequest.amount * borrowerChargePercent) / 100);
-  const borrowerChargeReference = `${loanRequestId}-borrower-admin-charge`;
-  const borrowerChargeRes = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/api/alat/debit/process-transfer`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      transactionReference: borrowerChargeReference,
-      amount: borrowerCharge,
-      sourceAccountNumber: requesterProfile.account_number,
-      destinationAccountNumber: adminAccountNumber,
-      narration: `Borrower admin charge for loan request ${loanRequestId}`,
-      user_id: loanRequest.user_id,
-    }),
-  });
-  const borrowerChargeData = await borrowerChargeRes.json();
-  if (borrowerChargeData.status !== "success") {
-    return { success: false, error: borrowerChargeData.message || borrowerChargeData.error || "Borrower admin charge debit failed" };
+  // 1c. Borrower admin fee (borrower → admin)
+  // NOTE: Borrower may not have received the on-chain transfer yet at this point.
+  // Check balance and only charge if funds are available; otherwise record as deferred.
+  let borrowerFeeData: any = { success: false, data: null, deferred: false }
+  const borrowerBalanceCheck = await checkSufficientBalance({
+    walletAddress: borrowerWallet.base_address,
+    amount: borrowerFeeAmount,
+    asset: "CNGN",
+    network: "BASE"
+  })
+
+  if (borrowerBalanceCheck.sufficient && requesterProfile.sr_user_id) {
+    try {
+      const result = await stablesrail.tokenWithdrawal({
+        userId: requesterProfile.sr_user_id,
+        internalWallet: borrowerWallet.base_address,
+        destinationWallet: adminWalletAddress,
+        amount: borrowerFeeAmount,
+        ticker: "CNGN",
+        network: "BASE"
+      })
+      borrowerFeeData = { success: true, data: result, deferred: false }
+    } catch (e) {
+      console.error("Borrower fee collection failed:", e)
+      borrowerFeeData = { success: false, data: null, deferred: true }
+    }
+  } else {
+    // TODO: Record deferred fee in a `deferred_fees` table for later collection
+    console.warn("Borrower fee deferred — insufficient balance or missing SR account. Will collect after on-chain settlement.")
+    borrowerFeeData = { success: false, data: null, deferred: true }
   }
 
   // 2. Calculate repayment due date
@@ -469,10 +543,16 @@ export async function approveLoanRequest({ loanRequestId, pin, approverId }: { l
     updated_at: new Date().toISOString(),
   })
 
-  // 4. Update loan request status
+  // Update loan record with all transaction IDs
   const { error: updateError } = await adminClient
     .from("loan_requests")
-    .update({ status: "approved" })
+    .update({ 
+      status: "approved",
+      disbursement_tx_id: loanTransferData.data.transactionId,
+      disbursement_correlation_id: loanTransferData.data.correlationId,
+      lender_fee_tx_id: lenderFeeData.data?.transactionId,
+      borrower_fee_tx_id: borrowerFeeData.data?.transactionId
+    })
     .eq("id", loanRequestId)
   if (updateError) {
     return { success: false, error: "Failed to update loan status" }
@@ -508,18 +588,7 @@ export async function approveLoanRequest({ loanRequestId, pin, approverId }: { l
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   })
-  // 7. Create notification for requester
-  await adminClient.from("notifications").insert({
-    user_id: loanRequest.user_id,
-    actor_id: approverId,
-    type: "loan_approved",
-    content: `Your loan request has been approved and funds transferred.`,
-    data: { message: `Your loan request has been approved and funds transferred.`, loanRequestId },
-    reference_id: loanRequestId,
-    read: false,
-    created_at: new Date().toISOString(),
-  })
-  // Also trigger notification via createNotification
+  // 7. Create notification for requester (via createNotification — single source of truth)
   await createNotification({
     userId: loanRequest.user_id,
     actorId: approverId,
@@ -574,18 +643,7 @@ export async function rejectLoanRequest({ loanRequestId, approverId }: { loanReq
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
-    // Create notification for requester
-    await adminClient.from("notifications").insert({
-      user_id: loanRequest.user_id,
-      actor_id: approverId,
-      type: "loan_rejected",
-      content: `Your loan request was rejected.`,
-      data: { message: `Your loan request was rejected.`, loanRequestId },
-      reference_id: loanRequestId,
-      read: false,
-      created_at: new Date().toISOString(),
-    })
-    // Also trigger notification via createNotification
+    // Create notification for requester (via createNotification — single source of truth)
     await createNotification({
       userId: loanRequest.user_id,
       actorId: approverId,
@@ -606,6 +664,9 @@ export async function rejectLoanRequest({ loanRequestId, approverId }: { loanReq
 }
 
 // Utility: Process loan repayments and send reminders
+// TODO: The balance debit/credit operations below are non-atomic (read-then-update).
+// This creates a race condition if multiple repayments process concurrently.
+// Migrate to a Supabase RPC function that performs atomic balance transfers in a single transaction.
 export async function processLoanRepayments() {
   const adminClient = createAdminClient() as SupabaseClient<Database>
   const now = new Date()

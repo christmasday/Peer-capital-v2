@@ -375,7 +375,7 @@ export async function getUnreadNotificationsCount() {
       return { success: true, count: 0 } // Return 0 if not logged in
     }
 
-    const supabase = createServerClient()
+    const supabase = await createServerClient()
 
     const { count, error } = await supabase
       .from("notifications")

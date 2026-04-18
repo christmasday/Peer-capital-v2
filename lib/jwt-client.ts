@@ -49,26 +49,38 @@ export function parseJWT(token: string) {
 }
 
 // Check if JWT is expired (client-side only)
-export function isJWTExpired(token: string) {
+// bufferSeconds: treat as expired if within this many seconds of expiry
+export function isJWTExpired(token: string, bufferSeconds = 0) {
   try {
     const payload = parseJWT(token)
     if (!payload || !payload.exp) return true
 
     // exp is in seconds, Date.now() is in milliseconds
-    return payload.exp * 1000 < Date.now()
+    return (payload.exp - bufferSeconds) * 1000 < Date.now()
   } catch (error) {
     return true // Assume expired on error
   }
 }
 
 // Get JWT from cookies on client
+// NOTE: The primary "auth-token" cookie is HttpOnly and cannot be read from JS.
+// We check "auth-status" to detect if auth is present, and use localStorage "jwt-token" for the actual token.
 export function getJWTFromClientCookies(): string | null {
   if (typeof document === "undefined") return null
 
+  // First try to get from localStorage (where storeJWT puts it)
+  const storedToken = getJWTFromStorage()
+  if (storedToken) return storedToken
+
+  // Check auth-status cookie to confirm auth is set (non-HttpOnly companion cookie)
   const value = `; ${document.cookie}`
-  const parts = value.split(`; jwt-token=`)
+  const parts = value.split(`; auth-status=`)
   if (parts.length === 2) {
-    return parts.pop()?.split(";").shift() || null
+    const authStatus = parts.pop()?.split(";").shift()
+    if (authStatus === "authenticated") {
+      // Auth cookie is present but HttpOnly — return token from storage or null
+      return null
+    }
   }
   return null
 }

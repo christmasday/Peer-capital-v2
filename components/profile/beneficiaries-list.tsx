@@ -45,7 +45,7 @@ export function BeneficiariesList({ userId }: { userId: string }) {
         setResolveError("")
         try {
           const bankCode = beneficiaryBanks.find(b => b.name === beneficiaryBank)?.code
-          const res = await fetch("/api/paystack/resolve-account", {
+          const res = await fetch("/api/virtual-account", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ account_number: beneficiaryAccountNumber, bank_code: bankCode }),
@@ -93,7 +93,7 @@ export function BeneficiariesList({ userId }: { userId: string }) {
     try {
       // Call Paystack transferrecipient API
       const bankCode = beneficiaryBanks.find(b => b.name === beneficiaryBank)?.code
-      const res = await fetch("/api/paystack/transferrecipient", {
+      const res = await fetch("/api/virtual-account", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
   try {
     // Check authentication
     const cookieStore = cookies()
-    const supabase = createServerClient(cookieStore)
+    const supabase = await createServerClient(cookieStore)
     const {
       data: { session },
     } = await supabase.auth.getSession()

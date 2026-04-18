@@ -89,7 +89,7 @@ export function FundAccountForm({ userId: initialUserId }: { userId?: string }) 
       const storedJWT = getJWTFromStorage()
 
       // Initialize Paystack transaction
-      const response = await fetch("/api/paystack/initialize", {
+      const response = await fetch("/api/virtual-account", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
