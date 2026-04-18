@@ -44,6 +44,7 @@ export function TopNav({ userName, userImage, hideSearch }: TopNavProps) {
   const [fetchError, setFetchError] = useState(false)
   const [localUserName, setLocalUserName] = useState(userName || "")
   const [localUserImage, setLocalUserImage] = useState(userImage || "")
+  const [isAdmin, setIsAdmin] = useState(false)
   const pathname = usePathname()
 
   // Fetch user data if not provided via props
@@ -68,6 +69,28 @@ export function TopNav({ userName, userImage, hideSearch }: TopNavProps) {
 
     fetchUserData()
   }, [userName, userImage])
+
+  useEffect(() => {
+    const fetchAdminStatus = async () => {
+      try {
+        const response = await fetch("/api/admin/check-auth", {
+          credentials: "include",
+        })
+
+        if (!response.ok) {
+          setIsAdmin(false)
+          return
+        }
+
+        const data = await response.json()
+        setIsAdmin(Boolean(data?.isAdmin))
+      } catch (error) {
+        setIsAdmin(false)
+      }
+    }
+
+    fetchAdminStatus()
+  }, [])
 
   // Ensure we have a valid user name to display
   const displayName = (userName || localUserName) && (userName || localUserName).trim() !== "" ? (userName || localUserName) : "My Account"
@@ -322,6 +345,18 @@ export function TopNav({ userName, userImage, hideSearch }: TopNavProps) {
                       </Link>
                     </DropdownMenuSubContent>
                   </DropdownMenuSub>
+
+                  {isAdmin && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <Link href="/admin/dashboard">
+                        <DropdownMenuItem className="cursor-pointer">
+                          <Shield className="h-4 w-4 mr-2" />
+                          <span>Admin</span>
+                        </DropdownMenuItem>
+                      </Link>
+                    </>
+                  )}
 
                   <DropdownMenuSub>
                     <DropdownMenuSubTrigger>

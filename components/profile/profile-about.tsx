@@ -1349,6 +1349,10 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
   // Fetch wallets from DB or Stablesrail
   useEffect(() => {
     if (activeSection !== "wallets") return
+
+    function isBenignWalletOnboardingFailure(message?: string) {
+      return !!message && /insufficient wallet balance|identity verification failed/i.test(message)
+    }
     
     async function fetchWallets() {
       setIsLoadingWallets(true)
@@ -1375,7 +1379,16 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
               console.error("Failed to persist Stablesrail userId:", error)
             }
           } else if (onboardStatusData?.data?.status === "failed") {
-            setWalletsError(onboardStatusData?.data?.error?.message || onboardStatusData?.data?.message || "Wallet onboarding failed")
+            const onboardFailureMessage =
+              onboardStatusData?.data?.error?.message ||
+              onboardStatusData?.data?.message ||
+              "Wallet onboarding failed"
+
+            if (isBenignWalletOnboardingFailure(onboardFailureMessage)) {
+              console.warn("[Profile] Ignoring wallet onboarding balance failure:", onboardFailureMessage)
+            } else {
+              setWalletsError(onboardFailureMessage)
+            }
           }
         }
 
