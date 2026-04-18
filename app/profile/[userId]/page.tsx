@@ -30,7 +30,6 @@ import {
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { FollowButton } from "@/components/profile/follow-button"
-import { useState } from "react"
 import { isFollowingUser } from "@/lib/actions/connections"
 
 // Import the PostItem component and getUserPosts function
@@ -65,7 +64,7 @@ export default async function UserProfilePage({
   }
 
   const cookieStore = cookies()
-  const supabase = createServerClient()
+  const supabase = await createServerClient()
   const adminClient = createAdminClient()
 
   // Get current user session to determine if viewing own profile
@@ -122,9 +121,9 @@ export default async function UserProfilePage({
 
   const user = userProfile.user
 
-  // Fetch all loan requests for the 'More' tab
+  // Fetch all loan requests for the 'Loan Requests' tab
   let allLoanRequests: any[] = []
-  if (activeTab === "more") {
+  if (activeTab === "loan-requests") {
     const allLoanReqResult = await getAllLoanRequests()
     allLoanRequests = allLoanReqResult.loanRequests || []
   }
@@ -269,8 +268,8 @@ export default async function UserProfilePage({
 
           {/* Right content area (8/12) */}
           <div className="col-span-8">
-            {/* More tab: show all loan requests */}
-            {activeTab === "more" ? (
+            {/* Loan Requests tab */}
+            {activeTab === "loan-requests" ? (
               <>
                 <h2 className="text-xl font-bold mb-4">All Loan Requests</h2>
                 <LoanRequestsList loanRequests={allLoanRequests} currentUserId={currentUserId} />

@@ -19,7 +19,7 @@ export default async function UserConnectionsPage({
   const activeTab = searchParams.tab || "followers"
 
   const cookieStore = cookies()
-  const supabase = createServerClient(cookieStore)
+  const supabase = await createServerClient(cookieStore)
   const adminClient = createAdminClient()
 
   // Get user profile

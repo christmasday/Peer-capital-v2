@@ -1,17 +1,16 @@
 import { cookies } from "next/headers"
-import { redirect } from "next/navigation"
 import { getJWTFromCookies, verifyJWT } from "@/lib/jwt"
 import { createServerClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 // Function to check authentication on server components
-export async function checkAuth() {
+export async function checkAuth(preventRedirect = false) {
   const { cookies } = await import("next/headers")
   const { getJWTFromCookies, verifyJWT } = await import("@/lib/jwt")
   const { createServerClient } = await import("@/lib/supabase/server")
 
   // Try JWT first
-  const jwt = getJWTFromCookies()
+  const jwt = await getJWTFromCookies()
   if (jwt) {
     const { payload, error } = await verifyJWT(jwt)
     if (!error && payload) {
@@ -21,8 +20,7 @@ export async function checkAuth() {
 
   // Try Supabase session as fallback
   try {
-    const cookieStore = cookies()
-    const supabase = createServerClient(cookieStore)
+    const supabase = await createServerClient()
     const { data } = await supabase.auth.getSession()
 
     if (data.session) {
@@ -31,19 +29,31 @@ export async function checkAuth() {
   } catch (error) {
   }
 
-  // Check for custom auth token
-  const customAuthToken = cookies().get("custom-auth-token")?.value
+  // Check for custom auth token — validate against DB
+  const cookieStore2 = await cookies()
+  const customAuthToken = cookieStore2.get("custom-auth-token")?.value
   if (customAuthToken) {
-    return { authenticated: true }
-  }
+    try {
+      const adminClient = createAdminClient()
+      const { data: userData, error } = await adminClient
+        .from("auth_users")
+        .select("id")
+        .eq("access_token", customAuthToken)
+        .single()
 
-  // Check for auth bypass
-  const authBypass = cookies().get("auth-bypass")?.value
-  if (authBypass === "true") {
-    return { authenticated: true }
+      if (!error && userData?.id) {
+        return { authenticated: true, userId: userData.id }
+      }
+    } catch {
+      // Token invalid — fall through
+    }
   }
 
   // If we get here, user is not authenticated
+  if (preventRedirect) {
+    return { authenticated: false, userId: null }
+  }
+  const { redirect } = await import("next/navigation")
   redirect("/?from=auth-check")
 }
 
@@ -53,7 +63,7 @@ export async function checkAuth() {
 export async function getCurrentUserId() {
   try {
     // First try to get user ID from JWT
-    const jwt = getJWTFromCookies()
+    const jwt = await getJWTFromCookies()
     if (jwt) {
       try {
         const { payload, error } = await verifyJWT(jwt)
@@ -69,8 +79,7 @@ export async function getCurrentUserId() {
     }
 
     // If no JWT, try to get from Supabase session
-    const cookieStore = cookies()
-    const supabase = createServerClient(cookieStore)
+    const supabase = await createServerClient()
     const {
       data: { session },
     } = await supabase.auth.getSession()
@@ -83,7 +92,8 @@ export async function getCurrentUserId() {
     }
 
     // If no Supabase session, try to get from custom auth token
-    const customAuthToken = cookieStore.get("custom-auth-token")?.value
+    const cookieStoreForAuth = await cookies()
+    const customAuthToken = cookieStoreForAuth.get("custom-auth-token")?.value
     if (customAuthToken) {
       const { createAdminClient } = await import("@/lib/supabase/admin")
       const adminClient = createAdminClient()
@@ -101,21 +111,13 @@ export async function getCurrentUserId() {
       }
     }
 
-    // If no auth token, try to get from auth-status cookie
-    const authStatus = cookieStore.get("auth-status")?.value
-    if (authStatus === "authenticated") {
-      // We know the user is authenticated, but we don't know their ID
-      // This is a fallback case - we should log this situation
-    }
+    // If no auth token, auth-status cookie alone is not sufficient
+    // (it doesn't provide a userId and can be forged)
 
-    // Last resort for dev mode
-    if (process.env.NODE_ENV === "development") {
-      const adminClient = createAdminClient()
-      const { data: firstUser } = await adminClient.from("profiles").select("id").limit(1).single()
-
-      if (firstUser?.id) {
-        return firstUser.id
-      }
+    // Last resort for dev mode — only if DEV_FALLBACK_USER_ID is explicitly set
+    if (process.env.NODE_ENV === "development" && process.env.DEV_FALLBACK_USER_ID) {
+      console.warn("⚠️ [getCurrentUserId] No auth found — using DEV_FALLBACK_USER_ID (dev only)")
+      return process.env.DEV_FALLBACK_USER_ID
     }
 
     return null
@@ -129,15 +131,14 @@ export async function getUserEmail(userId: string): Promise<string | null> {
   try {
     const adminClient = createAdminClient()
 
-    // Try to get from auth.users first
-    const { data: authUser, error: authError } = await adminClient
-      .from("auth.users")
-      .select("email")
-      .eq("id", userId)
-      .single()
-
-    if (!authError && authUser?.email) {
-      return authUser.email
+    // Try to get from auth.users via the admin API
+    try {
+      const { data: { user }, error: authError } = await adminClient.auth.admin.getUserById(userId)
+      if (!authError && user?.email) {
+        return user.email
+      }
+    } catch {
+      // Admin API may not be available, fall through
     }
 
     // Try to get from profiles table
@@ -151,8 +152,8 @@ export async function getUserEmail(userId: string): Promise<string | null> {
       return profile.email
     }
 
-    // If all else fails, create a placeholder email
-    return `user-${userId}@example.com`
+    // If all else fails, return null (no valid email found)
+    return null
   } catch (error) {
     return null
   }

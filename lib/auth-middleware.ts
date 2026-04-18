@@ -35,7 +35,8 @@ export function isStaticAsset(path: string): boolean {
 export async function verifyAuth(req: NextRequest) {
   try {
     // First try JWT verification (doesn't require database)
-    const token = req.cookies.get("jwt-token")?.value
+    // Read both "auth-token" (canonical) and "jwt-token" (legacy) cookie names
+    const token = req.cookies.get("auth-token")?.value || req.cookies.get("jwt-token")?.value
 
     if (token) {
       const { payload, error } = await verifyJWT(token)
@@ -53,7 +54,7 @@ export async function verifyAuth(req: NextRequest) {
       }
     }
 
-    // Check for custom auth token
+    // Check for custom auth token (validated against DB)
     const customAuthToken = req.cookies.get("custom-auth-token")?.value
 
     if (customAuthToken) {
@@ -78,26 +79,6 @@ export async function verifyAuth(req: NextRequest) {
       }
     }
 
-    // Check for auth-status cookie
-    const authStatus = req.cookies.get("auth-status")?.value
-    if (authStatus === "authenticated") {
-      return {
-        authenticated: true,
-        userId: null,
-        method: "auth-status",
-      }
-    }
-
-    // Check for auth-bypass cookie
-    const authBypass = req.cookies.get("auth-bypass")?.value
-    if (authBypass === "true") {
-      return {
-        authenticated: true,
-        userId: null,
-        method: "auth-bypass",
-      }
-    }
-
     // If offline mode is active, allow with warning
     if (isOfflineMode()) {
       return {
@@ -112,19 +93,19 @@ export async function verifyAuth(req: NextRequest) {
     const timeoutPromise = new Promise((resolve) => {
       setTimeout(() => {
         resolve({
-          authenticated: true,
+          authenticated: false,
           userId: null,
           method: "timeout-fallback",
         })
-      }, 2000) // 2 second timeout
+      }, 2000) // 2 second timeout — fail-closed
     })
 
     return await Promise.race([sessionPromise, timeoutPromise])
   } catch (error) {
     console.error("Auth verification error:", error instanceof Error ? error.message : String(error))
-    // On error, allow as fallback
+    // Fail-closed: deny access on error
     return {
-      authenticated: true,
+      authenticated: false,
       userId: null,
       method: "error-fallback",
     }

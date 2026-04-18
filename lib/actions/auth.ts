@@ -81,7 +81,7 @@ export async function refreshJWT(currentToken: string) {
     }
 
     // Set the new JWT in cookies
-    const cookieSet = setJWTCookie(jwt)
+    const cookieSet = await setJWTCookie(jwt)
 
     if (!cookieSet) {
       return { error: "Failed to set authentication cookie" }
@@ -208,16 +208,6 @@ export async function signIn(formData: FormData) {
       return { error: "Invalid email or password" }
     }
 
-    // Update last sign in time
-    await adminClient
-      .from("auth_users")
-      .update({
-        last_sign_in_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", userData.id) // Await update before eq
-
-
     // Create a session object similar to Supabase's
     const sessionId = uuidv4()
     const session = {
@@ -227,6 +217,16 @@ export async function signIn(formData: FormData) {
       expires_at: Math.floor(Date.now() / 1000) + 60 * 60 * 24, // 24 hours
       access_token: uuidv4(), // Generate a random token
     }
+
+    // Store access_token in auth_users so getCurrentUserId can look it up
+    await adminClient
+      .from("auth_users")
+      .update({
+        access_token: session.access_token,
+        last_sign_in_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", userData.id)
 
     // Generate JWT
     let jwt = null
@@ -242,7 +242,7 @@ export async function signIn(formData: FormData) {
         // Continue with session as fallback
       } else if (generatedJwt) {
         // Set JWT in cookies
-        const cookieSet = setJWTCookie(generatedJwt)
+        const cookieSet = await setJWTCookie(generatedJwt)
         jwt = generatedJwt
       }
     } catch (jwtError) {
@@ -251,7 +251,7 @@ export async function signIn(formData: FormData) {
 
     // Set cookies with longer expiration
     try {
-      const cookieStore = cookies()
+      const cookieStore = await cookies()
 
       // Set a session cookie with a long expiration
       cookieStore.set("custom-auth-token", session.access_token, {
@@ -1323,11 +1323,11 @@ export async function resetPassword(formData: FormData) {
 export async function signOut() {
   try {
     // Clear JWT cookies
-    clearJWTCookies()
+    await clearJWTCookies()
 
     // Set a signout cookie immediately
     try {
-      const cookieStore = cookies()
+      const cookieStore = await cookies()
       cookieStore.set("auth-signout", "true", {
         path: "/",
         maxAge: 60, // 60 seconds
@@ -1388,7 +1388,7 @@ export async function getUserProfile() {
     }
 
     // Get user ID from JWT
-    const jwt = getJWTFromCookies()
+    const jwt = await getJWTFromCookies()
     let userId = null
 
     if (jwt) {
@@ -1409,7 +1409,7 @@ export async function getUserProfile() {
     // If no userId from JWT, try to get from custom auth token
     if (!userId) {
       try {
-        const cookieStore = cookies()
+        const cookieStore = await cookies()
         const authToken = cookieStore.get("custom-auth-token")?.value
 
         if (authToken) {
@@ -1467,6 +1467,7 @@ export async function getUserProfile() {
         ...profile,
         idExpirationDate: profile.id_expiration_date,
         idDateIssued: profile.id_date_issued,
+        correlationId: profile.correlation_id, // <-- Add this line
       },
       account: accountData || { balance: 120000, loan_balance: 50000 },
     }
@@ -1593,7 +1594,7 @@ export async function resetPasswordWithToken(token: string, newPassword: string)
 // Change password for authenticated user
 export async function changePassword(currentPassword: string, newPassword: string) {
   try {
-    const supabase = createServerClient()
+    const supabase = await createServerClient()
     const adminClient = createAdminClient()
 
     // Get the current user
@@ -1604,7 +1605,7 @@ export async function changePassword(currentPassword: string, newPassword: strin
 
     if (!userId) {
       // Try to get user ID from JWT
-      const jwt = getJWTFromCookies()
+      const jwt = await getJWTFromCookies()
       if (jwt) {
         try {
           const { payload, error } = await verifyJWT(jwt)
@@ -1618,7 +1619,7 @@ export async function changePassword(currentPassword: string, newPassword: strin
       // Try to get from custom auth token
       if (!userId) {
         try {
-          const cookieStore = cookies()
+          const cookieStore = await cookies()
           const authToken = cookieStore.get("custom-auth-token")?.value
 
           if (authToken) {

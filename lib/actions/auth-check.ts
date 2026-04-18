@@ -8,7 +8,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 export async function checkAuthStatus() {
   try {
     // Try JWT first
-    const jwt = getJWTFromCookies()
+    const jwt = await getJWTFromCookies()
     if (jwt) {
       const { payload, error } = await verifyJWT(jwt)
       if (!error && payload && (payload.sub || payload.userId)) {
@@ -22,8 +22,8 @@ export async function checkAuthStatus() {
 
     // Try Supabase session as fallback
     try {
-      const cookieStore = cookies()
-      const supabase = createServerClient(cookieStore)
+      const cookieStore = await cookies()
+      const supabase = await createServerClient(cookieStore)
       const { data } = await supabase.auth.getSession()
 
       if (data.session?.user?.id) {
@@ -37,7 +37,7 @@ export async function checkAuthStatus() {
     }
 
     // Check for custom auth token
-    const customAuthToken = cookies().get("custom-auth-token")?.value
+  const customAuthToken = (await cookies()).get("custom-auth-token")?.value
     if (customAuthToken) {
       try {
         const adminClient = createAdminClient()

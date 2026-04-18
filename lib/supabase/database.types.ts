@@ -41,6 +41,7 @@ export interface Database {
           bank_name?: string | null
           account_number?: string | null
           account_name?: string | null
+          sr_user_id?: string | null
           // Bio field
           bio?: string | null
           // Referral fields
@@ -89,6 +90,7 @@ export interface Database {
           bank_name?: string | null
           account_number?: string | null
           account_name?: string | null
+          sr_user_id?: string | null
           // Bio field
           bio?: string | null
           // Referral fields
@@ -135,6 +137,7 @@ export interface Database {
           bank_name?: string | null
           account_number?: string | null
           account_name?: string | null
+          sr_user_id?: string | null
           // Bio field
           bio?: string | null
           // Referral fields
@@ -257,6 +260,146 @@ export interface Database {
           verification_activity?: boolean
           account_activity?: boolean
           system_activity?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      user_sessions: {
+        Row: {
+          id: string
+          user_id: string
+          session_token: string
+          is_active: boolean
+          last_activity: string
+          created_at: string
+          expires_at: string
+          user_agent: string | null
+          ip_address: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          session_token: string
+          is_active?: boolean
+          last_activity?: string
+          created_at?: string
+          expires_at?: string
+          user_agent?: string | null
+          ip_address?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          session_token?: string
+          is_active?: boolean
+          last_activity?: string
+          created_at?: string
+          expires_at?: string
+          user_agent?: string | null
+          ip_address?: string | null
+        }
+      }
+      user_roles: {
+        Row: {
+          id: string
+          user_id: string
+          role_type: string
+          created_at: string
+          updated_at: string
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          role_type: string
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          role_type?: string
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+        }
+      }
+      support_tickets: {
+        Row: {
+          id: string
+          user_id: string | null
+          email: string
+          category: string
+          subject: string
+          description: string
+          status: string
+          priority: string
+          assigned_to: string | null
+          created_at: string
+          updated_at: string
+          resolved_at: string | null
+          user_agent: string | null
+          ip_address: string | null
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          email: string
+          category: string
+          subject: string
+          description: string
+          status?: string
+          priority?: string
+          assigned_to?: string | null
+          created_at?: string
+          updated_at?: string
+          resolved_at?: string | null
+          user_agent?: string | null
+          ip_address?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          email?: string
+          category?: string
+          subject?: string
+          description?: string
+          status?: string
+          priority?: string
+          assigned_to?: string | null
+          created_at?: string
+          updated_at?: string
+          resolved_at?: string | null
+          user_agent?: string | null
+          ip_address?: string | null
+        }
+      }
+      support_ticket_responses: {
+        Row: {
+          id: string
+          ticket_id: string
+          user_id: string | null
+          is_staff_response: boolean
+          message: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          ticket_id: string
+          user_id?: string | null
+          is_staff_response?: boolean
+          message: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          ticket_id?: string
+          user_id?: string | null
+          is_staff_response?: boolean
+          message?: string
           created_at?: string
           updated_at?: string
         }
@@ -524,42 +667,242 @@ export interface Database {
           created_at?: string
         }
       }
-      transfer_beneficiaries: {
+              transfer_beneficiaries: {
+          Row: {
+            id: string
+            user_id: string
+            account_name: string
+            account_number: string
+            bank_name: string
+            bank_code: string
+            recipient_code: string
+            created_at: string
+            updated_at: string
+          }
+          Insert: {
+            id?: string
+            user_id: string
+            account_name: string
+            account_number: string
+            bank_name: string
+            bank_code: string
+            recipient_code: string
+            created_at?: string
+            updated_at?: string
+          }
+          Update: {
+            id?: string
+            user_id?: string
+            account_name?: string
+            account_number?: string
+            bank_name?: string
+            bank_code?: string
+            recipient_code?: string
+            created_at?: string
+            updated_at?: string
+          }
+        }
+        virtual_accounts: {
+          Row: {
+            id: string
+            user_id: string
+            account_number: string
+            account_name: string
+            bank_name: string
+            bank_code: string
+            currency: string
+            assigned: boolean
+            paystack_id: string
+            created_at: string
+            updated_at: string
+            email: string | null
+          }
+          Insert: {
+            id?: string
+            user_id: string
+            account_number: string
+            account_name: string
+            bank_name: string
+            bank_code: string
+            currency?: string
+            assigned?: boolean
+            paystack_id: string
+            created_at?: string
+            updated_at?: string
+            email?: string | null
+          }
+          Update: {
+            id?: string
+            user_id?: string
+            account_number?: string
+            account_name?: string
+            bank_name?: string
+            bank_code?: string
+            currency?: string
+            assigned?: boolean
+            paystack_id?: string
+            created_at?: string
+            updated_at?: string
+            email?: string | null
+          }
+        }
+      wallet_address: {
         Row: {
           id: string
           user_id: string
-          account_name: string
-          account_number: string
-          bank_name: string
-          bank_code: string
-          recipient_code: string
+          wallet_address: string
+          request_id: string | null
+          account_number: string | null
           created_at: string
           updated_at: string
+          base_address: string | null
+          ethereum_address: string | null
+          polygon_address: string | null
+          bnb_address: string | null
+          asset_chain_address: string | null
+          bantu_address: string | null
         }
         Insert: {
           id?: string
           user_id: string
-          account_name: string
-          account_number: string
-          bank_name: string
-          bank_code: string
-          recipient_code: string
+          wallet_address: string
+          request_id?: string | null
+          account_number?: string | null
           created_at?: string
           updated_at?: string
+          base_address?: string | null
+          ethereum_address?: string | null
+          polygon_address?: string | null
+          bnb_address?: string | null
+          asset_chain_address?: string | null
+          bantu_address?: string | null
         }
         Update: {
           id?: string
           user_id?: string
-          account_name?: string
-          account_number?: string
-          bank_name?: string
-          bank_code?: string
-          recipient_code?: string
+          wallet_address?: string
+          request_id?: string | null
+          account_number?: string | null
           created_at?: string
           updated_at?: string
+          base_address?: string | null
+          ethereum_address?: string | null
+          polygon_address?: string | null
+          bnb_address?: string | null
+          asset_chain_address?: string | null
+          bantu_address?: string | null
         }
       }
-    }
+      posts: {
+        Row: {
+          id: string
+          user_id: string
+          content: string
+          image_url: string | null
+          image_sizes: any | null
+          created_at: string
+          updated_at: string
+          likes_count: number
+          comments_count: number
+          shares_count: number
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          content: string
+          image_url?: string | null
+          image_sizes?: any | null
+          created_at?: string
+          updated_at?: string
+          likes_count?: number
+          comments_count?: number
+          shares_count?: number
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          content?: string
+          image_url?: string | null
+          image_sizes?: any | null
+          created_at?: string
+          updated_at?: string
+          likes_count?: number
+          comments_count?: number
+          shares_count?: number
+        }
+      }
+      post_comments: {
+        Row: {
+          id: string
+          post_id: string
+          user_id: string
+          content: string
+          created_at: string
+          updated_at: string
+          likes_count: number
+        }
+        Insert: {
+          id?: string
+          post_id: string
+          user_id: string
+          content: string
+          created_at?: string
+          updated_at?: string
+          likes_count?: number
+        }
+        Update: {
+          id?: string
+          post_id?: string
+          user_id?: string
+          content?: string
+          created_at?: string
+          updated_at?: string
+          likes_count?: number
+        }
+      }
+      post_likes: {
+        Row: {
+          id: string
+          post_id: string | null
+          comment_id: string | null
+          user_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          post_id?: string | null
+          comment_id?: string | null
+          user_id: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          post_id?: string | null
+          comment_id?: string | null
+          user_id?: string
+          created_at?: string
+        }
+      }
+      reposts: {
+        Row: {
+          id: string
+          post_id: string
+          user_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          post_id: string
+          user_id: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          post_id?: string
+          user_id?: string
+          created_at?: string
+        }
+      }
     Views: {
       [_ in never]: never
     }

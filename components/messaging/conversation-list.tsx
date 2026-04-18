@@ -6,8 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { UserRound, Loader2, RefreshCcw } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { cn } from "@/lib/utils"
-import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 
 interface Conversation {
@@ -20,12 +19,23 @@ interface Conversation {
   unread_count: number
 }
 
-export function ConversationList() {
+interface ConversationListProps {
+  onConversationSelect?: (userId: string) => void
+  selectedUserId?: string | null
+  searchQuery?: string
+  activeTab?: string
+}
+
+export function ConversationList({ 
+  onConversationSelect, 
+  selectedUserId, 
+  searchQuery = "", 
+  activeTab = "all" 
+}: ConversationListProps) {
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isAuthError, setIsAuthError] = useState(false)
-  const pathname = usePathname()
   const router = useRouter()
 
   const fetchConversations = useCallback(async () => {
@@ -67,6 +77,27 @@ export function ConversationList() {
     }
   }, [fetchConversations, error])
 
+  // Filter conversations based on search query and active tab
+  const filteredConversations = conversations.filter(conversation => {
+    const fullName = `${conversation.first_name || ""} ${conversation.last_name || ""}`.trim()
+    const matchesSearch = fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         conversation.last_message.toLowerCase().includes(searchQuery.toLowerCase())
+    
+    if (activeTab === "unread") {
+      return matchesSearch && conversation.unread_count > 0
+    }
+    
+    return matchesSearch
+  })
+
+  const handleConversationClick = (userId: string) => {
+    if (onConversationSelect) {
+      onConversationSelect(userId)
+    } else {
+      router.push(`/messages/${userId}`)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-40">
@@ -92,31 +123,36 @@ export function ConversationList() {
     )
   }
 
-  if (conversations.length === 0) {
+  if (filteredConversations.length === 0) {
     return (
       <div className="text-center p-8 text-gray-500">
-        <p>No conversations yet</p>
-        <p className="text-sm mt-2">Start messaging someone to see your conversations here</p>
+        <p>No conversations found</p>
+        <p className="text-sm mt-2">
+          {searchQuery ? "Try adjusting your search" : "Start messaging someone to see your conversations here"}
+        </p>
       </div>
     )
   }
 
   return (
-    <div className="divide-y">
-      {conversations.map((conversation) => {
+    <div className="divide-y divide-gray-100">
+      {filteredConversations.map((conversation) => {
         const fullName = `${conversation.first_name || ""} ${conversation.last_name || ""}`.trim() || "User"
         const initials = fullName
           .split(" ")
           .map((n) => n[0])
           .join("")
           .toUpperCase()
-        const isActive = pathname === `/messages/${conversation.user_id}`
+        const isActive = selectedUserId === conversation.user_id
 
         return (
-          <Link
+          <button
             key={conversation.user_id}
-            href={`/messages/${conversation.user_id}`}
-            className={cn("flex items-center gap-3 p-4 hover:bg-gray-50 transition-colors", isActive && "bg-blue-50")}
+            onClick={() => handleConversationClick(conversation.user_id)}
+            className={cn(
+              "w-full flex items-center gap-3 p-4 hover:bg-gray-50 transition-colors text-left",
+              isActive && "bg-blue-50"
+            )}
           >
             <div className="relative">
               <Avatar className="h-12 w-12">
@@ -129,21 +165,21 @@ export function ConversationList() {
                 )}
               </Avatar>
               {conversation.unread_count > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
                   {conversation.unread_count}
                 </span>
               )}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex justify-between items-baseline">
-                <h3 className="font-medium truncate">{fullName}</h3>
+                <h3 className="font-medium truncate text-gray-900">{fullName}</h3>
                 <span className="text-xs text-gray-500 ml-2 whitespace-nowrap">
                   {formatDistanceToNow(new Date(conversation.last_message_time), { addSuffix: true })}
                 </span>
               </div>
               <p className="text-sm text-gray-600 truncate">{conversation.last_message}</p>
             </div>
-          </Link>
+          </button>
         )
       })}
     </div>

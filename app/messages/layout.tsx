@@ -13,7 +13,7 @@ export default async function MessagesLayout({ children }: { children: ReactNode
   const userImage = profile?.profile_picture_url || "/vibrant-street-market.png"
 
   return (
-    <MainLayout userName={userName} userImage={userImage}>
+    <MainLayout userName={userName} userImage={userImage} className="p-0">
       {children}
     </MainLayout>
   )

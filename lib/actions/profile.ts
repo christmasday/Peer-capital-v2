@@ -17,7 +17,7 @@ function isOfflineMode(): boolean {
 async function getCurrentUserId() {
   try {
     const cookieStore = cookies()
-    const supabase = createServerClient()
+    const supabase = await createServerClient()
     const adminClient = createAdminClient()
 
     // Method 1: Try to get user from Supabase session
@@ -33,7 +33,7 @@ async function getCurrentUserId() {
     // Method 2: Try to get user from JWT
     try {
       const { getJWTFromCookies, verifyJWT } = await import("@/lib/jwt")
-      const jwt = getJWTFromCookies()
+      const jwt = await getJWTFromCookies()
       if (jwt) {
         const { payload, error } = await verifyJWT(jwt)
         if (!error && payload && (payload.userId || payload.sub)) {
@@ -211,6 +211,8 @@ type UpdateProfileInput = {
   id_verified?: boolean;
   fraud_screened?: boolean;
   fraud_screened_at?: string;
+  srUserId?: string;
+  correlationId?: string;
 };
 
 export async function updateProfile(input: UpdateProfileInput, userIdOverride?: string) {
@@ -219,7 +221,7 @@ export async function updateProfile(input: UpdateProfileInput, userIdOverride?: 
       // Return a mock success response, adjust as needed based on expected behavior
       return { success: true, data: {} };
     }
-    const supabase = createServerClient()
+    const supabase = await createServerClient()
     const adminClient = createAdminClient()
 
     // Use the override if provided
@@ -241,7 +243,7 @@ export async function updateProfile(input: UpdateProfileInput, userIdOverride?: 
     if (!userId) {
       try {
         const { getJWTFromCookies, verifyJWT } = await import("@/lib/jwt")
-        const jwt = getJWTFromCookies()
+        const jwt = await getJWTFromCookies()
         if (jwt) {
           const { payload, error } = await verifyJWT(jwt)
           if (!error && payload && (payload.userId || payload.sub)) {
@@ -346,9 +348,29 @@ export async function updateProfile(input: UpdateProfileInput, userIdOverride?: 
     if (input.id_verified !== undefined) updateData.id_verified = input.id_verified;
     if (input.fraud_screened !== undefined) updateData.fraud_screened = input.fraud_screened;
     if (input.fraud_screened_at !== undefined) updateData.fraud_screened_at = input.fraud_screened_at;
+    if (input.srUserId !== undefined) updateData.sr_user_id = input.srUserId;
+    if (input.correlationId !== undefined) updateData.correlation_id = input.correlationId;
 
     if (Object.keys(updateData).length === 0) {
         return { success: false, error: "No fields to update." };
+    }
+
+    // Provide a user-friendly BVN duplication error before hitting DB constraints.
+    if (updateData.bvn) {
+      const normalizedBvn = String(updateData.bvn).trim()
+      const { data: existingBvnProfile, error: existingBvnError } = await adminClient
+        .from("profiles")
+        .select("id")
+        .eq("bvn", normalizedBvn)
+        .neq("id", userId)
+        .maybeSingle()
+
+      if (!existingBvnError && existingBvnProfile?.id) {
+        return {
+          success: false,
+          error: "This BVN is already linked to another account. Please use a different BVN or sign in to the existing account.",
+        }
+      }
     }
 
     const { data, error } = await adminClient
@@ -359,6 +381,12 @@ export async function updateProfile(input: UpdateProfileInput, userIdOverride?: 
       .single();
 
     if (error) {
+      if (error.code === "23505" || (error as any).constraint === "profiles_bvn_key") {
+        return {
+          success: false,
+          error: "This BVN is already linked to another account. Please use a different BVN or sign in to the existing account.",
+        }
+      }
       return { success: false, error: error.message };
     }
 
@@ -466,7 +494,7 @@ export async function uploadIdDocument(file: File) {
       // Return a mock success response with a placeholder URL
       return { success: true, url: "/placeholder-id.svg" }
     }
-    const supabase = createServerClient()
+    const supabase = await createServerClient()
     const adminClient = createAdminClient()
 
     // Try multiple methods to get the user ID
@@ -486,7 +514,7 @@ export async function uploadIdDocument(file: File) {
     if (!userId) {
       try {
         const { getJWTFromCookies, verifyJWT } = await import("@/lib/jwt")
-        const jwt = getJWTFromCookies()
+        const jwt = await getJWTFromCookies()
         if (jwt) {
           const { payload, error } = await verifyJWT(jwt)
           if (!error && payload && (payload.userId || payload.sub)) {
@@ -562,7 +590,7 @@ export async function uploadBannerImage(file: File) {
       return { success: true, url: "/placeholder-banner.svg" }
     }
     const cookieStore = cookies()
-    const supabase = createServerClient()
+    const supabase = await createServerClient()
     const adminClient = createAdminClient()
 
     // Get current user ID with enhanced method
@@ -722,7 +750,7 @@ export async function uploadProfilePicture(file: File) {
       // Return a mock success response with a placeholder URL
       return { success: true, url: "/placeholder-avatar.svg" }
     }
-    const supabase = createServerClient()
+    const supabase = await createServerClient()
     const adminClient = createAdminClient()
 
     // Try multiple methods to get the user ID
@@ -742,7 +770,7 @@ export async function uploadProfilePicture(file: File) {
     if (!userId) {
       try {
         const { getJWTFromCookies, verifyJWT } = await import("@/lib/jwt")
-        const jwt = getJWTFromCookies()
+        const jwt = await getJWTFromCookies()
         if (jwt) {
           const { payload, error } = await verifyJWT(jwt)
           if (!error && payload && (payload.userId || payload.sub)) {

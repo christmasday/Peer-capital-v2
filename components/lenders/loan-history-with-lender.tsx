@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Loader2, Star } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { createClientComponentClient } from "@supabase/supabase-js"
+import { createBrowserClient } from "@/lib/supabase/client"
 
 interface LoanHistoryWithLenderProps {
   lenderId: string
@@ -17,7 +17,7 @@ export function LoanHistoryWithLender({ lenderId, onSelectLoan }: LoanHistoryWit
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const { toast } = useToast()
-  const supabase = createClientComponentClient()
+  const supabase = createBrowserClient()
 
   useEffect(() => {
     const fetchLoans = async () => {

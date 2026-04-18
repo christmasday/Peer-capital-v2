@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
     let authenticated = false
 
     // Try JWT authentication
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     const jwtToken = cookieStore.get("jwt-token")?.value
 
     if (jwtToken) {
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
 
     // Try Supabase authentication if JWT failed
     if (!userId) {
-      const supabase = createServerClient(cookieStore)
+      const supabase = await createServerClient(cookieStore)
       const { data } = await supabase.auth.getSession()
 
       if (data.session?.user?.id) {

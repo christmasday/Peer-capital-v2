@@ -5,6 +5,10 @@ import { cookies } from "next/headers"
 const getJWTSecret = () => {
   const secret = process.env.JWT_SECRET
   if (!secret) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("FATAL: JWT_SECRET environment variable is not set in production")
+    }
+    console.warn("⚠️ [JWT] JWT_SECRET not set — using insecure fallback (dev only)")
     return new TextEncoder().encode("fallback-secret-key-for-development-only")
   }
   return new TextEncoder().encode(secret)
@@ -50,9 +54,9 @@ export async function verifyJWT(token: string) {
 }
 
 // Set JWT in cookies
-export function setJWTCookie(jwt: string) {
+export async function setJWTCookie(jwt: string) {
   try {
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     cookieStore.set(JWT_COOKIE_NAME, jwt, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -77,9 +81,9 @@ export function setJWTCookie(jwt: string) {
 }
 
 // Get JWT from cookies (server-side)
-export function getJWTFromCookies() {
+export async function getJWTFromCookies() {
   try {
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     return cookieStore.get(JWT_COOKIE_NAME)?.value
   } catch (error) {
     return null
@@ -87,9 +91,9 @@ export function getJWTFromCookies() {
 }
 
 // Clear JWT cookies
-export function clearJWTCookies() {
+export async function clearJWTCookies() {
   try {
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     cookieStore.set(JWT_COOKIE_NAME, "", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",

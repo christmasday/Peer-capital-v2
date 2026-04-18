@@ -14,7 +14,7 @@ export async function getUserProfileForMessaging(userId: string) {
 
   try {
     const cookieStore = cookies()
-    const supabase = createServerClient(cookieStore)
+    const supabase = await createServerClient(cookieStore)
 
     // First try to get the profile using the regular client
     const { data: profile, error } = await supabase.from("profiles").select("*").eq("id", userId).single()

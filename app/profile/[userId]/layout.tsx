@@ -6,7 +6,7 @@ import type { ReactNode } from "react"
 export default async function UserProfileLayout({ children }: { children: ReactNode }) {
   // Get user information for the TopNav
   const cookieStore = cookies()
-  const supabase = createServerClient(cookieStore)
+  const supabase = await createServerClient(cookieStore)
 
   // Get current user session
   const {

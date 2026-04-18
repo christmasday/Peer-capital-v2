@@ -40,9 +40,7 @@ import { getFollowersCount, getFollowingCount } from "@/lib/actions/connections"
 import { updateProfile } from "@/lib/actions/profile"
 import { LoanRequestsList } from "@/components/loans/LoanRequestsList"
 import { getAllLoanRequests } from "@/lib/actions/loans"
-import { getVirtualAccount } from "@/lib/actions/paystack"
-import { CreateVirtualAccountButton } from '@/components/profile/CreateVirtualAccountButton'
-import { BeneficiariesList } from "@/components/profile/beneficiaries-list"
+// Removed Paystack virtual account integration
 
 export const dynamic = "force-dynamic"
 export const revalidate = 0
@@ -61,7 +59,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
   const user = userProfile.user
 
   const cookieStore = cookies()
-  const supabase = createServerClient()
+  const supabase = await createServerClient()
   const adminClient = createAdminClient()
 
   // Get account balance
@@ -102,22 +100,17 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
   const followersCount = followersResult.count || 0
   const followingCount = followingResult.count || 0
 
-  // Get active tab from search params or default to "posts"
-  const activeTab = searchParams?.tab || "posts"
+  // Get active tab from search params or default to "about"
+  const activeTab = searchParams?.tab || "about"
 
-  // Fetch all loan requests for the 'More' tab
+  // Fetch all loan requests for the 'Loan Requests' tab
   let allLoanRequests: any[] = []
-  if (activeTab === "more") {
+  if (activeTab === "loan-requests") {
     const allLoanReqResult = await getAllLoanRequests()
     allLoanRequests = allLoanReqResult.loanRequests || []
   }
 
-  // Fetch virtual account for about tab
-  let virtualAccount: any = null
-  if (activeTab === "about") {
-    const vaResult = await getVirtualAccount(user.id)
-    virtualAccount = vaResult.virtualAccount || null
-  }
+  // Virtual account removed
 
   return (
     <MainLayout userName={fullName} userImage={profile.profile_picture_url}>
@@ -202,15 +195,13 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
           </div>
         </div>
 
-        {/* Facebook-style tabs */}
+        {/* Tabs (removed Posts tab) */}
         <div className="border-b border-gray-300 mb-6">
           <div className="flex space-x-1 overflow-x-auto justify-center">
             {[
-              { name: "Posts", href: "/profile", active: activeTab === "posts" },
               { name: "About", href: "/profile?tab=about", active: activeTab === "about" },
               { name: "Friends", href: "/profile/?tab=friends", active: activeTab === "friends" },
-              { name: "Transfer Beneficiaries", href: "/profile?tab=beneficiaries", active: activeTab === "beneficiaries" },
-              { name: "Loan Requests", href: "/profile?tab=more", active: activeTab === "more" },
+              { name: "Loan Requests", href: "/profile?tab=loan-requests", active: activeTab === "loan-requests" },
             ].map((tab) => (
               <Link
                 key={tab.name}
@@ -238,14 +229,12 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
             initialFollowersCount={followersCount}
             initialFollowingCount={followingCount}
           />
-        ) : activeTab === "beneficiaries" ? (
-          <BeneficiariesList userId={user.id} />
         ) : activeTab === "about" ? (
-          <ProfileAbout profile={profile} isCurrentUser={true} virtualAccount={virtualAccount} initialSection="about" />
-        ) : activeTab === "more" ? (
+          <ProfileAbout profile={profile} isCurrentUser={true} virtualAccount={null} initialSection="about" />
+        ) : activeTab === "loan-requests" ? (
           <div className="lg:col-span-12">
             <h2 className="text-xl font-bold mb-4">All Loan Requests</h2>
-            <LoanRequestsList loanRequests={allLoanRequests} currentUserId={user.id} showAdminActions />
+            <LoanRequestsList loanRequests={allLoanRequests} currentUserId={user.id} showAdminActions highlight={searchParams?.highlight} />
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6" id="overview">
@@ -323,15 +312,9 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
               )}
             </div>
 
-            {/* Main Content - Posts section (8/12) */}
+            {/* Main Content - About details (8/12) */}
             <div className="lg:col-span-8">
-              {/* Create post card and posts list now handled by ProfilePostsWrapper */}
-              <ProfilePostsWrapper
-                userId={user.id}
-                userName={fullName}
-                userImage={profile.profile_picture_url}
-                initialPosts={posts || []}
-              />
+              <ProfileAbout profile={profile} isCurrentUser={true} virtualAccount={null} initialSection="about" />
             </div>
           </div>
         )}

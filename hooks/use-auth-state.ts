@@ -2,10 +2,10 @@
 
 import { useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { useSupabase } from "./use-supabase"
+import { useSupabaseClient } from "@/components/supabase/SupabaseProvider"
 
 export function useAuthState() {
-  const { supabase, resetClient } = useSupabase()
+  const { supabase } = useSupabaseClient()
   const router = useRouter()
 
   const checkAndRefreshSession = useCallback(async () => {
@@ -18,7 +18,7 @@ export function useAuthState() {
         // If session exists but is about to expire (less than 10 minutes), refresh it
         const expiresAt = data.session.expires_at
         const now = Math.floor(Date.now() / 1000)
-        const timeUntilExpiry = expiresAt - now
+        const timeUntilExpiry = typeof expiresAt === "number" ? expiresAt - now : Infinity
 
         if (timeUntilExpiry < 600) {
           // 10 minutes
@@ -37,11 +37,11 @@ export function useAuthState() {
                 }),
               )
             } catch (e) {
+              console.error("[useAuthState] Failed to update localStorage:", e)
             }
           }
         }
       } else {
-
         // Check localStorage as fallback
         try {
           const authState = localStorage.getItem("auth_state")
@@ -61,6 +61,7 @@ export function useAuthState() {
         }
       }
     } catch (error) {
+      console.error("[useAuthState] Session check error:", error)
     }
   }, [supabase, router])
 
@@ -84,10 +85,8 @@ export function useAuthState() {
         // Clear the cookie
         document.cookie = "auth-signout=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
 
-        // Reset the client
-        if (resetClient) {
-          resetClient()
-        }
+        // Sign out from Supabase
+        supabase?.auth.signOut().catch(() => {})
 
         // Redirect to login
         router.push("/")
@@ -102,10 +101,8 @@ export function useAuthState() {
       // Clear the parameter from URL without reloading
       window.history.replaceState({}, document.title, window.location.pathname)
 
-      // Reset the client
-      if (resetClient) {
-        resetClient()
-      }
+      // Sign out from Supabase
+      supabase?.auth.signOut().catch(() => {})
 
       // Redirect to login
       router.push("/")
@@ -118,15 +115,14 @@ export function useAuthState() {
         // Remove the timestamp
         localStorage.removeItem("signout-timestamp")
 
-        // Reset the client
-        if (resetClient) {
-          resetClient()
-        }
+        // Sign out from Supabase
+        supabase?.auth.signOut().catch(() => {})
 
         // Redirect to login
         router.push("/")
       }
     } catch (error) {
+      console.error("[useAuthState] Error checking signout timestamp:", error)
     }
 
     // Set up auth state change listener
@@ -141,6 +137,7 @@ export function useAuthState() {
             try {
               localStorage.removeItem("auth_state")
             } catch (e) {
+              console.error("[useAuthState] Failed to clear localStorage:", e)
             }
 
             // Redirect to login
@@ -156,10 +153,12 @@ export function useAuthState() {
                 }),
               )
             } catch (e) {
+              console.error("[useAuthState] Failed to update localStorage:", e)
             }
           }
         })
       } catch (error) {
+        console.error("[useAuthState] Auth state change listener error:", error)
       }
     }
 
@@ -168,10 +167,11 @@ export function useAuthState() {
         try {
           authListener.data.subscription.unsubscribe()
         } catch (error) {
+          console.error("[useAuthState] Failed to unsubscribe auth listener:", error)
         }
       }
     }
-  }, [resetClient, router, supabase])
+  }, [router, supabase])
 
   return null
 }

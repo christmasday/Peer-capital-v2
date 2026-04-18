@@ -22,7 +22,7 @@ export default async function LoanRequestPage({ params }: { params: { helperId: 
   }
 
   // Get the helper details
-  const supabase = createServerClient() as SupabaseClient<Database>
+  const supabase = await createServerClient() as SupabaseClient<Database>
   // Fetch helper from loan_helpers
   const { data: helper, error } = await supabase.from("loan_helpers").select("*").eq("id", params.helperId).single()
 

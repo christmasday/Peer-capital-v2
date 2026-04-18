@@ -3,7 +3,10 @@ import { getUserProfile } from "@/lib/actions/auth"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { checkAuth } from "@/lib/auth-utils"
 import { getMaxLoanAmountByLender, getTotalAmountGivenByLender } from "@/lib/actions/find-lenders"
-import { getVirtualAccount } from "@/lib/actions/paystack"
+// Removed Paystack virtual account integration
+
+// Force dynamic rendering to prevent static generation issues
+export const dynamic = 'force-dynamic'
 
 export default async function HomePage() {
   // Check authentication
@@ -12,12 +15,7 @@ export default async function HomePage() {
   // Get user profile
   const userProfile = await getUserProfile()
 
-  // Fetch user's virtual account
-  let virtualAccount = null
-  if (userProfile?.profile?.id) {
-    const vaResult = await getVirtualAccount(userProfile.profile.id)
-    virtualAccount = vaResult.virtualAccount || null
-  }
+  // Virtual account removed
 
   // Fetch loan offers from followed users
   let loanHelpers: any[] = []
@@ -77,6 +75,6 @@ export default async function HomePage() {
   }
 
   return (
-    <HomeContent userProfile={userProfile} loanHelpers={loanHelpers} virtualAccount={virtualAccount} />
+    <HomeContent userProfile={userProfile} loanHelpers={loanHelpers} />
   )
 }

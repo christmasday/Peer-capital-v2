@@ -22,7 +22,7 @@ export async function getLoanHelperSettings(
   userId: string,
 ): Promise<{ data: LoanHelperSettings | null; error: string | null }> {
   try {
-    const supabase = createServerClient() as unknown as SupabaseClient<Database>
+    const supabase = await createServerClient() as unknown as SupabaseClient<Database>
 
     const { data, error } = await supabase.from("loan_helper_settings").select("*").eq("user_id", userId).maybeSingle()
 
