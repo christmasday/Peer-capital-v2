@@ -5,7 +5,6 @@ import { revalidatePath } from "next/cache"
 import { v4 as uuidv4 } from "uuid"
 import { getCurrentUserId } from "@/lib/auth-utils"
 import { createNotification } from "./notifications"
-import { getBlockedUsers } from "@/lib/actions/connections"
 
 export interface Message {
   id: string
@@ -412,24 +411,17 @@ export async function getConversations(): Promise<{
       return { conversations: [] }
     }
 
-    // Filter out blocked users
-    const { blocked } = await getBlockedUsers();
-    const filteredUserIds = userIds.filter((id) => !blocked.includes(id));
-    if (filteredUserIds.length === 0) {
-      return { conversations: [] }
-    }
-
     const { data: profiles, error: profilesError } = await adminClient
       .from("profiles")
       .select("id, first_name, last_name, profile_picture_url")
-      .in("id", filteredUserIds)
+      .in("id", userIds)
 
     if (profilesError) {
       return { error: "Failed to fetch user profiles" }
     }
 
     // Combine conversation data with profiles
-    const conversations = filteredUserIds.map((userId) => {
+    const conversations = userIds.map((userId) => {
       const conversation = conversationMap.get(userId)!
       const profile = profiles?.find((p) => p.id === userId)
 
@@ -468,12 +460,6 @@ export async function getMessages(
     const userId = await getCurrentUserId()
     if (!userId) {
       return { error: "You must be logged in to view messages" }
-    }
-
-    // Filter out messages if the other user is blocked
-    const { blocked } = await getBlockedUsers();
-    if (blocked.includes(otherUserId)) {
-      return { messages: [], hasMore: false };
     }
 
     // Use the admin client to bypass RLS policies

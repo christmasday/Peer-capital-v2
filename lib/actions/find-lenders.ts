@@ -5,7 +5,6 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { cookies } from "next/headers"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/lib/supabase/database.types"
-import { getBlockedUsers } from "@/lib/actions/connections"
 
 export type LenderSearchParams = {
   loanAmount?: number
@@ -114,16 +113,11 @@ export async function findLenders({ loanAmount, loanDuration }: LenderSearchPara
     // Now, for each lender setting, get the user profile information and loan statistics
     const lenders: LenderResult[] = []
 
-    // Get blocked users
-    const { blocked } = await getBlockedUsers();
-
     for (const helper of finalHelpers) {
       try {
         // Use helper and joined settings
         const settings = helper.loan_helper_settings || {}
         const userId = helper.user_id
-        // Skip if user is blocked
-        if (blocked.includes(userId)) continue;
         const name = helper.name
         const profileImageUrl = helper.profile_image_url
         const interestRate = helper.interest_rate
