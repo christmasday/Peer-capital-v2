@@ -4,7 +4,7 @@ import { checkAuth } from "@/lib/auth-utils"
 
 export async function GET(req: NextRequest) {
   try {
-    const auth = await checkAuth()
+    const auth = await checkAuth(true)
     if (!auth.authenticated || !auth.userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
@@ -17,7 +17,8 @@ export async function GET(req: NextRequest) {
     }
 
     const stablesrail = createStablesrailClient()
-    const result: any = await stablesrail.getCngnRequestStatus({ correlationId })
+    // Use cngnOnrampStatus with the correlationId as requestId
+    const result: any = await stablesrail.cngnOnrampStatus({ requestId: correlationId })
     
     return NextResponse.json({ 
       success: true, 

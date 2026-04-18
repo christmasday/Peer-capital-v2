@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Briefcase, GraduationCap, MapPin, Phone, Mail, Heart, Calendar, User, Info, Edit, Wallet, Plus, Wallet as WalletIcon, Loader2 } from "lucide-react"
 import Link from "next/link"
@@ -100,6 +100,12 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
   const [bvnText, setBvnText] = useState(profile.bvn || "");
   const [isSavingBvn, setIsSavingBvn] = useState(false);
   const [bvnError, setBvnError] = useState<string | null>(null);
+  const [bvnOnboardRequestId, setBvnOnboardRequestId] = useState<string | null>(null);
+  const [resolvedSrUserId, setResolvedSrUserId] = useState<string | null>(profile.sr_user_id || null);
+  const [isEditingNin, setIsEditingNin] = useState(false);
+  const [ninText, setNinText] = useState(profile.id_number || profile.idNumber || "");
+  const [isSavingNin, setIsSavingNin] = useState(false);
+  const [ninError, setNinError] = useState<string | null>(null);
   const [isVerifyingBvn, setIsVerifyingBvn] = useState(false);
   const [bvnVerified, setBvnVerified] = useState<boolean | null>(profile.bvn_verified ?? null);
   const [bvnVerificationMsg, setBvnVerificationMsg] = useState<string | null>(null);
@@ -244,6 +250,8 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
     setBankName(profile.bank_name || "")
     setAccountNumber(profile.account_number || "")
     setAccountName(profile.account_name || "")
+    setBvnVerified(profile.bvn_verified ?? null)
+    setNinText(profile.id_number || profile.idNumber || "")
     setLoanHelperLoaded(false);
     // Add state for all address fields
     setBuildingNumber(profile.buildingNumber || "");
@@ -259,7 +267,19 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
     setCountry(profile.country || "Nigeria");
     setFullAddress(profile.fullAddress || "");
     setPostalCode(profile.postalCode || "");
+    setResolvedSrUserId(profile.sr_user_id || null);
   }, [profile])
+
+  useEffect(() => {
+    try {
+      const storedRequestId = window.sessionStorage.getItem("stablesrail_bvn_request_id");
+      if (storedRequestId) {
+        setBvnOnboardRequestId(storedRequestId);
+      }
+    } catch (error) {
+      // Session storage is optional.
+    }
+  }, []);
 
   // Fetch loan helper settings when section is active and not loaded
   useEffect(() => {
@@ -1086,6 +1106,40 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
     'bold', 'italic', 'underline', 'list', 'bullet', 'link',
   ];
 
+  async function submitBvnForOnboarding(bvnValue: string) {
+    const res = await fetch("/api/stablesrail/onboard-user", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ bvn: bvnValue }),
+    })
+    const data = await res.json()
+
+    if (data?.existingUser) {
+      setBvnVerified(false)
+      setBvnVerificationMsg("This BVN is already linked to an existing account. Please sign in to continue.")
+      return { success: false as const }
+    }
+
+    if (res.ok && data?.success) {
+      setBvnVerified(false)
+      if (data?.requestId) {
+        setBvnOnboardRequestId(data.requestId)
+        try {
+          window.sessionStorage.setItem("stablesrail_bvn_request_id", data.requestId)
+        } catch (error) {
+          // Ignore storage failures.
+        }
+      }
+      setBvnVerificationMsg("BVN verification initiated. We'll notify you once it's completed.")
+      return { success: true as const, requestId: data?.requestId || null }
+    }
+
+    setBvnVerified(false)
+    setBvnVerificationMsg(data?.error || "Verification initiation failed")
+    return { success: false as const }
+  }
+
   // Add BVN verification handler (Stablesrail onboard-user)
   async function handleVerifyBvn() {
     setIsVerifyingBvn(true);
@@ -1097,30 +1151,16 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
         const saved = await updateProfile({ bvn: bvnText })
         if (!saved?.success) {
           setBvnError(saved?.error || "Failed to save BVN before verification")
-          setIsVerifyingBvn(false)
           return
         }
       }
 
-      const res = await fetch("/api/stablesrail/onboard-user", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ bvn: bvnText }),
-      })
-      const data = await res.json()
-      if (res.ok && data?.success) {
-        setBvnVerified(false)
-        setBvnVerificationMsg("BVN verification initiated. We'll notify you once it's completed.")
-      } else {
-        setBvnVerified(false)
-        setBvnVerificationMsg(data?.error || "Verification initiation failed")
-      }
+      await submitBvnForOnboarding(bvnText)
     } catch (err: any) {
       setBvnVerified(false)
       setBvnVerificationMsg("Verification initiation failed. Please try again.")
     } finally {
-      setIsVerifyingBvn(false)
+      setIsVerifyingBvn(false);
     }
   }
 
@@ -1130,6 +1170,7 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
     try {
       const result = await updateProfile({ bvn: bvnText });
       if (result.success) {
+        await submitBvnForOnboarding(bvnText)
         setIsEditingBvn(false);
       } else {
         setBvnError(result.error || "Failed to update BVN");
@@ -1145,6 +1186,85 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
     setBvnText(profile.bvn || "");
     setIsEditingBvn(false);
     setBvnError(null);
+  }
+
+  async function handleVerifyBvnWithDojah() {
+    const bvnValue = (bvnText || profile.bvn || "").trim();
+    if (!/^\d{11}$/.test(bvnValue)) {
+      setBvnError("Please enter a valid 11-digit BVN before verification.");
+      return;
+    }
+
+    setIsVerifyingBvn(true);
+    setBvnError(null);
+    setBvnVerificationMsg(null);
+
+    try {
+      if (bvnValue !== (profile.bvn || "")) {
+        const saved = await updateProfile({ bvn: bvnValue });
+        if (!saved?.success) {
+          setBvnError(saved?.error || "Failed to save BVN before verification");
+          return;
+        }
+      }
+
+      const res = await fetch("/api/dojah/kyc/bvn-full", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ bvn: bvnValue }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data?.success || data?.verified !== true) {
+        setBvnVerified(false);
+        setBvnVerificationMsg(data?.error || "BVN verification failed. Please try again.");
+        return;
+      }
+
+      const updateResult = await updateProfile({
+        bvn: bvnValue,
+        bvn_verified: true,
+        bvn_verified_at: new Date().toISOString(),
+      });
+
+      if (!updateResult?.success) {
+        setBvnError(updateResult?.error || "BVN was validated, but profile update failed.");
+        return;
+      }
+
+      setBvnVerified(true);
+      setBvnVerificationMsg("BVN verified successfully.");
+      setIsEditingBvn(false);
+    } catch (error: any) {
+      setBvnVerified(false);
+      setBvnVerificationMsg("BVN verification failed. Please try again.");
+    } finally {
+      setIsVerifyingBvn(false);
+    }
+  }
+
+  async function handleSaveNin() {
+    setIsSavingNin(true);
+    setNinError(null);
+    try {
+      const result = await updateProfile({ idNumber: ninText });
+      if (result.success) {
+        setIsEditingNin(false);
+      } else {
+        setNinError(result.error || "Failed to update NIN");
+      }
+    } catch (err: any) {
+      setNinError(err?.message || "Failed to update NIN");
+    } finally {
+      setIsSavingNin(false);
+    }
+  }
+
+  function handleCancelNin() {
+    setNinText(profile.id_number || profile.idNumber || "");
+    setIsEditingNin(false);
+    setNinError(null);
   }
 
   // Compute if bank details are dirty
@@ -1235,6 +1355,32 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
       setWalletsError(null)
       
       try {
+        const effectiveSrUserId = resolvedSrUserId || profile.sr_user_id || null
+
+        if (bvnOnboardRequestId && !effectiveSrUserId) {
+          const onboardStatusRes = await fetch("/api/stablesrail/onboard-status", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ requestId: bvnOnboardRequestId }),
+          })
+          const onboardStatusData = await onboardStatusRes.json()
+          const onboardUserId = onboardStatusData?.data?.userId || onboardStatusData?.data?.data?.userId
+
+          if (onboardStatusRes.ok && onboardUserId) {
+            setResolvedSrUserId(onboardUserId)
+            try {
+              await updateProfile({ srUserId: onboardUserId })
+            } catch (error) {
+              console.error("Failed to persist Stablesrail userId:", error)
+            }
+          } else if (onboardStatusData?.data?.status === "failed") {
+            setWalletsError(onboardStatusData?.data?.error?.message || onboardStatusData?.data?.message || "Wallet onboarding failed")
+          }
+        }
+
+        const srUserIdForWallets = resolvedSrUserId || profile.sr_user_id || null
+
         // First, try to fetch from database
         const dbRes = await fetch("/api/stablesrail/wallet-address", {
           credentials: 'include'
@@ -1282,12 +1428,12 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
         }
         
         // If no wallets in DB, check if user has Stablesrail ID
-        if (profile.sr_user_id) {
+        if (srUserIdForWallets) {
           // Call Stablesrail to get wallets
           const stablesrailRes = await fetch("/api/stablesrail/list-user-wallets", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ userId: profile.sr_user_id }),
+            body: JSON.stringify({ userId: srUserIdForWallets }),
             credentials: 'include'
           })
           
@@ -1341,7 +1487,7 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
     }
     
     fetchWallets()
-  }, [activeSection, profile.sr_user_id])
+  }, [activeSection, bvnOnboardRequestId, profile.sr_user_id, resolvedSrUserId])
 
   // Fetch accounts (beneficiaries) on mount and when modal closes
   useEffect(() => {
@@ -2683,7 +2829,64 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
         {activeSection === "bank" && (
           <div className="space-y-6">
             <h2 className="text-xl font-medium">Repayment Account</h2>
-            <div className="text-sm text-gray-600">BVN: {profile.bvn || "Not provided"}</div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-gray-700">BVN</span>
+                  {(profile.bvn_verified || bvnVerified) && (
+                    <Badge className="bg-green-500 text-white">Verified</Badge>
+                  )}
+                </div>
+                {isCurrentUser && !isEditingBvn && (
+                  <div className="flex items-center gap-2">
+                    {(bvnText || profile.bvn) && !(profile.bvn_verified || bvnVerified) && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                        onClick={handleVerifyBvnWithDojah}
+                        disabled={isVerifyingBvn}
+                      >
+                        {isVerifyingBvn ? "Verifying..." : "Verify"}
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      onClick={() => setIsEditingBvn(true)}
+                      aria-label="Edit BVN"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {isEditingBvn ? (
+                <div className="flex flex-col gap-2">
+                  <input
+                    type="text"
+                    value={bvnText}
+                    onChange={e => setBvnText(e.target.value.replace(/[^0-9]/g, "").slice(0, 11))}
+                    placeholder="Enter your BVN"
+                    className="border px-3 py-2 rounded w-full"
+                    maxLength={11}
+                    disabled={isSavingBvn}
+                  />
+                  {bvnError && <div className="text-red-500 text-sm">{bvnError}</div>}
+                  <div className="flex gap-2 justify-end">
+                    <Button variant="outline" onClick={handleCancelBvn} disabled={isSavingBvn}>Cancel</Button>
+                    <Button onClick={handleSaveBvn} disabled={isSavingBvn || bvnText === (profile.bvn || "") || bvnText.length !== 11}>
+                      {isSavingBvn ? "Saving..." : "Save"}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-sm text-gray-600">{profile.bvn ? `BVN: ${profile.bvn}` : "BVN: Not provided"}</div>
+              )}
+              {bvnVerificationMsg && <div className="text-xs text-gray-500">{bvnVerificationMsg}</div>}
+            </div>
             <div className="flex justify-between items-center mb-4">
               <span className="font-medium">Your Accounts</span>
               {isCurrentUser && (
@@ -2852,8 +3055,21 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
             <CardContent>
 
               {/* BVN Display and Inline Edit */}
-              <div className="mb-4">
-                <label className="block font-medium mb-1">BVN</label>
+              <div className="mb-6">
+                <div className="flex items-center justify-between gap-3 mb-1">
+                  <label className="block font-medium">BVN</label>
+                  {isCurrentUser && !isEditingBvn && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      onClick={() => setIsEditingBvn(true)}
+                      aria-label="Edit BVN"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
                 {isEditingBvn ? (
                   <div className="flex flex-col gap-2">
                     <input
@@ -2874,29 +3090,59 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="text-gray-900 font-mono">{profile.bvn || "Not set"}</span>
-                    {/* Only show Edit button if wallet account details are NOT present */}
-                    {!(profile.account_number && profile.account_name) && !profile.bvn_verified && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 w-8 p-0"
-                        onClick={() => setIsEditingBvn(true)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                    )}
                     {isCurrentUser && !profile.bvn_verified && profile.correlation_id && (
                       <Button
                         size="sm"
                         variant="secondary"
                         onClick={() => setOtpModalOpen(true)}
-                        className="ml-2"
                       >
                         Verify
                       </Button>
                     )}
+                  </div>
+                )}
+              </div>
+
+              {/* NIN Display and Inline Edit */}
+              <div className="mb-4">
+                <div className="flex items-center justify-between gap-3 mb-1">
+                  <label className="block font-medium">NIN</label>
+                  {isCurrentUser && !isEditingNin && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      onClick={() => setIsEditingNin(true)}
+                      aria-label="Edit NIN"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+                {isEditingNin ? (
+                  <div className="flex flex-col gap-2">
+                    <input
+                      type="text"
+                      value={ninText}
+                      onChange={e => setNinText(e.target.value.replace(/[^0-9]/g, "").slice(0, 11))}
+                      placeholder="Enter your NIN"
+                      className="border px-3 py-2 rounded w-full"
+                      maxLength={11}
+                      disabled={isSavingNin}
+                    />
+                    {ninError && <div className="text-red-500 text-sm">{ninError}</div>}
+                    <div className="flex gap-2 justify-end">
+                      <Button variant="outline" onClick={handleCancelNin} disabled={isSavingNin}>Cancel</Button>
+                      <Button onClick={handleSaveNin} disabled={isSavingNin || ninText === (profile.id_number || profile.idNumber || "") || ninText.length !== 11}>
+                        {isSavingNin ? "Saving..." : "Save"}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-900 font-mono">{profile.id_number || profile.idNumber || "Not set"}</span>
                   </div>
                 )}
               </div>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createStablesrailClient, StablesrailError } from "@/lib/stablesrail/client"
 import { checkAuth } from "@/lib/auth-utils"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { cngnOnrampSchema } from "@/lib/stablesrail/schemas"
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,10 +14,6 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => null)
     if (!body || typeof body !== "object") {
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 })
-    }
-
-    if (!body.userId || !body.amount) {
-      return NextResponse.json({ error: "userId and amount are required" }, { status: 400 })
     }
 
     // Fetch user's base wallet address from wallet_address table
@@ -39,15 +36,50 @@ export async function POST(req: NextRequest) {
       }, { status: 400 })
     }
 
-    const stablesrail = createStablesrailClient()
-    const result: any = await stablesrail.cngnOnramp({
-      userId: body.userId,
+    // Fetch the user's StablesRail user ID from their profile
+    const { data: profile, error: profileError } = await admin
+      .from("profiles")
+      .select("sr_user_id")
+      .eq("id", auth.userId)
+      .maybeSingle()
+
+    if (profileError && profileError.code !== 'PGRST116') {
+      console.error("Error fetching user profile:", profileError)
+      return NextResponse.json({ error: "Failed to fetch user profile" }, { status: 500 })
+    }
+
+    const srUserId = profile?.sr_user_id
+    if (!srUserId) {
+      return NextResponse.json({ 
+        error: "StablesRail account not found. Please complete your account setup first." 
+      }, { status: 400 })
+    }
+
+    // Prepare full payload with wallet address for validation
+    const fullPayload = {
+      userId: srUserId,
       amount: body.amount,
-      owner: userBaseWalletAddress, // Use user's base wallet address as owner
+      owner: userBaseWalletAddress,
       network: body.network || "BASE",
       assetSwap: "CNGN",
-      autoSwap: false
-    })
+      autoSwap: false,
+      sweepToOfframp: true
+    }
+
+    // Validate request using Zod schema
+    const parseResult = cngnOnrampSchema.safeParse(fullPayload)
+    if (!parseResult.success) {
+      const fieldErrors = parseResult.error.flatten().fieldErrors
+      return NextResponse.json({ 
+        error: "Validation failed", 
+        fieldErrors 
+      }, { status: 400 })
+    }
+
+    const validatedPayload = parseResult.data
+
+    const stablesrail = createStablesrailClient()
+    const result: any = await stablesrail.cngnOnramp(validatedPayload)
     
     // Extract requestId from response
     const requestId = result?.requestId || result?.data?.requestId

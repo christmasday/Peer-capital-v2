@@ -1,13 +1,28 @@
 import { NextRequest, NextResponse } from "next/server"
 import crypto from "crypto"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { validateRequest, ValidationError, genericWebhookPayloadSchema, webhookEventSchema } from "@/lib/stablesrail/schemas"
+import { processWebhookEvent, isKnownEventType } from "@/lib/stablesrail/webhook-handlers"
+import type { WebhookEvent } from "@/types/stablesrail"
 
-// Stablesrail Webhook verification per docs:
-// 1. Construct signing string: timestamp + raw_body
-// 2. Compute HMAC-SHA256 using webhook secret as key
-// 3. Hex-encode and prefix with "sha256="
-// 4. Compare with X-Traycer-Signature header using constant-time comparison
-function verifyWebhookSignature(rawBody: string, signatureHeader: string | null, timestamp: string | null, secret: string): boolean {
+// ============================================================================
+// Webhook Security Functions
+// ============================================================================
+
+/**
+ * Verify webhook signature using HMAC-SHA256
+ * Per StablesRail docs:
+ * 1. Construct signing string: timestamp + raw_body
+ * 2. Compute HMAC-SHA256 using webhook secret as key
+ * 3. Hex-encode and prefix with "sha256="
+ * 4. Compare with X-Traycer-Signature header using constant-time comparison
+ */
+function verifyWebhookSignature(
+  rawBody: string,
+  signatureHeader: string | null,
+  timestamp: string | null,
+  secret: string
+): boolean {
   if (!signatureHeader || !timestamp) {
     return false
   }
@@ -39,7 +54,9 @@ function verifyWebhookSignature(rawBody: string, signatureHeader: string | null,
   }
 }
 
-// Verify required headers are present
+/**
+ * Verify required headers are present
+ */
 function validateWebhookHeaders(req: NextRequest): { valid: boolean; missingHeaders: string[] } {
   const requiredHeaders = [
     'x-traycer-signature',
@@ -62,17 +79,23 @@ function validateWebhookHeaders(req: NextRequest): { valid: boolean; missingHead
   }
 }
 
-// Verify User-Agent header matches expected value
+/**
+ * Verify User-Agent header matches expected value
+ */
 function validateUserAgent(userAgent: string | null): boolean {
   return userAgent === 'cNGN-Webhook/1.0'
 }
 
-// Verify Content-Type header
+/**
+ * Verify Content-Type header
+ */
 function validateContentType(contentType: string | null): boolean {
   return contentType === 'application/json'
 }
 
-// Validate timestamp to prevent replay attacks (optional but recommended)
+/**
+ * Validate timestamp to prevent replay attacks
+ */
 function validateTimestamp(timestamp: string | null): { valid: boolean; reason?: string } {
   if (!timestamp) {
     return { valid: false, reason: 'Missing timestamp' }
@@ -93,362 +116,59 @@ function validateTimestamp(timestamp: string | null): { valid: boolean; reason?:
   return { valid: true }
 }
 
-async function logEvent(event_type: string, payload: unknown, processed = false) {
+// ============================================================================
+// Logging Helper
+// ============================================================================
+
+/**
+ * Log webhook event to database
+ */
+async function logEvent(
+  eventType: string,
+  payload: unknown,
+  processed = false,
+  notes?: string
+): Promise<void> {
   try {
     const admin = createAdminClient()
-    await admin.from("webhook_events").insert({ event_type, payload, processed })
-  } catch {
+    await admin.from("webhook_events").insert({
+      event_type: eventType,
+      payload,
+      processed,
+      notes,
+      created_at: new Date().toISOString()
+    })
+  } catch (error) {
     // Swallow logging errors to avoid impacting webhook ack
+    console.error('🔴 [WEBHOOK] Failed to log event:', error)
   }
 }
 
-// Handler for user.otp.send.completed event
-async function handleUserOtpSendCompleted(payload: any) {
-  try {
-    const admin = createAdminClient()
-    const { phoneNumber, otpId, completedAt, metadata } = payload
-    
-    console.log('🟢 [WEBHOOK] User OTP Send Completed:', { phoneNumber, otpId, completedAt })
-    
-    // Log the OTP completion for analytics/audit purposes
-    await admin.from('webhook_events').insert({
-      event_type: 'user.otp.send.completed',
-      payload: payload,
-      processed: true,
-      created_at: new Date().toISOString()
-    })
-    
-    // TODO: Add specific business logic here, such as:
-    // - Update user verification status
-    // - Send confirmation notification
-    // - Update analytics tracking
-  } catch (error) {
-    console.error('🔴 [WEBHOOK] Error handling user.otp.send.completed:', error)
-  }
-}
-
-// Handler for virtual.account.created event
-async function handleVirtualAccountCreated(payload: any) {
-  try {
-    const admin = createAdminClient()
-    // Expect payload per docs
-    const accountNumber = String(payload?.accountNumber || "")
-    const accountName = String(payload?.accountName || "")
-    const bankCode = String(payload?.bankCode || "STABLESRAIL")
-    const bankName = String(payload?.bankName || "Stablesrail")
-    const currency = String(payload?.currency || "NGN")
-    const srUserId = String(payload?.metadata?.userId || "")
-
-    if (!accountNumber || !srUserId) return
-
-    // Resolve our auth user by profiles.sr_user_id
-    const { data: profile } = await admin
-      .from("profiles")
-      .select("id")
-      .eq("sr_user_id", srUserId)
-      .maybeSingle()
-
-    if (!profile?.id) return
-
-    const record = {
-      user_id: profile.id as string,
-      account_number: accountNumber,
-      account_name: accountName,
-      bank_name: bankName,
-      bank_code: bankCode,
-      currency,
-      assigned: true,
-      updated_at: new Date().toISOString(),
-    }
-
-    // Upsert to keep a single VA row per user
-    await admin.from("virtual_accounts").upsert(record, { onConflict: "user_id" })
-    console.log('✅ [WEBHOOK] Virtual account created and saved:', { accountNumber, srUserId })
-  } catch (error) {
-    console.error('🔴 [WEBHOOK] Error handling virtual.account.created:', error)
-  }
-}
-
-// Handler for payments.confirmed event
-async function handlePaymentsConfirmed(payload: any) {
-  try {
-    const admin = createAdminClient()
-    const { txRef, reference, amount, currency, status, confirmedAt, metadata, requestId } = payload
-    
-    console.log('🟢 [WEBHOOK] Payment Confirmed:', { txRef, reference, amount, currency, status, requestId })
-    
-    // Store webhook event
-    await admin.from('webhook_events').insert({
-      event_type: 'payments.confirmed',
-      payload: payload,
-      processed: true,
-      created_at: new Date().toISOString()
-    })
-    
-    // If requestId is present, match it to a funding transaction
-    if (requestId || reference) {
-      const matchingRequestId = requestId || reference
-      
-      // Try to find the virtual account by requestId to get the user_id
-      const { data: vaData } = await admin
-        .from('virtual_accounts')
-        .select('user_id, request_id')
-        .eq('request_id', matchingRequestId)
-        .maybeSingle()
-      
-      if (vaData?.user_id) {
-        console.log('🟢 [WEBHOOK] Matched payment to user:', vaData.user_id)
-        // Store additional metadata linking payment to user
-        // Note: We already inserted the event, so we'll update the most recent one
-        const { data: recentEvent } = await admin
-          .from('webhook_events')
-          .select('id')
-          .eq('event_type', 'payments.confirmed')
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single()
-        
-        if (recentEvent) {
-          const updatedPayload = typeof payload === 'object' ? { ...payload, matchedUserId: vaData.user_id } : payload
-          await admin.from('webhook_events').update({
-            payload: updatedPayload
-          }).eq('id', recentEvent.id)
-        }
-      }
-    }
-    
-    // TODO: Add specific business logic here, such as:
-    // - Credit user's wallet balance
-    // - Send payment confirmation notification
-    // - Update analytics/reporting
-    // - Trigger any post-payment workflows
-  } catch (error) {
-    console.error('🔴 [WEBHOOK] Error handling payments.confirmed:', error)
-  }
-}
-
-// Handler for wallet.funding.completed event
-async function handleWalletFundingCompleted(payload: any) {
-  try {
-    const admin = createAdminClient()
-    const { walletAddress, amount, tokenAddress, transactionHash, completedAt, fundingSource, metadata, requestId } = payload
-    
-    console.log('🟢 [WEBHOOK] Wallet Funding Completed:', { walletAddress, amount, tokenAddress, transactionHash, requestId })
-    
-    // Store webhook event
-    await admin.from('webhook_events').insert({
-      event_type: 'wallet.funding.completed',
-      payload: payload,
-      processed: true,
-      created_at: new Date().toISOString()
-    })
-    
-    // If requestId is present, match it to a funding transaction
-    if (requestId) {
-      // Try to find the virtual account by requestId to get the user_id
-      const { data: vaData } = await admin
-        .from('virtual_accounts')
-        .select('user_id, request_id')
-        .eq('request_id', requestId)
-        .maybeSingle()
-      
-      if (vaData?.user_id) {
-        console.log('🟢 [WEBHOOK] Matched wallet funding to user:', vaData.user_id)
-        // Store additional metadata linking funding to user
-        // Note: We already inserted the event, so we'll update the most recent one
-        const { data: recentEvent } = await admin
-          .from('webhook_events')
-          .select('id')
-          .eq('event_type', 'wallet.funding.completed')
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single()
-        
-        if (recentEvent) {
-          const updatedPayload = typeof payload === 'object' ? { ...payload, matchedUserId: vaData.user_id } : payload
-          await admin.from('webhook_events').update({
-            payload: updatedPayload
-          }).eq('id', recentEvent.id)
-        }
-      }
-    } else if (walletAddress) {
-      // Try to match by wallet address
-      const { data: walletData } = await admin
-        .from('wallet_address')
-        .select('user_id')
-        .or(`base_address.eq.${walletAddress},ethereum_address.eq.${walletAddress}`)
-        .maybeSingle()
-      
-      if (walletData?.user_id) {
-        console.log('🟢 [WEBHOOK] Matched wallet funding by address to user:', walletData.user_id)
-      }
-    }
-    
-    // TODO: Add specific business logic here, such as:
-    // - Update wallet balance in database
-    // - Record transaction in transaction history
-    // - Update user's asset holdings
-    // - Send funding confirmation notification
-    // - Update portfolio analytics
-  } catch (error) {
-    console.error('🔴 [WEBHOOK] Error handling wallet.funding.completed:', error)
-  }
-}
-
-// Handler for swaps.completed event
-async function handleSwapsCompleted(payload: any) {
-  try {
-    const admin = createAdminClient()
-    const { walletAddress, owner, sellToken, buyToken, amountIn, amountOut, swapTxHash, transferTxHash, completedAt, smartwalletContext, swapMetrics } = payload
-    
-    console.log('🟢 [WEBHOOK] Swap Completed:', { walletAddress, sellToken, buyToken, amountIn, amountOut, swapTxHash })
-    
-    // TODO: Add specific business logic here, such as:
-    // - Update user's token balances
-    // - Record swap transaction in history
-    // - Update portfolio analytics
-    // - Send swap completion notification
-    // - Update trading statistics
-    // - Handle any swap-related rewards/points
-    
-    await admin.from('webhook_events').insert({
-      event_type: 'swaps.completed',
-      payload: payload,
-      processed: true,
-      created_at: new Date().toISOString()
-    })
-  } catch (error) {
-    console.error('🔴 [WEBHOOK] Error handling swaps.completed:', error)
-  }
-}
-
-// Handler for swaps.failed event
-async function handleSwapsFailed(payload: any) {
-  try {
-    const admin = createAdminClient()
-    const { walletAddress, owner, sellToken, buyToken, amountIn, failedAt, error, retryable, metadata } = payload
-    
-    console.log('🔴 [WEBHOOK] Swap Failed:', { walletAddress, sellToken, buyToken, amountIn, error: error?.message })
-    
-    // TODO: Add specific business logic here, such as:
-    // - Log swap failure for analysis
-    // - Send failure notification to user
-    // - Initiate retry if retryable
-    // - Update failure analytics
-    // - Handle refunds if necessary
-    // - Update user's swap history with failure status
-    
-    await admin.from('webhook_events').insert({
-      event_type: 'swaps.failed',
-      payload: payload,
-      processed: true,
-      created_at: new Date().toISOString()
-    })
-  } catch (error) {
-    console.error('🔴 [WEBHOOK] Error handling swaps.failed:', error)
-  }
-}
-
-// Handler for vault.return.transfer.confirmed event
-async function handleVaultReturnTransferConfirmed(payload: any) {
-  try {
-    const admin = createAdminClient()
-    const { transferId, vaultReturnId, amount, tokenAddress, transactionHash, confirmedAt, blockNumber, metadata } = payload
-    
-    console.log('🟢 [WEBHOOK] Vault Return Transfer Confirmed:', { transferId, vaultReturnId, amount, tokenAddress })
-    
-    // TODO: Add specific business logic here, such as:
-    // - Update vault return status in database
-    // - Record transfer in transaction history
-    // - Update user's vault holdings
-    // - Send transfer confirmation notification
-    // - Update vault analytics
-    
-    await admin.from('webhook_events').insert({
-      event_type: 'vault.return.transfer.confirmed',
-      payload: payload,
-      processed: true,
-      created_at: new Date().toISOString()
-    })
-  } catch (error) {
-    console.error('🔴 [WEBHOOK] Error handling vault.return.transfer.confirmed:', error)
-  }
-}
-
-// Handler for vault.return.payout.completed event
-async function handleVaultReturnPayoutCompleted(payload: any) {
-  try {
-    const admin = createAdminClient()
-    const { payoutId, vaultReturnId, amount, recipientAccountNumber, recipientBankCode, transactionReference, completedAt, metadata } = payload
-    
-    console.log('🟢 [WEBHOOK] Vault Return Payout Completed:', { payoutId, vaultReturnId, amount, recipientAccountNumber })
-    
-    // TODO: Add specific business logic here, such as:
-    // - Update payout status in database
-    // - Record payout in transaction history
-    // - Update user's account balance
-    // - Send payout completion notification
-    // - Update payout analytics
-    // - Handle any payout-related rewards
-    
-    await admin.from('webhook_events').insert({
-      event_type: 'vault.return.payout.completed',
-      payload: payload,
-      processed: true,
-      created_at: new Date().toISOString()
-    })
-  } catch (error) {
-    console.error('🔴 [WEBHOOK] Error handling vault.return.payout.completed:', error)
-  }
-}
-
-// Handler for vault.return.payout.failed event
-async function handleVaultReturnPayoutFailed(payload: any) {
-  try {
-    const admin = createAdminClient()
-    const { payoutId, vaultReturnId, amount, recipientAccountNumber, recipientBankCode, failedAt, error, retryable, metadata } = payload
-    
-    console.log('🔴 [WEBHOOK] Vault Return Payout Failed:', { payoutId, vaultReturnId, amount, error: error?.message })
-    
-    // TODO: Add specific business logic here, such as:
-    // - Log payout failure for analysis
-    // - Send failure notification to user
-    // - Initiate retry if retryable
-    // - Update failure analytics
-    // - Handle refunds if necessary
-    // - Update payout status in database
-    
-    await admin.from('webhook_events').insert({
-      event_type: 'vault.return.payout.failed',
-      payload: payload,
-      processed: true,
-      created_at: new Date().toISOString()
-    })
-  } catch (error) {
-    console.error('🔴 [WEBHOOK] Error handling vault.return.payout.failed:', error)
-  }
-}
+// ============================================================================
+// Webhook Handler
+// ============================================================================
 
 export async function POST(req: NextRequest) {
   try {
+    // Step 1: Check webhook secret is configured
     const secret = process.env.STABLESRAIL_WEBHOOK_SECRET || ""
     if (!secret) {
+      console.error('🔴 [WEBHOOK] Webhook secret not configured')
       return NextResponse.json({ error: "Webhook secret not configured" }, { status: 500 })
     }
 
-    // Step 1: Validate required headers are present
+    // Step 2: Validate required headers are present
     const headerValidation = validateWebhookHeaders(req)
     if (!headerValidation.valid) {
       await logEvent("webhook.headers.missing", { 
         missingHeaders: headerValidation.missingHeaders,
-        receivedHeaders: Object.fromEntries(req.headers)
       }, false)
       return NextResponse.json({ 
         error: `Missing required headers: ${headerValidation.missingHeaders.join(', ')}` 
       }, { status: 400 })
     }
 
-    // Step 2: Validate User-Agent header
+    // Step 3: Validate User-Agent header
     const userAgent = req.headers.get('user-agent')
     if (!validateUserAgent(userAgent)) {
       await logEvent("webhook.user_agent.invalid", { 
@@ -458,7 +178,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid User-Agent" }, { status: 401 })
     }
 
-    // Step 3: Validate Content-Type header
+    // Step 4: Validate Content-Type header
     const contentType = req.headers.get('content-type')
     if (!validateContentType(contentType)) {
       await logEvent("webhook.content_type.invalid", { 
@@ -468,14 +188,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid Content-Type" }, { status: 400 })
     }
 
-    // Step 4: Read raw body for signature verification (must be done before JSON parsing)
+    // Step 5: Read raw body for signature verification (must be done before JSON parsing)
     const rawBody = await req.text()
 
-    // Step 5: Extract signature and timestamp headers
+    // Step 6: Extract signature and timestamp headers
     const signature = req.headers.get("x-traycer-signature")
     const timestamp = req.headers.get("x-traycer-timestamp")
 
-    // Step 5.5: Validate timestamp to prevent replay attacks
+    // Step 7: Validate timestamp to prevent replay attacks
     const timestampValidation = validateTimestamp(timestamp)
     if (!timestampValidation.valid) {
       await logEvent("webhook.timestamp.invalid", { 
@@ -486,78 +206,101 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `Invalid timestamp: ${timestampValidation.reason}` }, { status: 401 })
     }
 
-    // Step 6: Verify webhook signature using HMAC-SHA256
+    // Step 8: Verify webhook signature using HMAC-SHA256
     const signatureValid = verifyWebhookSignature(rawBody, signature, timestamp, secret)
     if (!signatureValid) {
       await logEvent("webhook.signature.invalid", { 
-        headers: Object.fromEntries(req.headers), 
-        body: rawBody,
         timestamp,
-        signatureReceived: signature
+        signatureReceived: signature?.substring(0, 20) + '...',
       }, false)
       return NextResponse.json({ error: "Invalid signature" }, { status: 401 })
     }
 
-    // Step 7: Parse JSON payload (only after signature verification)
-    let parsed: any
+    // Step 9: Parse JSON payload (only after signature verification)
+    let parsed: unknown
     try {
       parsed = JSON.parse(rawBody)
     } catch {
-      await logEvent("webhook.payload.invalid_json", { body: rawBody }, false)
+      await logEvent("webhook.payload.invalid_json", { body: rawBody.substring(0, 500) }, false)
       return NextResponse.json({ error: "Invalid JSON" }, { status: 400 })
     }
 
-    const eventType: string = String(parsed?.eventType || "")
-    const payload = parsed?.payload
+    // Step 10: Validate basic webhook structure
+    let genericPayload
+    try {
+      genericPayload = validateRequest(genericWebhookPayloadSchema, parsed)
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        await logEvent("webhook.payload.validation_failed", { 
+          errors: error.fieldErrors,
+          payload: parsed 
+        }, false)
+        return NextResponse.json({ 
+          error: "Invalid webhook payload structure",
+          details: error.fieldErrors 
+        }, { status: 400 })
+      }
+      throw error
+    }
+
+    const { eventType } = genericPayload
+    const payload = genericPayload.data || genericPayload
 
     if (!eventType) {
       await logEvent("webhook.event.missing_type", parsed, false)
       return NextResponse.json({ error: "Missing eventType" }, { status: 400 })
     }
 
-    // Step 8: Log receipt immediately (after all validations pass)
+    console.log(`🟢 [WEBHOOK] Received event: ${eventType}`)
+
+    // Step 11: Log receipt immediately (after all validations pass)
     await logEvent(eventType, payload, false)
 
-    // Step 9: Route events (non-blocking safety inside try/catch)
-    switch (eventType) {
-      case "user.otp.send.completed":
-        await handleUserOtpSendCompleted(payload)
-        break
-      case "virtual.account.created":
-        await handleVirtualAccountCreated(payload)
-        break
-      case "payments.confirmed":
-        await handlePaymentsConfirmed(payload)
-        break
-      case "wallet.funding.completed":
-        await handleWalletFundingCompleted(payload)
-        break
-      case "swaps.completed":
-        await handleSwapsCompleted(payload)
-        break
-      case "swaps.failed":
-        await handleSwapsFailed(payload)
-        break
-      case "vault.return.transfer.confirmed":
-        await handleVaultReturnTransferConfirmed(payload)
-        break
-      case "vault.return.payout.completed":
-        await handleVaultReturnPayoutCompleted(payload)
-        break
-      case "vault.return.payout.failed":
-        await handleVaultReturnPayoutFailed(payload)
-        break
-      default:
-        // Unknown event; still acknowledged
-        await logEvent("webhook.unknown_event", { eventType, payload }, true, "Unknown event type received")
-        break
-    }
+    // Step 12: Check if this is a known event type and process with typed handler
+    if (isKnownEventType(eventType)) {
+      try {
+        // Validate against the full typed schema
+        const typedEvent = validateRequest(webhookEventSchema, {
+          eventType,
+          timestamp: genericPayload.timestamp || new Date().toISOString(),
+          requestId: genericPayload.requestId,
+          userId: genericPayload.userId,
+          data: payload,
+        })
 
-    return NextResponse.json({ ok: true })
+        // Process with typed handler
+        const result = await processWebhookEvent(typedEvent as WebhookEvent)
+        
+        console.log(`✅ [WEBHOOK] Event ${eventType} processed:`, result)
+        
+        // Update the logged event as processed
+        if (result.success) {
+          await logEvent(eventType, { ...payload, handlerResult: result }, true)
+        }
+
+        return NextResponse.json({ ok: true, result })
+      } catch (error) {
+        // If typed validation fails, fall back to generic processing
+        if (error instanceof ValidationError) {
+          console.warn(`⚠️ [WEBHOOK] Event ${eventType} failed typed validation, processing as generic:`, error.fieldErrors)
+          // Still acknowledge the webhook to prevent retries
+          await logEvent(eventType, { payload, validationErrors: error.fieldErrors }, true, 'Processed as generic due to validation failure')
+          return NextResponse.json({ ok: true, warning: 'Processed as generic event' })
+        }
+        throw error
+      }
+    } else {
+      // Unknown event type - log and acknowledge
+      console.warn(`⚠️ [WEBHOOK] Unknown event type: ${eventType}`)
+      await logEvent("webhook.unknown_event", { eventType, payload }, true, 'Unknown event type')
+      return NextResponse.json({ ok: true, warning: `Unknown event type: ${eventType}` })
+    }
   } catch (err) {
-    await logEvent("webhook.handler.error", { error: err instanceof Error ? err.message : String(err) }, false)
+    console.error('🔴 [WEBHOOK] Unhandled error:', err)
+    await logEvent("webhook.handler.error", { 
+      error: err instanceof Error ? err.message : String(err),
+      stack: err instanceof Error ? err.stack : undefined
+    }, false)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
-
-

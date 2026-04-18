@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createStablesrailClient, StablesrailError } from "@/lib/stablesrail/client"
 import { checkAuth } from "@/lib/auth-utils"
 
+/**
+ * @deprecated Use /api/stablesrail/cngn-request-status instead.
+ * This endpoint is kept for backward compatibility and proxies to the canonical endpoint.
+ */
 export async function GET(req: NextRequest) {
   try {
-    const auth = await checkAuth()
+    const auth = await checkAuth(true)
     if (!auth.authenticated || !auth.userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
@@ -15,16 +18,17 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "correlationId is required" }, { status: 400 })
     }
 
-    const stablesrail = createStablesrailClient()
-    const result = await stablesrail.getCngnRequestStatus({ correlationId })
-    return NextResponse.json({ success: true, data: result })
+    // Proxy to the canonical cngn-request-status endpoint
+    const canonicalUrl = new URL("/api/stablesrail/cngn-request-status", req.url)
+    canonicalUrl.searchParams.set("correlationId", correlationId)
+
+    // Forward cookies for auth
+    const response = await fetch(canonicalUrl.toString(), {
+      headers: { cookie: req.headers.get("cookie") || "" },
+    })
+    const data = await response.json()
+    return NextResponse.json(data, { status: response.status })
   } catch (error) {
-    if (error instanceof StablesrailError) {
-      return NextResponse.json(
-        { error: error.message, code: error.responseCode, details: error.details },
-        { status: 400 },
-      )
-    }
     console.error("Error in transaction-status:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }

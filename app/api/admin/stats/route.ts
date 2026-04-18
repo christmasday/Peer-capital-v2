@@ -21,23 +21,34 @@ export async function GET(req: NextRequest) {
       .from('profiles')
       .select('*', { count: 'exact', head: true })
 
-    // Daily Active Users (DAU) - users who logged in today
-    const { count: dau } = await admin
-      .from('user_sessions')
-      .select('*', { count: 'exact', head: true })
-      .gte('last_seen', today.toISOString())
+    const getUniqueUsersSince = async (sinceISO: string) => {
+      const { data, error } = await admin
+        .from('user_sessions')
+        .select('user_id')
+        .gte('last_activity', sinceISO)
 
-    // Monthly Active Users (MAU) - users who logged in within last 30 days
-    const { count: mau } = await admin
-      .from('user_sessions')
-      .select('*', { count: 'exact', head: true })
-      .gte('last_seen', thirtyDaysAgo.toISOString())
+      if (error || !data) {
+        return 0
+      }
 
-    // Weekly Active Users (WAU) - users who logged in within last 7 days
-    const { count: wau } = await admin
+      return new Set(data.map((entry) => entry.user_id)).size
+    }
+
+    // Daily/Weekly/Monthly Active Users as unique user IDs with session activity in the period
+    const [dau, wau, mau] = await Promise.all([
+      getUniqueUsersSince(today.toISOString()),
+      getUniqueUsersSince(sevenDaysAgo.toISOString()),
+      getUniqueUsersSince(thirtyDaysAgo.toISOString()),
+    ])
+
+    const { count: totalSessions } = await admin
       .from('user_sessions')
       .select('*', { count: 'exact', head: true })
-      .gte('last_seen', sevenDaysAgo.toISOString())
+
+    const { count: activeSessions } = await admin
+      .from('user_sessions')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_active', true)
 
     // Total transactions (from posts table as proxy)
     const { count: totalTransactions } = await admin
@@ -88,9 +99,11 @@ export async function GET(req: NextRequest) {
     const stats = {
       users: {
         total: totalUsers || 0,
-        dau: dau || 0,
-        mau: mau || 0,
-        wau: wau || 0,
+        dau,
+        mau,
+        wau,
+        totalSessions: totalSessions || 0,
+        activeSessions: activeSessions || 0,
         dauGrowth,
         mauGrowth,
         registrationsToday: registrationsToday || 0,

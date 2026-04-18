@@ -14,7 +14,9 @@ import {
   Menu,
   ChevronDown,
   LogOut,
-  DollarSign
+  DollarSign,
+  ArrowUpRight,
+  ArrowDownRight
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -32,6 +34,8 @@ interface AdminLayoutProps {
 const navigation = [
   { name: "Dashboard", href: "/admin/dashboard", icon: BarChart3 },
   { name: "Users", href: "/admin/users", icon: Users },
+  { name: "Onramp Requests", href: "/admin/onramp-requests", icon: ArrowUpRight },
+  { name: "Offramp Requests", href: "/admin/offramp-requests", icon: ArrowDownRight },
   { name: "IP Allowlist", href: "/admin/ip-allowlist", icon: Globe },
   { name: "Asset Preferences", href: "/admin/asset-preferences", icon: Settings },
   { name: "Fee Configuration", href: "/admin/fees", icon: DollarSign },

@@ -32,18 +32,29 @@ function createMockClient(): SupabaseClient<Database> {
   return {
     from: (_table: string) => ({
       select: function () {
-        return {
+        const createSelectQueryBuilder = (): any => ({
           eq: function () {
-            return {
-              single: async () => ({ data: null, error: null }),
-              maybeSingle: async () => ({ data: null, error: null }),
-              order: function () { return { data: [], error: null } },
-            }
+            return createSelectQueryBuilder()
           },
-          order: function () { return { data: [], error: null } },
+          order: function () {
+            return createSelectQueryBuilder()
+          },
+          limit: function () {
+            return createSelectQueryBuilder()
+          },
+          range: function () {
+            return createSelectQueryBuilder()
+          },
+          in: function () {
+            return createSelectQueryBuilder()
+          },
           single: async () => ({ data: null, error: null }),
           maybeSingle: async () => ({ data: null, error: null }),
-        }
+          then: async (resolve: any) => resolve({ data: [], error: null }),
+          catch: async (_reject: any) => ({ data: [], error: null }),
+        })
+
+        return createSelectQueryBuilder()
       },
       insert: async () => ({ data: null, error: null }),
       update: function (_data: any) {

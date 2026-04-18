@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createStablesrailClient, StablesrailError } from "@/lib/stablesrail/client"
 import { checkAuth } from "@/lib/auth-utils"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { createVirtualAccountSchema } from "@/lib/stablesrail/schemas"
 
 export async function POST(req: NextRequest) {
   try {
@@ -71,11 +72,24 @@ export async function POST(req: NextRequest) {
     const payload = {
       userId: profile.sr_user_id
     }
-    console.log('🔵 [create-virtual-account] Creating with Stablesrail, payload:', JSON.stringify(payload, null, 2))
+
+    // Validate payload using Zod schema
+    const parseResult = createVirtualAccountSchema.safeParse(payload)
+    if (!parseResult.success) {
+      const fieldErrors = parseResult.error.flatten().fieldErrors
+      console.error('🔴 [create-virtual-account] Validation failed:', fieldErrors)
+      return NextResponse.json({ 
+        error: "Validation failed", 
+        fieldErrors 
+      }, { status: 400 })
+    }
+
+    const validatedPayload = parseResult.data
+    console.log('🔵 [create-virtual-account] Creating with Stablesrail, payload:', JSON.stringify(validatedPayload, null, 2))
     
     let createResult: any
     try {
-      createResult = await stablesrail.createVirtualAccount(payload)
+      createResult = await stablesrail.createVirtualAccount(validatedPayload)
       console.log('🔵 [create-virtual-account] Stablesrail response:', JSON.stringify(createResult, null, 2))
     } catch (stablesrailError) {
       console.error('🔴 [create-virtual-account] Stablesrail API error:', stablesrailError)

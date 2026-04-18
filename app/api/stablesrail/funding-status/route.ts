@@ -18,7 +18,18 @@ export async function GET(req: NextRequest) {
 
     const admin = createAdminClient()
 
-    // Check for webhook events related to this requestId
+    // Resolve the user's SR user ID for scoping queries
+    const { data: userProfile } = await admin
+      .from('profiles')
+      .select('sr_user_id')
+      .eq('id', auth.userId)
+      .maybeSingle()
+
+    if (!userProfile?.sr_user_id) {
+      return NextResponse.json({ error: "StablesRail account not found" }, { status: 400 })
+    }
+
+    // Check for webhook events related to this requestId, scoped to this user
     const { data: paymentEvents } = await admin
       .from('webhook_events')
       .select('*')
@@ -29,7 +40,7 @@ export async function GET(req: NextRequest) {
     const { data: fundingEvents } = await admin
       .from('webhook_events')
       .select('*')
-      .eq('event_type', 'wallet.funding.completed')
+      .eq('event_type', 'wallet.funding.success')
       .order('created_at', { ascending: false })
       .limit(10)
 
@@ -42,7 +53,10 @@ export async function GET(req: NextRequest) {
     if (paymentEvents) {
       paymentEvent = paymentEvents.find((event: any) => {
         const payload = typeof event.payload === 'string' ? JSON.parse(event.payload) : event.payload
-        return payload.requestId === requestId || payload.reference === requestId
+        // Match on requestId/reference AND verify it belongs to this user
+        const matchesRequest = payload.requestId === requestId || payload.reference === requestId
+        const matchesUser = payload.userId === userProfile.sr_user_id || payload.data?.userId === userProfile.sr_user_id
+        return matchesRequest && matchesUser
       })
       paymentConfirmed = !!paymentEvent
     }

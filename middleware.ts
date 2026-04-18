@@ -12,11 +12,6 @@ export async function middleware(req: NextRequest) {
     "/signup",
     "/forgot-password",
     "/reset-password",
-    "/api/auth/refresh",
-    "/api/auth/signup",
-    "/api/sync-auth-users",
-    "/api/stablesrail/onboard-user",
-    "/api/stablesrail/verify-otp",
     "/contact",
     "/faq",
     "/privacy-policy",
@@ -28,6 +23,23 @@ export async function middleware(req: NextRequest) {
     "/aml-policy",
     "/kyc-policy"
   ]
+
+  // API routes that do NOT require middleware auth (they handle their own or are public)
+  const publicApiPaths = [
+    "/api/auth/refresh",
+    "/api/auth/signup",
+    "/api/auth/check-signup-availability",
+    "/api/auth/send-confirmation-code",
+    "/api/auth/verify-confirmation-code",
+    "/api/auth/login",
+    "/api/auth/logout",
+    "/api/auth/verify-token",
+    "/api/sync-auth-users",
+    "/api/stablesrail/onboard-user",
+    "/api/stablesrail/verify-otp",
+    "/api/stablesrail/webhook",
+  ]
+
   const path = req.nextUrl.pathname
 
   // Check if the path starts with any of the public paths
@@ -35,32 +47,24 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next()
   }
 
-  // Skip auth for static assets and API routes that handle their own auth
+  // Skip auth for static assets
   if (
     path.startsWith("/_next/") ||
     path.startsWith("/favicon.ico") ||
     path.includes(".png") ||
     path.includes(".jpg") ||
-    path.includes(".svg") ||
-    path.startsWith("/api/")
+    path.includes(".svg")
   ) {
     return NextResponse.next()
   }
 
+  // Skip auth only for explicitly listed public API routes
+  if (publicApiPaths.some((apiPath) => path === apiPath || path.startsWith(`${apiPath}/`))) {
+    return NextResponse.next()
+  }
+
   try {
-    // Check for auth bypass cookie first (set during login)
-    const authBypass = req.cookies.get("auth-bypass")?.value
-    if (authBypass === "true") {
-      return NextResponse.next()
-    }
-
-    // Check for recent login via auth-status cookie
-    const authStatus = req.cookies.get("auth-status")?.value
-    if (authStatus === "authenticated") {
-      return NextResponse.next()
-    }
-
-    // Check for JWT token
+    // Check for JWT token (primary auth method)
     const token = req.cookies.get(JWT_COOKIE_NAME)?.value || req.cookies.get("jwt-token")?.value
 
     if (token) {
@@ -69,7 +73,6 @@ export async function middleware(req: NextRequest) {
       if (!error && payload && (payload.sub || payload.userId)) {
         // JWT is valid, allow request
         return NextResponse.next()
-      } else if (error) {
       }
     }
 
@@ -78,30 +81,17 @@ export async function middleware(req: NextRequest) {
       return NextResponse.next()
     }
 
-    // Check for client-side auth flags in cookies
-    const isAuthenticated = req.cookies.get("is_authenticated")?.value === "true"
-    if (isAuthenticated) {
-      return NextResponse.next()
-    }
-
-    // Special case for /home with auth=direct parameter
-    if (path === "/home" && req.nextUrl.searchParams.get("auth") === "direct") {
-      return NextResponse.next()
-    }
-
     // Check Supabase session as fallback (with timeout)
     const sessionPromise = checkSupabaseSession(req)
     const timeoutPromise = new Promise((resolve) => {
       setTimeout(() => {
-        resolve({ valid: true, fallback: true })
-      }, 2000) // 2 second timeout
+        resolve({ valid: false, fallback: true })
+      }, 2000) // 2 second timeout — fail-closed
     })
 
-    const { valid, fallback } = (await Promise.race([sessionPromise, timeoutPromise])) as any
+    const { valid } = (await Promise.race([sessionPromise, timeoutPromise])) as any
 
     if (valid) {
-      if (fallback) {
-      }
       return NextResponse.next()
     }
 
@@ -111,8 +101,12 @@ export async function middleware(req: NextRequest) {
     url.searchParams.set("redirectedFrom", req.nextUrl.pathname)
     return NextResponse.redirect(url)
   } catch (error) {
-    // On error, allow the request rather than breaking the app
-    return NextResponse.next()
+    // Fail-closed: on error, deny access and redirect to login
+    console.error("[middleware] Auth error, denying access:", error instanceof Error ? error.message : String(error))
+    const url = req.nextUrl.clone()
+    url.pathname = "/"
+    url.searchParams.set("redirectedFrom", req.nextUrl.pathname)
+    return NextResponse.redirect(url)
   }
 }
 

@@ -208,16 +208,6 @@ export async function signIn(formData: FormData) {
       return { error: "Invalid email or password" }
     }
 
-    // Update last sign in time
-    await adminClient
-      .from("auth_users")
-      .update({
-        last_sign_in_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", userData.id) // Await update before eq
-
-
     // Create a session object similar to Supabase's
     const sessionId = uuidv4()
     const session = {
@@ -227,6 +217,16 @@ export async function signIn(formData: FormData) {
       expires_at: Math.floor(Date.now() / 1000) + 60 * 60 * 24, // 24 hours
       access_token: uuidv4(), // Generate a random token
     }
+
+    // Store access_token in auth_users so getCurrentUserId can look it up
+    await adminClient
+      .from("auth_users")
+      .update({
+        access_token: session.access_token,
+        last_sign_in_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", userData.id)
 
     // Generate JWT
     let jwt = null
@@ -251,7 +251,7 @@ export async function signIn(formData: FormData) {
 
     // Set cookies with longer expiration
     try {
-      const cookieStore = cookies()
+      const cookieStore = await cookies()
 
       // Set a session cookie with a long expiration
       cookieStore.set("custom-auth-token", session.access_token, {
@@ -1409,7 +1409,7 @@ export async function getUserProfile() {
     // If no userId from JWT, try to get from custom auth token
     if (!userId) {
       try {
-        const cookieStore = cookies()
+        const cookieStore = await cookies()
         const authToken = cookieStore.get("custom-auth-token")?.value
 
         if (authToken) {
@@ -1619,7 +1619,7 @@ export async function changePassword(currentPassword: string, newPassword: strin
       // Try to get from custom auth token
       if (!userId) {
         try {
-          const cookieStore = cookies()
+          const cookieStore = await cookies()
           const authToken = cookieStore.get("custom-auth-token")?.value
 
           if (authToken) {

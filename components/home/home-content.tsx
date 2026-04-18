@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Eye, EyeOff, Plus, ArrowRightLeft, TrendingUp, ArrowDown, Search, Loader2, AlertCircle, Info, CheckCircle } from "lucide-react"
+import { Eye, EyeOff, Plus, ArrowRightLeft, History, ArrowDown, Search, Loader2, AlertCircle, Info, CheckCircle, TrendingUp } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { HelperCard } from "@/components/helpers/helper-card"
 import { Button } from "@/components/ui/button"
@@ -769,13 +769,13 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
                     <ArrowDown className="h-5 w-5 sm:h-6 sm:w-6 md:h-8 md:w-8" />
                     <span className="font-medium">Withdrawal</span>
                   </Button>
-                  <Link href="/timeline" className="w-full">
+                  <Link href="/transactions" className="w-full">
                     <Button
                       variant="secondary"
                       className="w-full h-16 sm:h-20 md:h-24 flex flex-col items-center justify-center gap-1 sm:gap-2 bg-white text-blue-600 hover:bg-gray-50 text-xs sm:text-sm md:text-lg"
                     >
-                      <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 md:h-8 md:w-8" />
-                      <span className="font-medium">Timeline</span>
+                      <History className="h-5 w-5 sm:h-6 sm:w-6 md:h-8 md:w-8" />
+                      <span className="font-medium">History</span>
                     </Button>
                   </Link>
                 </div>

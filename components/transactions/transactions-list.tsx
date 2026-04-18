@@ -28,19 +28,16 @@ export function TransactionsList() {
       setLoading(true)
       setError(null)
       try {
-        // Get account number from localStorage (set by profile or home page)
-        let accountNumber = null
-        try {
-          const userProfile = JSON.parse(localStorage.getItem("userProfile") || "null")
-          accountNumber = userProfile?.profile?.account_number
-        } catch {}
-        if (!accountNumber) {
-          setError("No account number found")
-          setLoading(false)
+        const res = await fetch("/api/transactions", { credentials: "include" })
+        const data = await res.json()
+
+        if (!res.ok) {
+          setError(data.error || "Failed to fetch transactions")
+          setTransactions([])
           return
         }
-        // ALAT history removed: use empty list
-        setTransactions([])
+
+        setTransactions(data.transactions || [])
       } catch (err: any) {
         setError(err.message || "Failed to fetch transactions")
       } finally {

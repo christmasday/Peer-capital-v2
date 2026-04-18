@@ -5,6 +5,10 @@ import { cookies } from "next/headers"
 const getJWTSecret = () => {
   const secret = process.env.JWT_SECRET
   if (!secret) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("FATAL: JWT_SECRET environment variable is not set in production")
+    }
+    console.warn("⚠️ [JWT] JWT_SECRET not set — using insecure fallback (dev only)")
     return new TextEncoder().encode("fallback-secret-key-for-development-only")
   }
   return new TextEncoder().encode(secret)

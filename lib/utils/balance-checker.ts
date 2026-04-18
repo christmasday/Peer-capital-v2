@@ -1,6 +1,9 @@
 // Wallet Balance & Fee Checking Utility
 // Used to verify sufficient funds before initiating token withdrawals
 
+import { getTokenBalance } from "@/lib/base-rpc/client"
+import { createStablesrailClient } from "@/lib/stablesrail/client"
+
 export async function checkSufficientBalance({
   walletAddress,
   amount,
@@ -20,59 +23,59 @@ export async function checkSufficientBalance({
   error?: string;
 }> {
   try {
-    // 1. Fetch wallet balance using BASE RPC
-    const contractEnv = process.env.NEXT_PUBLIC_CNGN_CONTRACT_ADDRESS || process.env.CNGN_CONTRACT_ADDRESS || ''
-    const contractQuery = contractEnv ? `&contract=${encodeURIComponent(contractEnv)}` : ''
-    const balanceRes = await fetch(
-      `/api/stablesrail/base-balance?address=${walletAddress}${contractQuery}`
-    )
-    const balanceData = await balanceRes.json()
-    
-    if (!balanceRes.ok) {
+    // 1. Fetch wallet balance directly via BASE RPC (no relative URL)
+    const contractAddress = process.env.NEXT_PUBLIC_CNGN_CONTRACT_ADDRESS || process.env.CNGN_CONTRACT_ADDRESS || ''
+    if (!contractAddress) {
       return {
         sufficient: false,
         balance: 0,
         required: amount,
         gasFee: 0,
         platformFee: 0,
-        error: "Failed to fetch wallet balance"
+        error: "CNGN contract address not configured"
+      }
+    }
+
+    const balanceStr = await getTokenBalance(contractAddress, walletAddress)
+    const balance = parseFloat(balanceStr)
+
+    if (isNaN(balance)) {
+      return {
+        sufficient: false,
+        balance: 0,
+        required: amount,
+        gasFee: 0,
+        platformFee: 0,
+        error: "Failed to parse wallet balance"
       }
     }
     
-    const balance = parseFloat(balanceData.balance)
+    // 2. Get estimated gas fees
+    // TODO: Hardcoded ETH gas fee — this is in ETH units while CNGN is in token units.
+    // For a proper check, query BASE RPC for ETH balance separately and verify gas affordability.
+    // For now, we omit gas from the CNGN "required" total and only check token amounts.
+    const estimatedGasFee = 0.001 // ETH for BASE network (separate denomination)
     
-    // 2. Get estimated gas fees from Stablesrail (or hardcoded estimate)
-    const estimatedGasFee = 0.001 // ETH for BASE network (adjust as needed)
-    
-    // 3. Get platform fees from Stablesrail API
+    // 3. Get platform fees from StablesRail API directly (no relative URL)
+    let platformFeePercent = 0.5 // Default 0.5%
     try {
-      const feesRes = await fetch('/api/stablesrail/get-fees')
-      const feesData = await feesRes.json()
-      const platformFeePercent = feesData.withdrawalFee || 0.5 // Default 0.5%
-      const platformFee = (amount * platformFeePercent) / 100
-      
-      // 4. Calculate total required
-      const required = amount + estimatedGasFee + platformFee
-      
-      return {
-        sufficient: balance >= required,
-        balance,
-        required,
-        gasFee: estimatedGasFee,
-        platformFee
-      }
-    } catch (error) {
-      // If fees API fails, use default platform fee
-      const platformFee = (amount * 0.5) / 100 // Default 0.5%
-      const required = amount + estimatedGasFee + platformFee
-      
-      return {
-        sufficient: balance >= required,
-        balance,
-        required,
-        gasFee: estimatedGasFee,
-        platformFee
-      }
+      const stablesrail = createStablesrailClient()
+      const feesData: any = await stablesrail.getFees()
+      platformFeePercent = feesData?.withdrawalFee ?? feesData?.withdrawal_fee ?? 0.5
+    } catch {
+      // Use default on failure
+    }
+
+    const platformFee = (amount * platformFeePercent) / 100
+    // NOTE: gasFee is in ETH, not CNGN — do not add to CNGN required total
+    const required = amount + platformFee
+    
+    return {
+      sufficient: balance >= required,
+      balance,
+      required,
+      gasFee: estimatedGasFee,
+      platformFee
     }
   } catch (error) {
     return {

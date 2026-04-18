@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createStablesrailClient, StablesrailError } from "@/lib/stablesrail/client"
 import { checkAuth } from "@/lib/auth-utils"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { onboardUserSchema, ValidationError } from "@/lib/stablesrail/schemas"
 
 export async function POST(req: NextRequest) {
   console.log('🟢 [API] onboard-user endpoint called')
@@ -10,27 +11,29 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     console.log('🟢 [API] Request body:', { bvn: body.bvn ? `${body.bvn.substring(0, 3)}...` : 'missing' })
     
-    // Basic validation
-    if (!body || typeof body !== "object") {
-      console.error('🔴 [API] Invalid request body')
-      return NextResponse.json({ error: "Invalid request body" }, { status: 400 })
+    // Validate request using Zod schema
+    const parseResult = onboardUserSchema.safeParse(body)
+    if (!parseResult.success) {
+      const fieldErrors = parseResult.error.flatten().fieldErrors
+      console.error('🔴 [API] Validation failed:', fieldErrors)
+      return NextResponse.json({ 
+        error: "Validation failed", 
+        fieldErrors 
+      }, { status: 400 })
     }
 
-    // Validate BVN if provided
-    if (body.bvn && !/^\d{11}$/.test(body.bvn)) {
-      console.error('🔴 [API] Invalid BVN format:', body.bvn)
-      return NextResponse.json({ error: "BVN must be exactly 11 digits" }, { status: 400 })
-    }
+    const validatedBody = parseResult.data
 
     console.log('🟢 [API] Creating Stablesrail client...')
     const stablesrail = createStablesrailClient()
     
     console.log('🟢 [API] Calling Stablesrail onboardUser...')
-    const result = await stablesrail.onboardUser(body)
+    const result = await stablesrail.onboardUser(validatedBody)
     console.log('🟢 [API] Stablesrail response:', result)
 
     // Extract requestId from response
     const requestId = (result as any)?.requestId || (result as any)?.data?.requestId
+    const existingUser = Boolean((result as any)?.existingUser || (result as any)?.data?.existingUser)
     console.log('🟢 [API] Extracted requestId:', requestId)
 
     if (!requestId) {
@@ -44,6 +47,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ 
       success: true, 
       data: result,
+      existingUser,
       requestId: requestId 
     })
   } catch (error) {

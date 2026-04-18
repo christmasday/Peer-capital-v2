@@ -66,6 +66,7 @@ function buildQuery(params?: RequestOptions["query"]): string {
 export class StablesrailClient {
   private readonly apiKey: string
   private readonly baseUrl: string
+  private readonly debug: boolean
 
   constructor(apiKey: string, baseUrl = "https://beta.stablesrail.io/v1/") {
     if (!apiKey) {
@@ -73,6 +74,7 @@ export class StablesrailClient {
     }
     this.apiKey = apiKey
     this.baseUrl = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`
+    this.debug = process.env.NODE_ENV !== "production"
   }
 
   private async request<T>(path: string, options: RequestOptions = {}): Promise<T> {
@@ -99,11 +101,11 @@ export class StablesrailClient {
       next: { revalidate: 0 },
     })
 
-    console.log(`🔵 [StablesrailClient] ${method} ${path} - HTTP Status:`, res.status, res.statusText)
+    if (this.debug) console.log(`🔵 [StablesrailClient] ${method} ${path} - HTTP ${res.status}`)
 
     // Get response text first to handle both JSON and non-JSON responses
     const responseText = await res.text()
-    console.log(`🔵 [StablesrailClient] ${method} ${path} - Raw response:`, responseText.substring(0, 1000))
+    if (this.debug) console.log(`🔵 [StablesrailClient] ${method} ${path} - Response length: ${responseText.length}`)
 
     // Check if response is HTML (likely an error page or API documentation)
     if (responseText.trim().startsWith('<!DOCTYPE') || responseText.trim().startsWith('<html')) {
@@ -136,7 +138,7 @@ export class StablesrailClient {
       throw new Error(`Failed to parse response as JSON: ${e instanceof Error ? e.message : String(e)}`)
     }
 
-    console.log(`🔵 [StablesrailClient] ${method} ${path} - Parsed JSON:`, JSON.stringify(json, null, 2))
+    if (this.debug) console.log(`🔵 [StablesrailClient] ${method} ${path} - Parsed JSON OK`)
 
     // Check HTTP status code - even if JSON parses, non-2xx might indicate error
     if (!res.ok && res.status >= 400) {
@@ -149,8 +151,7 @@ export class StablesrailClient {
     // Handle empty response
     if (!json || Object.keys(json).length === 0) {
       console.warn(`⚠️ [StablesrailClient] ${method} ${path} - Empty response from Stablesrail`)
-      // Return empty object as data to avoid undefined
-      return {} as T
+      throw new StablesrailError(`Empty response from Stablesrail API for ${method} ${path}`, 0, null)
     }
 
     // The API uses a status field to indicate success/error
@@ -162,22 +163,22 @@ export class StablesrailClient {
       throw new StablesrailError(err.message || "Stablesrail API error", err.response_code, err.data)
     }
 
-    // Handle various success status formats
-    if (status === "success" || status === "Success") {
+    // Handle various success status formats (status is already lowercased)
+    if (status === "success") {
       const ok = json as StablesrailSuccessResponse<T>
       const data = ok.data
       if (data === undefined) {
-        console.warn(`⚠️ [StablesrailClient] ${method} ${path} - Success status but data is undefined, returning empty object`)
-        return {} as T
+        console.warn(`⚠️ [StablesrailClient] ${method} ${path} - Success status but data is undefined`)
+        throw new StablesrailError(`Success response but data is undefined for ${method} ${path}`, 0, null)
       }
-      console.log(`🔵 [StablesrailClient] ${method} ${path} - Returning data:`, JSON.stringify(data, null, 2))
+      if (this.debug) console.log(`🔵 [StablesrailClient] ${method} ${path} - Success`)
       return data
     }
 
     // If response has data field but status doesn't match, try to extract data anyway
     if ((json as any)?.data !== undefined) {
       const data = (json as any).data
-      console.log(`🔵 [StablesrailClient] ${method} ${path} - Returning data from response (status: ${status}):`, JSON.stringify(data, null, 2))
+      if (this.debug) console.log(`🔵 [StablesrailClient] ${method} ${path} - Returning data (status: ${status})`)
       return data
     }
 
@@ -228,16 +229,6 @@ export class StablesrailClient {
 
   cngnOfframp(payload: { [key: string]: unknown }) {
     return this.request<unknown>("cngnofframp", { method: "POST", body: payload })
-  }
-
-  // Transaction status by correlationId (deprecated - use cngnRampStatus instead)
-  getCngnRequestStatus(query: { correlationId: string }) {
-    // Try POST method as GET might not be supported
-    return this.request<unknown>("cngnrequeststatus", { method: "POST", body: query })
-  }
-
-  withdrawAsset(payload: { [key: string]: unknown }) {
-    return this.request<unknown>("withdrawasset", { method: "POST", body: payload })
   }
 
   getWithdrawalHistory(query?: { page?: number; pageSize?: number }) {
@@ -311,42 +302,34 @@ export class StablesrailClient {
     return this.request<unknown>("updateassets", { method: "POST", body: payload })
   }
 
-  // Alias for getCngnRequestStatus (deprecated - use cngnRampStatus instead)
-  cngnRequestStatus(query: { correlationId: string }) {
-    return this.getCngnRequestStatus(query)
+  cngnOnrampStatus(payload: { requestId: string }) {
+    return this.request<unknown>("cngnonrampstatus", { method: "POST", body: payload })
   }
 
-  cngnRampStatus(payload: { walletAddress?: string; requestId?: string; [key: string]: unknown }) {
-    return this.request<unknown>("cngnrampstatus", { method: "POST", body: payload })
+  cngnOfframpStatus(payload: { requestId: string }) {
+    return this.request<unknown>("cngnofframpstatus", { method: "POST", body: payload })
   }
 
   listUserWallets(payload: { userId: string }) {
     return this.request<unknown>("listuserwallets", { method: "POST", body: payload })
   }
 
-  getBanksCode() {
-    return this.request<unknown>("getbankscode", { method: "GET" })
-  }
-
   tokenWithdrawal(payload: {
     userId: string;
-    toAddress: string;
+    internalWallet: string;
+    destinationWallet: string;
     amount: number;
-    asset: string;
-    destinationWallet?: string;
+    ticker: string;
     network?: string;
   }) {
     return this.request<{
-      transactionId: string;
-      correlationId: string;
-      status: string;
+      withdrawalId: string;
       from: string;
       to: string;
-      amount: number;
+      amount: string;
       ticker: string;
+      network: string;
       initiatedAt: string;
-      estimatedGasFee?: number;
-      platformFee?: number;
     }>("withdrawasset", { method: "POST", body: payload })
   }
 

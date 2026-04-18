@@ -1,4 +1,4 @@
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { createBrowserClient } from "@/lib/supabase/client"
 
 export type AccountBalance = {
   id: string
@@ -10,7 +10,7 @@ export type AccountBalance = {
 }
 
 export async function ensureAccountBalance(): Promise<AccountBalance | null> {
-  const supabase = createClientComponentClient()
+  const supabase = createBrowserClient()
 
   // Check if the user already has an account balance
   const { data: existingBalance, error: checkError } = await supabase.from("account_balances").select("*").maybeSingle()

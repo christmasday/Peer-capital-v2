@@ -1,5 +1,6 @@
 // Client-side authentication utilities
 import { getJWTFromStorage, parseJWT, checkTokenValidity, getUserIdFromToken } from "./jwt-client"
+import { createBrowserClient } from "@/lib/supabase/client"
 
 // Get the current user ID from client-side
 export async function getCurrentUserIdClient(): Promise<string | null> {
@@ -28,8 +29,7 @@ export async function getCurrentUserIdClient(): Promise<string | null> {
 
     // Try to get from Supabase session
     try {
-      const { createClientComponentClient } = await import("@supabase/auth-helpers-nextjs")
-      const supabase = createClientComponentClient()
+      const supabase = createBrowserClient()
       const {
         data: { session },
       } = await supabase.auth.getSession()

@@ -4,8 +4,8 @@ import { checkAuth } from "@/lib/auth-utils"
 
 export async function POST(req: NextRequest) {
   try {
-    // Check authentication
-    const authResult = await checkAuth()
+    // Use preventRedirect in API routes so unauthenticated requests return 401 JSON.
+    const authResult = await checkAuth(true)
     if (!authResult.authenticated || !authResult.userId) {
       console.error('🔴 [API] Authentication failed:', { authenticated: authResult.authenticated, userId: authResult.userId })
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -28,6 +28,10 @@ export async function POST(req: NextRequest) {
     console.log('🟢 [API] onboard-status result:', JSON.stringify(result, null, 2))
     return NextResponse.json({ success: true, data: result })
   } catch (error) {
+    if ((error as any)?.digest?.startsWith('NEXT_REDIRECT')) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     if (error instanceof StablesrailError) {
       console.error('🔴 [API] StablesrailError:', error.message, error.responseCode, error.details)
       return NextResponse.json(

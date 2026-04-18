@@ -41,6 +41,7 @@ export interface Database {
           bank_name?: string | null
           account_number?: string | null
           account_name?: string | null
+          sr_user_id?: string | null
           // Bio field
           bio?: string | null
           // Referral fields
@@ -89,6 +90,7 @@ export interface Database {
           bank_name?: string | null
           account_number?: string | null
           account_name?: string | null
+          sr_user_id?: string | null
           // Bio field
           bio?: string | null
           // Referral fields
@@ -135,6 +137,7 @@ export interface Database {
           bank_name?: string | null
           account_number?: string | null
           account_name?: string | null
+          sr_user_id?: string | null
           // Bio field
           bio?: string | null
           // Referral fields

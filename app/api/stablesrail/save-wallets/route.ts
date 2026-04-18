@@ -2,14 +2,20 @@ import { NextRequest, NextResponse } from "next/server"
 import { checkAuth } from "@/lib/auth-utils"
 import { createAdminClient } from "@/lib/supabase/admin"
 
+// Ethereum address format validation
+const ETH_ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/
+
 export async function POST(req: NextRequest) {
   try {
-    const auth = await checkAuth()
+    const auth = await checkAuth(true)
     if (!auth.authenticated || !auth.userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const body = await req.json()
+    const body = await req.json().catch(() => null)
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 })
+    }
     const wallets = body.wallets || []
 
     if (!Array.isArray(wallets) || wallets.length === 0) {
@@ -25,6 +31,11 @@ export async function POST(req: NextRequest) {
 
     if (!walletAddress) {
       return NextResponse.json({ error: "walletAddress is required in wallet data" }, { status: 400 })
+    }
+
+    // Validate Ethereum address format
+    if (!ETH_ADDRESS_RE.test(walletAddress)) {
+      return NextResponse.json({ error: "Invalid Ethereum wallet address format" }, { status: 400 })
     }
 
     // Prepare wallet record - store primary wallet in base_address
@@ -65,7 +76,6 @@ export async function POST(req: NextRequest) {
       data: {
         ...data,
         totalWallets: wallets.length,
-        walletsData: wallets // Include all wallet data for reference
       }
     })
   } catch (error) {

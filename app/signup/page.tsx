@@ -1,5 +1,7 @@
 import { SignupForm } from "@/components/signup-form"
 import { Logo } from "@/components/logo"
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 export default function SignupPage() {
@@ -16,13 +18,19 @@ export default function SignupPage() {
           <CardHeader className="space-y-1">
               <CardTitle className="text-2xl font-bold text-center md:text-left">Create your account</CardTitle>
               <CardDescription className="text-center md:text-left">
-                Verify your BVN and create your account in 3 simple steps
+                Enter your details and confirm your email in 2 simple steps
               </CardDescription>
           </CardHeader>
           <CardContent>
             <SignupForm />
           </CardContent>
         </Card>
+
+        <div className="mt-4 flex justify-center">
+          <Button asChild type="button" variant="ghost" className="text-blue-600 hover:text-blue-700">
+            <Link href="/login">Back to login</Link>
+          </Button>
+        </div>
         </div>
       </div>
 

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createStablesrailClient, StablesrailError } from "@/lib/stablesrail/client"
 import { checkAuth } from "@/lib/auth-utils"
+import { createAdminClient } from "@/lib/supabase/admin"
+import { cngnOfframpSchema } from "@/lib/stablesrail/schemas"
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,42 +16,50 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 })
     }
 
-    // Validate required fields
-    const { userId, amount, accountNumber, bankCode, ticker  } = body
+    // Fetch the user's StablesRail user ID from their profile
+    const admin = createAdminClient()
+    const { data: profile, error: profileError } = await admin
+      .from("profiles")
+      .select("sr_user_id")
+      .eq("id", auth.userId)
+      .maybeSingle()
 
-    if (!userId) {
-      return NextResponse.json({ error: "userId is required" }, { status: 400 })
+    if (profileError && profileError.code !== 'PGRST116') {
+      console.error("Error fetching user profile:", profileError)
+      return NextResponse.json({ error: "Failed to fetch user profile" }, { status: 500 })
     }
 
-    if (!amount || typeof amount !== "number" || amount <= 0) {
-      return NextResponse.json({ error: "amount must be a positive number" }, { status: 400 })
+    const srUserId = profile?.sr_user_id
+    if (!srUserId) {
+      return NextResponse.json({ 
+        error: "StablesRail account not found. Please complete your account setup first." 
+      }, { status: 400 })
     }
 
-    if (!ticker || typeof ticker !== "string") {
-      return NextResponse.json({ error: "ticker is required" }, { status: 400 })
+    // Build the offramp payload with the StablesRail user ID
+    // Required fields: userId, amount, accountNumber, bankCode, ticker
+    const offrampPayload = {
+      userId: srUserId, // Use the StablesRail user ID from profile
+      amount: body.amount,
+      accountNumber: body.accountNumber,
+      bankCode: body.bankCode,
+      ticker: body.ticker || 'CNGN', // Default to CNGN if not provided
     }
 
-    if (!bankCode || typeof bankCode !== "string") {
-      return NextResponse.json({ error: "bankCode is required" }, { status: 400 })
+    // Validate request using Zod schema
+    const parseResult = cngnOfframpSchema.safeParse(offrampPayload)
+    if (!parseResult.success) {
+      const fieldErrors = parseResult.error.flatten().fieldErrors
+      return NextResponse.json({ 
+        error: "Validation failed", 
+        fieldErrors 
+      }, { status: 400 })
     }
 
-    if (!accountNumber || typeof accountNumber !== "string") {
-      return NextResponse.json({ error: "accountNumber is required" }, { status: 400 })
-    }
-
-  
-
-    // Prepare payload for Stablesrail
-    const payload = {
-      userId,
-      amount,
-      accountNumber,
-      bankCode,
-      ticker: ticker || "CNGN",
-    }
+    const validatedPayload = parseResult.data
 
     const stablesrail = createStablesrailClient()
-    const result = await stablesrail.cngnOfframp(payload)
+    const result = await stablesrail.cngnOfframp(validatedPayload)
     
     return NextResponse.json({ success: true, data: result })
   } catch (error) {
