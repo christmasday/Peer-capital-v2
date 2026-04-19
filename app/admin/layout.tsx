@@ -7,6 +7,7 @@ import Image from "next/image"
 import { 
   BarChart3, 
   Users, 
+  ClipboardList,
   Globe, 
   Settings, 
   Key, 
@@ -33,6 +34,7 @@ interface AdminLayoutProps {
 
 const navigation = [
   { name: "Dashboard", href: "/admin/dashboard", icon: BarChart3 },
+  { name: "Case Management", href: "/admin/cases", icon: ClipboardList },
   { name: "Users", href: "/admin/users", icon: Users },
   { name: "Onramp Requests", href: "/admin/onramp-requests", icon: ArrowUpRight },
   { name: "Offramp Requests", href: "/admin/offramp-requests", icon: ArrowDownRight },

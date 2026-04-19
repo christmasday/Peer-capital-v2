@@ -1,12 +1,14 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Link from "next/link"
 import { 
   Users, 
   UserCheck, 
   Activity, 
   TrendingUp,
   BarChart3,
+  ClipboardList,
   Clock,
   Calendar,
   RefreshCw
@@ -245,21 +247,29 @@ export default function AdminDashboard() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Button variant="outline" className="h-20 flex flex-col items-center justify-center">
+            <Button variant="outline" asChild className="h-20 flex flex-col items-center justify-center">
+              <Link href="/admin/users">
               <Users className="h-6 w-6 mb-2" />
               <span className="text-sm">Manage Users</span>
+              </Link>
             </Button>
-            <Button variant="outline" className="h-20 flex flex-col items-center justify-center">
+            <Button variant="outline" asChild className="h-20 flex flex-col items-center justify-center">
+              <Link href="/admin/cases">
+              <ClipboardList className="h-6 w-6 mb-2" />
+              <span className="text-sm">Case Management</span>
+              </Link>
+            </Button>
+            <Button variant="outline" asChild className="h-20 flex flex-col items-center justify-center">
+              <Link href="/admin/offramp-requests">
               <Activity className="h-6 w-6 mb-2" />
-              <span className="text-sm">View Transactions</span>
+              <span className="text-sm">Offramp Requests</span>
+              </Link>
             </Button>
-            <Button variant="outline" className="h-20 flex flex-col items-center justify-center">
+            <Button variant="outline" asChild className="h-20 flex flex-col items-center justify-center">
+              <Link href="/admin/onramp-requests">
               <BarChart3 className="h-6 w-6 mb-2" />
-              <span className="text-sm">Analytics</span>
-            </Button>
-            <Button variant="outline" className="h-20 flex flex-col items-center justify-center">
-              <TrendingUp className="h-6 w-6 mb-2" />
-              <span className="text-sm">Reports</span>
+              <span className="text-sm">Onramp Requests</span>
+              </Link>
             </Button>
           </div>
         </CardContent>
