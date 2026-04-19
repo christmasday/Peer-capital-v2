@@ -11,6 +11,7 @@ import { Logo } from "@/components/logo"
 import { Button } from "@/components/ui/button"
 import { UserSearchDialog } from "@/components/search/user-search-dialog"
 import { getUnreadNotificationsCount } from "@/lib/actions/notifications"
+import { useNotificationRealtime } from "@/hooks/use-notification-realtime"
 
 interface ResponsiveHeaderProps {
   userName?: string
@@ -24,26 +25,41 @@ export function ResponsiveHeader({ userName, userImage }: ResponsiveHeaderProps)
   const [fetchError, setFetchError] = useState(false)
   const pathname = usePathname()
 
-  useEffect(() => {
-    const fetchUnreadCounts = async () => {
+  const fetchUnreadCounts = async () => {
+    try {
+      setFetchError(false)
+      let notificationsCount = 0
       try {
-        setFetchError(false)
-        let notificationsCount = 0
-        try {
-          const notificationsResult = await getUnreadNotificationsCount()
-          notificationsCount = notificationsResult.count || 0
-        } catch (error) {}
-        setUnreadNotifications(notificationsCount)
-      } catch (error) {
-        setFetchError(true)
-      }
+        const notificationsResult = await getUnreadNotificationsCount()
+        notificationsCount = notificationsResult.count || 0
+      } catch (error) {}
+      setUnreadNotifications(notificationsCount)
+    } catch (error) {
+      setFetchError(true)
     }
-    fetchUnreadCounts()
+  }
+
+  const { isRealtimeConnected } = useNotificationRealtime(() => {
+    if (!fetchError) {
+      void fetchUnreadCounts()
+    }
+  })
+
+  useEffect(() => {
+    void fetchUnreadCounts()
+  }, [])
+
+  useEffect(() => {
+    if (isRealtimeConnected) {
+      return
+    }
+
     const interval = setInterval(() => {
       if (!fetchError) fetchUnreadCounts()
-    }, 30000)
+    }, 300000)
+
     return () => clearInterval(interval)
-  }, [fetchError])
+  }, [fetchError, isRealtimeConnected])
 
   const navItems = [
     { href: "/home", label: "Home", icon: Home },

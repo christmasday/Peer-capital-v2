@@ -272,7 +272,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
                   </div>
 
                   <Button variant="outline" className="w-full mt-4" asChild>
-                    <Link href="/profile/edit">Edit details</Link>
+                    <Link href="/profile">Edit details</Link>
                   </Button>
                 </CardContent>
               </Card>

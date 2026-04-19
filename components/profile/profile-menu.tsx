@@ -21,8 +21,8 @@ export function ProfileMenu({ userId }: ProfileMenuProps) {
     },
     {
       name: "Edit Profile",
-      href: "/profile/edit",
-      active: pathname === "/profile/edit",
+      href: "/profile",
+      active: pathname === `/profile/${userId}` || pathname === "/profile",
       icon: <FileText className="h-4 w-4" />,
     },
     {

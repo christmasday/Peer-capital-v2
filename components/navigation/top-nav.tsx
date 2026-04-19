@@ -26,6 +26,7 @@ import { getUnreadMessagesCount } from "@/lib/actions/messages"
 import { getUnreadNotificationsCount } from "@/lib/actions/notifications"
 import { NotificationsDropdown } from "@/components/notifications/notifications-dropdown"
 import { getConversations } from "@/lib/actions/messages"
+import { useNotificationRealtime } from "@/hooks/use-notification-realtime"
 
 interface TopNavProps {
   userName?: string // This should be the full name
@@ -158,7 +159,7 @@ export function TopNav({ userName, userImage, hideSearch }: TopNavProps) {
 
     fetchUnreadCounts()
 
-    // Poll for updates every 30 seconds, but only if the initial fetch was successful
+    // Poll for updates every 30 seconds.
     const interval = setInterval(() => {
       if (!fetchError) {
         fetchUnreadCounts()
@@ -167,6 +168,18 @@ export function TopNav({ userName, userImage, hideSearch }: TopNavProps) {
 
     return () => clearInterval(interval)
   }, [fetchError])
+
+  useNotificationRealtime(() => {
+    if (!fetchError) {
+      void (async () => {
+        try {
+          const notificationsResult = await getUnreadNotificationsCount()
+          setUnreadNotifications(notificationsResult.count || 0)
+        } catch {
+        }
+      })()
+    }
+  })
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white">

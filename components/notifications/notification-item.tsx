@@ -175,11 +175,11 @@ export function NotificationItem({ notification, onUpdate }: NotificationItemPro
       case "virtual_account_funded":
         return "/profile/virtual-account"
       case "profile_updated":
-        return "/profile/edit"
+        return "/profile"
       case "verification_started":
-        return "/profile/edit"
+        return "/profile"
       case "verification_completed":
-        return "/profile/edit"
+        return "/profile"
       case "account_created":
         return "/profile"
       case "security_alert":
