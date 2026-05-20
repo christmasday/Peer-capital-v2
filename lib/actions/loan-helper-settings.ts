@@ -106,6 +106,23 @@ export async function updateLoanHelperSettings(
         console.error("Error upserting loan_helpers:", upsertError)
         return { success: false, error: "Failed to upsert loan_helpers: " + upsertError.message }
       }
+      // Notify all users that this user updated/created loan offers
+      try {
+        const { createNotificationsForUsers } = await import("@/lib/actions/notifications")
+        // Fetch all user ids from profiles
+        const { data: allProfiles, error: profilesError } = await adminClient.from("profiles").select("id")
+        if (!profilesError && allProfiles && allProfiles.length > 0) {
+          const userIds = allProfiles.map((p: any) => p.id)
+          await createNotificationsForUsers({
+            userIds,
+            actorId: userId,
+            type: "loan_helper_set",
+            data: { userId, loanAmount, repaymentTime, repaymentUnit },
+          })
+        }
+      } catch (notifyErr) {
+        console.error("Failed to broadcast loan helper set notification:", notifyErr)
+      }
     } else {
       const { error: insertError } = await adminClient.from("loan_helper_settings").insert(settingsData)
 
@@ -136,6 +153,22 @@ export async function updateLoanHelperSettings(
       if (upsertError) {
         console.error("Error upserting loan_helpers:", upsertError)
         return { success: false, error: "Failed to upsert loan_helpers: " + upsertError.message }
+      }
+      // Notify all users that this user created loan offers
+      try {
+        const { createNotificationsForUsers } = await import("@/lib/actions/notifications")
+        const { data: allProfiles, error: profilesError } = await adminClient.from("profiles").select("id")
+        if (!profilesError && allProfiles && allProfiles.length > 0) {
+          const userIds = allProfiles.map((p: any) => p.id)
+          await createNotificationsForUsers({
+            userIds,
+            actorId: userId,
+            type: "loan_helper_set",
+            data: { userId, loanAmount, repaymentTime, repaymentUnit },
+          })
+        }
+      } catch (notifyErr) {
+        console.error("Failed to broadcast loan helper set notification:", notifyErr)
       }
     }
 

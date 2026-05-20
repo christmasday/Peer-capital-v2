@@ -219,7 +219,7 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
     { id: "lending-licence", name: "Lending Licence", icon: Briefcase },
     { id: "wallets", name: "Wallets", icon: Wallet },
     { id: "bank", name: "Repayment Account", icon: Briefcase },
-    { id: "loan-helper", name: "Loan helper settings", icon: Briefcase },
+    { id: "loan-helper", name: "Loan Goal Settings", icon: Briefcase },
   ]
 
   useEffect(() => {
@@ -3033,7 +3033,7 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
         {activeSection === "loan-helper" && (
           <div className={`space-y-8 ${!profile.lending_license_url && loanAmount ? 'opacity-50 pointer-events-none select-none' : ''}`}>
             <h2 className="text-xl font-medium flex items-center justify-between">
-              Loan Helper Settings
+              Loan Goal Settings
               {isCurrentUser && !isEditingLoanHelper && profile.lending_license_url && (
                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setIsEditingLoanHelper(true)}>
                   <Edit className="h-4 w-4" />

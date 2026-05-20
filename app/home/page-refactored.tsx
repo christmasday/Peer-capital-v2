@@ -80,6 +80,8 @@ export default async function HomePage() {
             loanIssued="80"
             amountIssued="N50M"
             profileImage="/placeholder.svg?height=100&width=100"
+            repaymentTime={12}
+            repaymentUnit="months"
           />
 
           <HelperCard
@@ -90,6 +92,8 @@ export default async function HomePage() {
             loanIssued="60"
             amountIssued="N35M"
             profileImage="/placeholder.svg?height=100&width=100"
+            repaymentTime={6}
+            repaymentUnit="months"
           />
         </div>
       </main>

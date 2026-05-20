@@ -1,6 +1,6 @@
 "use client"
 
-import { Bell, Menu, Home, Wallet, BarChart2, User, LogOut, Search, MessageCircleQuestion, Inbox, X } from "lucide-react"
+import { Bell, Menu, Home, Wallet, BarChart2, User, LogOut, Search, MessageCircleQuestion, X } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { useState, useEffect } from "react"
@@ -65,7 +65,6 @@ export function ResponsiveHeader({ userName, userImage }: ResponsiveHeaderProps)
     { href: "/home", label: "Home", icon: Home },
     { href: "/loans", label: "Loans", icon: Wallet },
     { href: "/transactions", label: "Transactions", icon: BarChart2 },
-    { href: "/messages", label: "Messages", icon: Inbox },
     { href: "/notifications", label: "Notifications", icon: Bell, badge: unreadNotifications },
     { href: "/profile", label: "Profile", icon: User },
     { href: "/faq", label: "FAQ", icon: MessageCircleQuestion },

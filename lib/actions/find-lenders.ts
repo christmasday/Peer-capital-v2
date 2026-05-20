@@ -261,6 +261,23 @@ export async function findLenders({ loanAmount, loanDuration }: LenderSearchPara
       return { lenders: [], error: errorMessage }
     }
 
+    // Notify followers who may be interested in this search
+    try {
+      const { createNotificationsForUsers } = await import("@/lib/actions/notifications")
+      // For simplicity, notify all profiles (could be scoped to followers or preferences)
+      const { data: allProfiles } = await adminClient.from("profiles").select("id")
+      if (allProfiles && allProfiles.length > 0) {
+        const userIds = allProfiles.map((p: any) => p.id)
+        await createNotificationsForUsers({
+          userIds,
+          type: "loan_search",
+          data: { loanAmount, loanDuration },
+        })
+      }
+    } catch (notifyErr) {
+      // non-fatal
+    }
+
     return { lenders: lenders, error: null }
   } catch (error) {
     return { lenders: [], error: "An unexpected error occurred" }

@@ -157,8 +157,8 @@ export function NotificationItem({ notification, onUpdate }: NotificationItemPro
           : "#"
       case "message":
         return notification.data?.senderId || notification.actor_id
-          ? `/messages/${notification.data?.senderId || notification.actor_id}`
-          : "/messages"
+          ? `/profile/${notification.data?.senderId || notification.actor_id}`
+          : "/support-inbox"
       case "loan_request":
         // Go to profile page, loan-requests tab, highlight the new request
         return notification.reference_id

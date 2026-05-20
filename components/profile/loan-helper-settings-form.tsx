@@ -33,8 +33,8 @@ export function LoanHelperSettingsForm({ userId, onSave, onCancel, lendingLicens
   const [success, setSuccess] = useState(false)
   const { toast } = useToast()
   const [isHelperEnabled, setIsHelperEnabled] = useState(false)
+  const [accountBalance, setAccountBalance] = useState<number | null>(null)
   const isDisabled = !lendingLicenseUrl;
-  const [accountBalance, setAccountBalance] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -110,8 +110,8 @@ export function LoanHelperSettingsForm({ userId, onSave, onCancel, lendingLicens
         setError(error)
         } else {
           toast({
-            title: "Helper Settings Updated",
-            description: "Your helper settings have been updated successfully.",
+            title: "Loan Goal Settings Updated",
+            description: "Your loan goal settings have been updated successfully.",
           })
         }
       } else {
@@ -119,8 +119,8 @@ export function LoanHelperSettingsForm({ userId, onSave, onCancel, lendingLicens
         await fetch(`/api/loan-helper-status?userId=${userId}`, { method: "DELETE" })
         if (onSave) onSave()
         toast({
-          title: "Helper Disabled",
-          description: "You are no longer listed as a loan helper.",
+          title: "Loan Goal Disabled",
+          description: "You are no longer listed as a loan goal.",
         })
       }
     } catch (e: any) {
@@ -142,13 +142,13 @@ export function LoanHelperSettingsForm({ userId, onSave, onCancel, lendingLicens
         {isDisabled && (
           <Alert variant="default">
             <AlertDescription>
-              You must upload a valid lending license to your profile before you can enable or edit loan helper settings.
+              You must upload a valid lending license to your profile before you can enable or edit loan goal settings.
             </AlertDescription>
           </Alert>
         )}
         <div className="flex items-center gap-3 mb-2">
           <Switch checked={isHelperEnabled} onCheckedChange={setIsHelperEnabled} id="helper-enabled-switch" disabled={isDisabled || accountBalance === 0} />
-          <Label htmlFor="helper-enabled-switch">Enable Loan Helper</Label>
+          <Label htmlFor="helper-enabled-switch">Enable Loan Goal</Label>
         </div>
         {accountBalance === 0 && (
           <Alert variant="default">

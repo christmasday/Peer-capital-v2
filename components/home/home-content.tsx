@@ -201,7 +201,7 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
     }
   }
 
-  // Reset search results and show all helpers
+  // Reset search results and show all lenders
   const handleResetSearch = () => {
     setSearchResults(null)
     setSearchError(null)
@@ -851,11 +851,11 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
         <div className="mb-8">
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-5">
             <h2 className="text-xl font-bold text-gray-900 mb-4 md:mb-0">
-              {hasSearched ? "Search Results" : "Loan Offers from People You Follow"}
+              {hasSearched ? "Search Results" : "loan offers you may like"}
             </h2>
             {hasSearched && (
               <Button variant="outline" onClick={handleResetSearch} className="text-sm py-2 h-auto">
-                Show All Helpers
+                Show All Lenders
               </Button>
             )}
           </div>
@@ -882,7 +882,7 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
                 </p>
                 <div className="flex gap-3">
                   <Button size="sm" className="text-sm py-2 h-auto" onClick={handleResetSearch}>
-                    Show All Helpers
+                    Show All Lenders
                   </Button>
                   <Button
                     variant="outline"
@@ -924,9 +924,9 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
                 <div className="bg-blue-50 p-3 rounded-full mb-3">
                   <TrendingUp className="h-6 w-6 text-blue-500" />
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">No loan helpers available</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">No lenders available</h3>
                 <p className="text-sm text-gray-500 max-w-md mx-auto mb-4">
-                  We couldn't find any loan helpers at the moment. Please check back later.
+                  We couldn't find any lenders at the moment. Please check back later.
                 </p>
                 <Button size="sm" className="text-sm py-2 h-auto" onClick={handleResetSearch}>
                   Refresh
