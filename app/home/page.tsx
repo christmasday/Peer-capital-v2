@@ -2,7 +2,7 @@ import { HomeContent } from "@/components/home/home-content"
 import { getUserProfile } from "@/lib/actions/auth"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { checkAuth } from "@/lib/auth-utils"
-import { getMaxLoanAmountByLender, getTotalAmountGivenByLender } from "@/lib/actions/find-lenders"
+import { getMaxLoanAmountByLender, getTotalAmountGivenByLender } from "@/lib/actions/lender-stats.server"
 // Removed Paystack virtual account integration
 
 // Force dynamic rendering to prevent static generation issues
