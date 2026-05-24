@@ -442,3 +442,46 @@ export async function getFollowing(userId: string, page = 1, limit = 10) {
     return { error: "An unexpected error occurred" }
   }
 }
+
+// Get list of blocked user ids for current user (both users they've blocked and users who blocked them)
+export async function getBlockedUsers() {
+  try {
+    const tableExists = await checkTableExists()
+    if (!tableExists) return { blocked: [] }
+
+    const currentUserId = await getCurrentUserId()
+    if (!currentUserId) return { blocked: [] }
+
+    const adminClient = createAdminClient()
+
+    // Users that current user has blocked (follower_id = currentUserId, status = 'blocked')
+    const { data: blockedByMe, error: err1 } = await adminClient
+      .from("user_connections")
+      .select("following_id")
+      .eq("follower_id", currentUserId)
+      .eq("status", "blocked")
+
+    // Users that have blocked current user (following_id = currentUserId, status = 'blocked')
+    const { data: blockedMe, error: err2 } = await adminClient
+      .from("user_connections")
+      .select("follower_id")
+      .eq("following_id", currentUserId)
+      .eq("status", "blocked")
+
+    if (err1 || err2) {
+      return { blocked: [] }
+    }
+
+    const ids = new Set<string>()
+    blockedByMe?.forEach((row: any) => {
+      if (row.following_id) ids.add(row.following_id)
+    })
+    blockedMe?.forEach((row: any) => {
+      if (row.follower_id) ids.add(row.follower_id)
+    })
+
+    return { blocked: Array.from(ids) }
+  } catch (error) {
+    return { blocked: [] }
+  }
+}
