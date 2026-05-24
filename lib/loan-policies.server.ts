@@ -3,7 +3,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "./supabase/database.types"
 import { createAdminClient } from "./supabase/admin"
-import { getTotalAmountGivenByLender } from "./actions/find-lenders"
+import { getTotalAmountGivenByLender } from "./actions/lender-stats.server"
 import { durationToDays } from "./loan-limits"
 
 type PolicyRow = {

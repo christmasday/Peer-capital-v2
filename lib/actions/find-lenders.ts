@@ -3,6 +3,8 @@
 import { createAdminClient } from "@/lib/supabase/admin"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/lib/supabase/database.types"
+import { getBlockedUsers } from "@/lib/actions/connections"
+import { durationToDays } from "@/lib/loan-limits"
 
 export type LenderSearchParams = {
   loanAmount?: number
@@ -189,32 +191,8 @@ export async function findLenders({ loanAmount, loanDuration, loanDurationUnit =
       return { lenders: [], error: "Failed to load lender profiles", hasMore: false }
     }
 
-    // Now, for each lender setting, get the user profile information and loan statistics
-    const lenders: LenderResult[] = []
-
-    for (const helper of finalHelpers) {
-      try {
-        // Use helper and joined settings
-        const settings = helper.loan_helper_settings || {}
-        const userId = helper.user_id
-        const name = helper.name
-        const profileImageUrl = helper.profile_image_url
-        const interestRate = helper.interest_rate
-        const maxLoanAmount = helper.max_loan_amount
-        const loansIssued = helper.loans_issued
-        const amountIssued = helper.amount_issued
-        const repaymentTime = settings.repayment_time
-        const repaymentUnit = settings.repayment_unit
-
-        // Get user profile information
-        const { data: profileDataArray, error: profileError } = await adminClient
-          .from("profiles")
-          .select(`first_name, last_name, profile_picture_url`)
-          .eq("id", userId)
-
-        if (profileError) {
-          continue
-        }
+    const profileMap = new Map<string, ProfileRow>((profilesResult.data || []).map((profile) => [profile.id, profile as ProfileRow]))
+    const helperMap = new Map<string, LoanHelperRow>((helpersResult.data || []).map((helper) => [helper.user_id, helper as LoanHelperRow]))
 
     const candidates: SearchCandidate[] = []
 
@@ -329,29 +307,4 @@ export async function findLenders({ loanAmount, loanDuration, loanDurationUnit =
   } catch (error) {
     return { lenders: [], error: "An unexpected error occurred", hasMore: false }
   }
-}
-
-// Returns the maximum loan amount ever offered by a lender (all loans in history)
-export async function getMaxLoanAmountByLender(lenderId: string): Promise<number> {
-  const adminClient = createAdminClient() as SupabaseClient<Database>
-  const { data, error } = await adminClient
-    .from("loan_history")
-    .select("amount")
-    .eq("lender_id", lenderId)
-    .order("amount", { ascending: false })
-    .limit(1)
-  if (error || !data || data.length === 0) return 0
-  return data[0].amount || 0
-}
-
-// Returns the total amount of money given in loans by a lender (approved or completed loans)
-export async function getTotalAmountGivenByLender(lenderId: string): Promise<number> {
-  const adminClient = createAdminClient() as SupabaseClient<Database>
-  const { data, error } = await adminClient
-    .from("loan_history")
-    .select("amount")
-    .eq("lender_id", lenderId)
-    .in("status", ["approved", "repaid"]) // Only count successful loans
-  if (error || !data) return 0
-  return data.reduce((sum: number, row: { amount: number }) => sum + (row.amount || 0), 0)
 }
