@@ -15,8 +15,8 @@ export default async function TransactionsPage() {
     <MainLayout userName={fullName} userImage={userProfile.profile.profile_picture_url || ""}>
       <div className="container mx-auto py-8">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Transaction History</h1>
-          <p className="text-sm text-gray-500 mt-1">All your account transactions in one place.</p>
+          <h1 className="text-2xl font-bold text-gray-900">Crypto Wallet History</h1>
+          <p className="text-sm text-gray-500 mt-1">All your crypto wallet funding, swaps, and offramp activity in one place.</p>
         </div>
         <TransactionsList />
       </div>

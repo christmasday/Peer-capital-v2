@@ -157,8 +157,8 @@ export function NotificationItem({ notification, onUpdate }: NotificationItemPro
           : "#"
       case "message":
         return notification.data?.senderId || notification.actor_id
-          ? `/messages/${notification.data?.senderId || notification.actor_id}`
-          : "/messages"
+          ? `/profile/${notification.data?.senderId || notification.actor_id}`
+          : "/support-inbox"
       case "loan_request":
         // Go to profile page, loan-requests tab, highlight the new request
         return notification.reference_id
@@ -175,11 +175,11 @@ export function NotificationItem({ notification, onUpdate }: NotificationItemPro
       case "virtual_account_funded":
         return "/profile/virtual-account"
       case "profile_updated":
-        return "/profile/edit"
+        return "/profile"
       case "verification_started":
-        return "/profile/edit"
+        return "/profile"
       case "verification_completed":
-        return "/profile/edit"
+        return "/profile"
       case "account_created":
         return "/profile"
       case "security_alert":

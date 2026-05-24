@@ -21,8 +21,8 @@ export function ProfileMenu({ userId }: ProfileMenuProps) {
     },
     {
       name: "Edit Profile",
-      href: "/profile/edit",
-      active: pathname === "/profile/edit",
+      href: "/profile",
+      active: pathname === `/profile/${userId}` || pathname === "/profile",
       icon: <FileText className="h-4 w-4" />,
     },
     {
@@ -38,7 +38,7 @@ export function ProfileMenu({ userId }: ProfileMenuProps) {
       icon: <Bell className="h-4 w-4" />,
     },
     {
-      name: "Loan Helper Settings",
+      name: "Loan Goal Settings",
       href: "/profile/loan-helper",
       active: pathname === "/profile/loan-helper",
       icon: <Wallet className="h-4 w-4" />,

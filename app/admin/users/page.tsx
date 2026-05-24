@@ -45,6 +45,8 @@ interface User {
   is_staff: boolean
   bvn_verified: boolean
   sr_user_id: string | null
+  suspended?: boolean
+  banned_until?: string | null
 }
 
 interface Pagination {
@@ -159,6 +161,9 @@ export default function UserManagement() {
   }, [pagination.page])
 
   const getStatusBadge = (user: User) => {
+    if (user.suspended) {
+      return <Badge variant="secondary" className="bg-red-100 text-red-800">Suspended</Badge>
+    }
     if (user.is_staff) {
       return <Badge variant="secondary" className="bg-blue-100 text-blue-800">Staff</Badge>
     }

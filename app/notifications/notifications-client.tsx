@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Bell, CheckCheck } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
+import { useNotificationRealtime } from "@/hooks/use-notification-realtime"
 
 export function NotificationsClient() {
   const [notifications, setNotifications] = useState<any[]>([])
@@ -47,6 +48,10 @@ export function NotificationsClient() {
   useEffect(() => {
     fetchNotifications(activeTab === "all")
   }, [activeTab])
+
+  useNotificationRealtime(() => {
+    fetchNotifications(activeTab === "all")
+  })
 
   const handleMarkAllAsRead = async () => {
     try {

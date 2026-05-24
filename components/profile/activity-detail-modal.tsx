@@ -226,7 +226,7 @@ export function ActivityDetailModal({ activity, isOpen, onClose }: ActivityDetai
               </Button>
             ) : activity.type === "message" ? (
               <Button asChild>
-                <Link href={activity.userId ? `/messages/${activity.userId}` : "/messages"}>
+                <Link href={activity.userId ? `/profile/${activity.userId}` : "/support-inbox"}>
                   <MessageCircle className="h-4 w-4 mr-1" /> View Message
                 </Link>
               </Button>

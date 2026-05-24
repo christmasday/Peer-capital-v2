@@ -28,6 +28,8 @@ export type NotificationType =
   | "account_created"
   | "security_alert"
   | "review" // Added review notification type
+  | "loan_helper_set"
+  | "loan_search"
 
 export interface Notification {
   id: string
@@ -291,6 +293,31 @@ export async function createNotification({
     }
 
     return { success: true, notification }
+  } catch (error) {
+    return { success: false, error }
+  }
+}
+
+// Create notifications for multiple users efficiently
+export async function createNotificationsForUsers({ userIds, actorId, type, data = {} }: { userIds: string[]; actorId?: string; type: NotificationType; data?: NotificationData }) {
+  try {
+    if (!userIds || userIds.length === 0) return { success: true }
+    const adminClient = createAdminClient()
+    const now = new Date().toISOString()
+    const rows = userIds.map((uid) => ({
+      id: uuidv4(),
+      user_id: uid,
+      actor_id: null,
+      type,
+      data: { ...data, ...(actorId ? { original_actor_id: actorId } : {}) },
+      is_read: false,
+      created_at: now,
+      updated_at: now,
+    }))
+
+    const { error } = await adminClient.from("notifications").insert(rows)
+    if (error) return { success: false, error }
+    return { success: true }
   } catch (error) {
     return { success: false, error }
   }

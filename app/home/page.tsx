@@ -2,7 +2,7 @@ import { HomeContent } from "@/components/home/home-content"
 import { getUserProfile } from "@/lib/actions/auth"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { checkAuth } from "@/lib/auth-utils"
-import { getMaxLoanAmountByLender, getTotalAmountGivenByLender } from "@/lib/actions/find-lenders"
+import { getMaxLoanAmountByLender, getTotalAmountGivenByLender } from "@/lib/actions/lender-stats.server"
 // Removed Paystack virtual account integration
 
 // Force dynamic rendering to prevent static generation issues
@@ -62,8 +62,11 @@ export default async function HomePage() {
                 profile_image_url: profile?.profile_picture_url || null,
                 rating: 4.5, // Optionally fetch
                 loanAmount: offer.loan_amount,
+                maxLoanAmount: offer.loan_amount,
                 repaymentTime: offer.repayment_time,
+                repayment_time: offer.repayment_time,
                 repaymentUnit: offer.repayment_unit,
+                repayment_unit: offer.repayment_unit,
               }
             })
           )

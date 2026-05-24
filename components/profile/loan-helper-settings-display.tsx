@@ -66,7 +66,7 @@ export function LoanHelperSettingsDisplay({ userId, lendingLicenseUrl }: LoanHel
       <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800">
         <div className="flex gap-2 items-center text-amber-600">
           <AlertTriangle className="h-5 w-5" />
-          <h3 className="font-medium">Error loading helper settings</h3>
+          <h3 className="font-medium">Error loading loan goal settings</h3>
         </div>
         <p className="mt-2 text-sm">{error}</p>
       </div>
@@ -82,10 +82,10 @@ export function LoanHelperSettingsDisplay({ userId, lendingLicenseUrl }: LoanHel
           </div>
           <h3 className="text-lg font-medium text-gray-900 mb-1">No Settings Configured</h3>
           <p className="text-gray-500 max-w-md mb-4">
-            You haven't configured your helper settings yet. Configure your settings to become a lender on the platform.
+            You haven't configured your loan goal settings yet. Configure your settings to become a lender on the platform.
           </p>
           <a href="/profile/loan-helper" className="text-blue-600 hover:text-blue-800 font-medium">
-            Configure Settings
+            Configure Loan Goal Settings
           </a>
         </div>
       </div>

@@ -300,7 +300,7 @@ export default async function AccountStatusPage() {
                           </div>
                           {!isCompleted && item.required && (
                             <Button variant="outline" size="sm" asChild>
-                              <Link href="/profile/edit">Complete</Link>
+                              <Link href="/profile">Complete</Link>
                             </Button>
                           )}
                         </div>
@@ -316,7 +316,7 @@ export default async function AccountStatusPage() {
         {/* Action Buttons */}
         <div className="mt-8 flex gap-4">
           <Button asChild>
-            <Link href="/profile/edit">Complete Profile</Link>
+            <Link href="/profile">Complete Profile</Link>
           </Button>
           <Button variant="outline" asChild>
             <Link href="/faq">Help Center</Link>
