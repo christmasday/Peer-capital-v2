@@ -3,6 +3,8 @@
 import { createAdminClient } from "@/lib/supabase/admin"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/lib/supabase/database.types"
+import { getBlockedUsers } from "@/lib/actions/connections"
+import { durationToDays } from "@/lib/loan-limits"
 
 export type LenderSearchParams = {
   loanAmount?: number
@@ -189,32 +191,8 @@ export async function findLenders({ loanAmount, loanDuration, loanDurationUnit =
       return { lenders: [], error: "Failed to load lender profiles", hasMore: false }
     }
 
-    // Now, for each lender setting, get the user profile information and loan statistics
-    const lenders: LenderResult[] = []
-
-    for (const helper of finalHelpers) {
-      try {
-        // Use helper and joined settings
-        const settings = helper.loan_helper_settings || {}
-        const userId = helper.user_id
-        const name = helper.name
-        const profileImageUrl = helper.profile_image_url
-        const interestRate = helper.interest_rate
-        const maxLoanAmount = helper.max_loan_amount
-        const loansIssued = helper.loans_issued
-        const amountIssued = helper.amount_issued
-        const repaymentTime = settings.repayment_time
-        const repaymentUnit = settings.repayment_unit
-
-        // Get user profile information
-        const { data: profileDataArray, error: profileError } = await adminClient
-          .from("profiles")
-          .select(`first_name, last_name, profile_picture_url`)
-          .eq("id", userId)
-
-        if (profileError) {
-          continue
-        }
+    const profileMap = new Map<string, ProfileRow>((profilesResult.data || []).map((profile) => [profile.id, profile as ProfileRow]))
+    const helperMap = new Map<string, LoanHelperRow>((helpersResult.data || []).map((helper) => [helper.user_id, helper as LoanHelperRow]))
 
     const candidates: SearchCandidate[] = []
 
@@ -330,5 +308,3 @@ export async function findLenders({ loanAmount, loanDuration, loanDurationUnit =
     return { lenders: [], error: "An unexpected error occurred", hasMore: false }
   }
 }
-
-// Lender stats helpers moved to lib/actions/lender-stats.server.ts
