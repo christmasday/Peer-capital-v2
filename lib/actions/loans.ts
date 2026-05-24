@@ -8,6 +8,8 @@ import { getJWTFromCookies, verifyJWT } from "@/lib/jwt"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/lib/supabase/database.types"
 import { createNotification } from "@/lib/actions/notifications"
+import { getBorrowerMaxAmount, getLenderMaxAmount, getBorrowerPolicyForAmount, getLenderTierForLender } from "@/lib/loan-policies.server"
+import { durationToDays } from "@/lib/loan-limits"
 import { getBlockedUsers } from "@/lib/actions/connections"
 
 // Mock data for fallback
@@ -93,6 +95,31 @@ export async function createLoanRequest({
     const loanId = uuidv4()
 
     // Create the loan request using admin client
+    // Enforce borrower-side limits (amount + tenor + interest)
+    try {
+      const borrowerMax = await getBorrowerMaxAmount(userId)
+      if (amount > borrowerMax) {
+        return { error: `Requested amount exceeds your allowed borrowing limit of ₦${borrowerMax.toLocaleString()}` }
+      }
+      const borrowerPolicy = await getBorrowerPolicyForAmount(amount)
+      const tenorDays = durationToDays(duration, durationUnit)
+      // normalize interest to percentage (e.g., 0.2 -> 20)
+      const interestPct = interestRate > 1 ? interestRate : interestRate * 100
+      if (borrowerPolicy) {
+        if (borrowerPolicy.minTenorDays && tenorDays < borrowerPolicy.minTenorDays) {
+          return { error: `Requested tenor is shorter than allowed minimum of ${borrowerPolicy.minTenorDays} days for this amount` }
+        }
+        if (borrowerPolicy.maxTenorDays && tenorDays > borrowerPolicy.maxTenorDays) {
+          return { error: `Requested tenor exceeds allowed maximum of ${borrowerPolicy.maxTenorDays} days for this amount` }
+        }
+        if (interestPct < borrowerPolicy.interestMinPct || interestPct > borrowerPolicy.interestMaxPct) {
+          return { error: `Interest rate must be between ${borrowerPolicy.interestMinPct}% and ${borrowerPolicy.interestMaxPct}% for this amount` }
+        }
+      }
+    } catch (e) {
+      console.warn("Could not enforce borrower limits:", e)
+    }
+
     const { data, error } = await adminClient
       .from("loan_requests")
       .insert({
@@ -368,6 +395,31 @@ export async function approveLoanRequest({ loanRequestId, pin, approverId }: { l
   if (loanRequest.helper_id !== approverId) {
     return { success: false, error: "You are not authorized to approve this loan request" }
   }
+
+  // Enforce lender-side limits (ensure this lender's tier allows approving this amount)
+    try {
+      const lenderMax = await getLenderMaxAmount(approverId)
+      if (loanRequest.amount > lenderMax) {
+        return { success: false, error: `Your investor tier does not allow approving loans above ₦${lenderMax.toLocaleString()}` }
+      }
+      // Also enforce lender tier policy on tenor and interest (based on lender's tier)
+      const lenderTier = await getLenderTierForLender(approverId)
+      const tenorDays = durationToDays(loanRequest.duration_months, loanRequest.duration_unit)
+      const interestPct = loanRequest.interest_rate > 1 ? loanRequest.interest_rate : loanRequest.interest_rate * 100
+      if (lenderTier) {
+        if (lenderTier.minTenorDays && tenorDays < lenderTier.minTenorDays) {
+          return { success: false, error: `Loan tenor shorter than allowed minimum of ${lenderTier.minTenorDays} days for your investor tier` }
+        }
+        if (lenderTier.maxTenorDays && tenorDays > lenderTier.maxTenorDays) {
+          return { success: false, error: `Loan tenor exceeds allowed maximum of ${lenderTier.maxTenorDays} days for your investor tier` }
+        }
+        if (interestPct < lenderTier.interestMinPct || interestPct > lenderTier.interestMaxPct) {
+          return { success: false, error: `Interest rate must be between ${lenderTier.interestMinPct}% and ${lenderTier.interestMaxPct}% for your investor tier` }
+        }
+      }
+    } catch (e) {
+      console.warn("Could not determine lender limit:", e)
+    }
   // Fetch approver (helper) and requester profiles for virtual account details
   const { data: helperProfile } = await adminClient
     .from("profiles")

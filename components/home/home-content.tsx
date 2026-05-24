@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Eye, EyeOff, Plus, ArrowRightLeft, History, ArrowDown, Search, Loader2, AlertCircle, Info, CheckCircle, TrendingUp } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { HelperCard } from "@/components/helpers/helper-card"
@@ -9,20 +9,86 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
+import { durationToDays } from "@/lib/loan-limits"
 
 interface HomeContentProps {
   userProfile: any
   loanHelpers: any[]
 }
 
+type BorrowerPolicy = {
+  level?: number
+  min: number
+  max: number
+  minTenorDays: number
+  maxTenorDays: number
+  interestMinPct: number
+  interestMaxPct: number
+}
+
+type LenderCardData = {
+  id: string
+  name: string
+  interestRate: number
+  maxLoanAmount: number
+  loanAmount: number
+  loanIssued: number
+  amountIssued: number
+  profileImage: string
+  rating: number
+  repaymentTime: number
+  repaymentUnit: string
+}
+
+function normalizeLenderCard(helper: any, fallbackRating = 4.5): LenderCardData {
+  const loanAmount = Number(helper.loanAmount ?? helper.max_loan_amount ?? 0)
+  const loanIssued = Number(helper.loans_issued ?? 0)
+  const amountIssued = Number(helper.amount_issued ?? 0)
+  const repaymentTime = Number(helper.repaymentTime ?? helper.repayment_time ?? 0)
+  const repaymentUnit = helper.repaymentUnit ?? helper.repayment_unit ?? "months"
+  const interestRate = Number.parseFloat(String(helper.interest_rate ?? helper.interestRate ?? 0))
+  const rating = Number(helper.rating ?? fallbackRating)
+
+  return {
+    id: String(helper.id),
+    name: String(helper.name ?? "Loan Helper"),
+    interestRate,
+    maxLoanAmount: loanAmount,
+    loanAmount,
+    loanIssued,
+    amountIssued,
+    profileImage: String(helper.profile_image_url ?? helper.profileImage ?? "/vibrant-street-market.png"),
+    rating,
+    repaymentTime,
+    repaymentUnit,
+  }
+}
+
 export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
   const { toast } = useToast()
+  const searchResultsSentinelRef = useRef<HTMLDivElement | null>(null)
+  const SEARCH_PAGE_SIZE = 12
   const [loanAmount, setLoanAmount] = useState<string>("")
   const [loanDuration, setLoanDuration] = useState<string>("")
+  const [loanDurationUnit, setLoanDurationUnit] = useState<"days" | "months">("months")
   const [isSearching, setIsSearching] = useState(false)
+  const [isLoadingMoreLenders, setIsLoadingMoreLenders] = useState(false)
   const [searchResults, setSearchResults] = useState<any[] | null>(null)
   const [searchError, setSearchError] = useState<string | null>(null)
   const [hasSearched, setHasSearched] = useState(false)
+  const [searchPage, setSearchPage] = useState(1)
+  const [searchHasMore, setSearchHasMore] = useState(false)
+  const [searchQuery, setSearchQuery] = useState<{
+    loanAmount?: number
+    loanDuration?: number
+    loanDurationUnit: "days" | "months"
+  } | null>(null)
+  const [loanLimits, setLoanLimits] = useState<{
+    borrowerMaxAmount: number
+    borrowerPolicies: BorrowerPolicy[]
+    currentBorrowerPolicy: BorrowerPolicy
+  } | null>(null)
+  const [loanLimitsLoading, setLoanLimitsLoading] = useState(true)
   const [walletInfo, setWalletInfo] = useState<{ walletNumber: string, availableBalance: string } | null>(null)
   const [walletLoading, setWalletLoading] = useState(false)
   const [walletError, setWalletError] = useState<string | null>(null)
@@ -111,6 +177,38 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
     })()
   }, [])
 
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadLoanLimits() {
+      setLoanLimitsLoading(true)
+      try {
+        const response = await fetch("/api/loan-limits", { credentials: "include" })
+        const data = await response.json()
+
+        if (!cancelled && response.ok) {
+          setLoanLimits(data)
+        } else if (!cancelled) {
+          setLoanLimits(null)
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setLoanLimits(null)
+        }
+      } finally {
+        if (!cancelled) {
+          setLoanLimitsLoading(false)
+        }
+      }
+    }
+
+    loadLoanLimits()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   // Fetch beneficiaries when withdrawal modal opens
   useEffect(() => {
     if (showWithdrawalModal) {
@@ -144,10 +242,104 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
     }
   }, [showWithdrawalModal])
 
+  const fetchLenderSearchPage = async (pageToLoad: number, replaceResults: boolean, queryOverride?: typeof searchQuery) => {
+    const query = queryOverride || searchQuery
+
+    if (!query) {
+      return
+    }
+
+    if (replaceResults) {
+      setIsSearching(true)
+      setSearchError(null)
+    } else {
+      setIsLoadingMoreLenders(true)
+    }
+
+    try {
+      const res = await fetch("/api/find-lenders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          loanAmount: query.loanAmount,
+          loanDuration: query.loanDuration,
+          loanDurationUnit: query.loanDurationUnit,
+          page: pageToLoad,
+          pageSize: SEARCH_PAGE_SIZE,
+        }),
+        credentials: "include",
+      })
+
+      const { lenders, error, hasMore, page } = await res.json()
+
+      if (error) {
+        if (replaceResults || !searchResults?.length) {
+          setSearchError(error)
+          toast({
+            title: "No Matches Found",
+            description: error,
+            variant: "destructive",
+          })
+          setSearchResults([])
+        } else {
+          toast({
+            title: "Search Paused",
+            description: error,
+            variant: "destructive",
+          })
+        }
+        setSearchHasMore(false)
+        return
+      }
+
+      if (replaceResults) {
+        if (lenders.length === 0) {
+          const message = "No lenders found matching your criteria. Try adjusting your search."
+          setSearchError(message)
+          setSearchResults([])
+          toast({
+            title: "No Matches Found",
+            description: message,
+            variant: "destructive",
+          })
+        } else {
+          setSearchResults(lenders)
+          toast({
+            title: "Lenders Found",
+            description: `Found ${lenders.length} lenders matching your criteria`,
+          })
+        }
+      } else {
+        setSearchResults((current) => [...(current || []), ...lenders])
+      }
+
+      setSearchPage(page || pageToLoad)
+      setSearchHasMore(Boolean(hasMore))
+    } catch (error) {
+      const message = "An unexpected error occurred"
+      if (replaceResults || !searchResults?.length) {
+        setSearchError(message)
+        setSearchResults([])
+        toast({
+          title: "Error",
+          description: "Failed to find lenders. Please try again.",
+          variant: "destructive",
+        })
+      }
+      setSearchHasMore(false)
+    } finally {
+      setIsSearching(false)
+      setIsLoadingMoreLenders(false)
+    }
+  }
+
   const handleFindLenders = async () => {
     setIsSearching(true)
     setSearchError(null)
     setHasSearched(true)
+    setSearchResults(null)
+    setSearchPage(1)
+    setSearchHasMore(false)
 
     try {
       // Parse inputs
@@ -161,33 +353,14 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
         return
       }
 
-      // Call the API route to find lenders
-      const res = await fetch("/api/find-lenders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ loanAmount: amount && amount > 0 ? amount : undefined, loanDuration: duration && duration > 0 ? duration : undefined }),
-        credentials: "include"
-      })
-      const { lenders, error } = await res.json()
-
-      if (error) {
-        setSearchError(error)
-        toast({
-          title: "No Matches Found",
-          description: error,
-          variant: "destructive",
-        })
-        setSearchResults([])
-      } else if (lenders.length === 0) {
-        setSearchError("No lenders found matching your criteria. Try adjusting your search.")
-        setSearchResults([])
-      } else {
-        setSearchResults(lenders)
-        toast({
-          title: "Lenders Found",
-          description: `Found ${lenders.length} lenders matching your criteria`,
-        })
+      const nextQuery = {
+        loanAmount: amount && amount > 0 ? amount : undefined,
+        loanDuration: duration && duration > 0 ? duration : undefined,
+        loanDurationUnit,
       }
+
+      setSearchQuery(nextQuery)
+      await fetchLenderSearchPage(1, true, nextQuery)
     } catch (error) {
       setSearchError("An unexpected error occurred")
       setSearchResults([])
@@ -201,13 +374,111 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
     }
   }
 
+  useEffect(() => {
+    if (!hasSearched || !searchHasMore || isSearching || isLoadingMoreLenders) {
+      return
+    }
+
+    const sentinel = searchResultsSentinelRef.current
+    if (!sentinel) {
+      return
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+      const [entry] = entries
+      if (entry?.isIntersecting && searchQuery) {
+        void fetchLenderSearchPage(searchPage + 1, false)
+      }
+    }, {
+      root: null,
+      rootMargin: "240px",
+      threshold: 0.1,
+    })
+
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [hasSearched, searchHasMore, isSearching, isLoadingMoreLenders, searchPage, searchQuery])
+
+  const parsedLoanAmount = loanAmount ? Number.parseFloat(loanAmount) : undefined
+  const parsedLoanDuration = loanDuration ? Number.parseInt(loanDuration, 10) : undefined
+  const activeDurationDays = parsedLoanDuration && parsedLoanDuration > 0
+    ? durationToDays(parsedLoanDuration, loanDurationUnit)
+    : undefined
+
+  const getPolicyForAmount = (amount?: number) => {
+    if (!loanLimits) {
+      return null
+    }
+
+    if (amount && amount > 0) {
+      return loanLimits.borrowerPolicies.find((policy) => amount >= policy.min && amount <= policy.max) ?? null
+    }
+
+    return loanLimits.currentBorrowerPolicy
+  }
+
+  const activePolicy = getPolicyForAmount(parsedLoanAmount)
+  const amountError = (() => {
+    if (!loanAmount) return null
+    if (Number.isNaN(parsedLoanAmount) || parsedLoanAmount === undefined || parsedLoanAmount <= 0) {
+      return "Enter a valid amount"
+    }
+    if (loanLimitsLoading) {
+      return null
+    }
+    if (!loanLimits) {
+      return "Unable to load your current limits"
+    }
+    if (parsedLoanAmount > loanLimits.borrowerMaxAmount) {
+      return `Amount exceeds your current limit of ₦${loanLimits.borrowerMaxAmount.toLocaleString()}`
+    }
+    return null
+  })()
+
+  const durationError = (() => {
+    if (!loanDuration) return null
+    if (Number.isNaN(parsedLoanDuration) || parsedLoanDuration === undefined || parsedLoanDuration <= 0) {
+      return "Enter a valid duration"
+    }
+    if (loanLimitsLoading) {
+      return null
+    }
+    if (!loanLimits) {
+      return "Unable to load your current limits"
+    }
+
+    const policy = activePolicy ?? loanLimits.currentBorrowerPolicy
+    if (!policy) {
+      return null
+    }
+
+    if ((activeDurationDays ?? 0) < policy.minTenorDays) {
+      return `Duration is below your minimum of ${policy.minTenorDays} days`
+    }
+    if ((activeDurationDays ?? 0) > policy.maxTenorDays) {
+      return `Duration exceeds your maximum of ${policy.maxTenorDays} days`
+    }
+    return null
+  })()
+
+  const canSearch =
+    !loanLimitsLoading &&
+    !!loanLimits &&
+    !amountError &&
+    !durationError &&
+    (Boolean(loanAmount?.trim()) || Boolean(loanDuration?.trim()))
+
   // Reset search results and show all lenders
   const handleResetSearch = () => {
     setSearchResults(null)
     setSearchError(null)
     setLoanAmount("")
     setLoanDuration("")
+    setLoanDurationUnit("months")
     setHasSearched(false)
+    setSearchQuery(null)
+    setSearchPage(1)
+    setSearchHasMore(false)
   }
 
   const pollVirtualAccount = async (requestId: string) => {
@@ -729,6 +1000,7 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
 
   // Determine which lenders to display
   const displayLenders = searchResults !== null ? searchResults : loanHelpers
+  const normalizedLenders = displayLenders.map((helper, index) => normalizeLenderCard(helper, 4.5 - index * 0.2))
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -804,31 +1076,61 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
                 <Input
                   id="loan-amount"
                   placeholder="Enter amount"
-                  className="w-full py-2 px-3 text-sm border-2 rounded-lg"
+                  className={`w-full py-2 px-3 text-sm rounded-lg transition-colors border border-transparent border-b-2 ${amountError ? "border-b-red-500 bg-red-50 focus-visible:ring-red-500" : "border-b-gray-200 focus-visible:ring-blue-500"}`}
                   value={loanAmount}
                   onChange={(e) => setLoanAmount(e.target.value)}
                   type="number"
                   min="1000"
+                  max={loanLimits?.borrowerMaxAmount}
+                  aria-invalid={Boolean(amountError)}
                 />
+                {amountError && (
+                  <p className="mt-1 text-xs text-red-600">{amountError}</p>
+                )}
               </div>
               <div>
                 <label htmlFor="loan-duration" className="block text-xs font-medium text-gray-700 mb-1">
-                  Duration in months (optional)
+                  Duration (optional)
                 </label>
-                <Input
-                  id="loan-duration"
-                  placeholder="Enter duration"
-                  type="number"
-                  min="1"
-                  max="12"
-                  className="w-full py-2 px-3 text-sm border-2 rounded-lg"
-                  value={loanDuration}
-                  onChange={(e) => setLoanDuration(e.target.value)}
-                />
+                <div className={`grid items-stretch rounded-lg border border-transparent border-b-2 transition-colors group ${durationError ? "border-b-red-500 bg-red-50 focus-within:border-b-red-500" : "border-b-gray-200 bg-white focus-within:border-b-blue-500"}`} style={{ gridTemplateColumns: "7fr 3fr" }}>
+                  <Input
+                    id="loan-duration"
+                    placeholder="Enter duration"
+                    type="number"
+                    min={loanDurationUnit === "days" ? (loanLimits ? (activePolicy ?? loanLimits.currentBorrowerPolicy).minTenorDays : 1) : loanLimits ? Math.max(1, Math.ceil((activePolicy ?? loanLimits.currentBorrowerPolicy).minTenorDays / 30)) : 1}
+                    max={loanDurationUnit === "days" ? (loanLimits ? (activePolicy ?? loanLimits.currentBorrowerPolicy).maxTenorDays : undefined) : loanLimits ? Math.ceil((activePolicy ?? loanLimits.currentBorrowerPolicy).maxTenorDays / 30) : undefined}
+                    className={`w-full border-0 bg-transparent py-2 px-3 text-sm rounded-r-none shadow-none focus-visible:ring-0 ${durationError ? "text-red-900 placeholder:text-red-300" : "text-gray-900 placeholder:text-gray-400"}`}
+                    value={loanDuration}
+                    onChange={(e) => setLoanDuration(e.target.value)}
+                    aria-invalid={Boolean(durationError)}
+                  />
+                  <Select value={loanDurationUnit} onValueChange={(value) => setLoanDurationUnit(value as "days" | "months")}> 
+                      <SelectTrigger className={`h-full w-full border-l rounded-l-none rounded-r-lg bg-white px-3 py-2 text-sm shadow-none focus:ring-0 ${durationError ? "text-red-700 justify-end pr-2 border-l-transparent" : "text-gray-700 justify-end pr-2 border-l-gray-200 group-focus-within:border-l-blue-500"}`}>
+                        <SelectValue placeholder="Unit" className="text-right" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="days">Days</SelectItem>
+                      <SelectItem value="months">Months</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {durationError && (
+                  <p className="mt-1 text-xs text-red-600">{durationError}</p>
+                )}
               </div>
+              {!loanLimitsLoading && loanLimits && (
+                <p className="text-[11px] text-gray-500 leading-relaxed">
+                  Current limit: up to ₦{loanLimits.borrowerMaxAmount.toLocaleString()} and a tenor of up to {loanLimits.currentBorrowerPolicy.maxTenorDays} days
+                  {" "}
+                  ({Math.max(1, Math.ceil(loanLimits.currentBorrowerPolicy.maxTenorDays / 30))} month(s)).
+                </p>
+              )}
+              {loanLimitsLoading && (
+                <p className="text-[11px] text-gray-500">Loading your current limits...</p>
+              )}
               <Button
                 onClick={handleFindLenders}
-                disabled={isSearching}
+                disabled={isSearching || !canSearch}
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-3 text-sm rounded-lg transition-colors flex items-center justify-center"
               >
                 {isSearching ? (
@@ -851,7 +1153,7 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
         <div className="mb-8">
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-5">
             <h2 className="text-xl font-bold text-gray-900 mb-4 md:mb-0">
-              {hasSearched ? "Search Results" : "loan offers you may like"}
+              {hasSearched ? "Search Results" : "Loan offers you may like"}
             </h2>
             {hasSearched && (
               <Button variant="outline" onClick={handleResetSearch} className="text-sm py-2 h-auto">
@@ -899,24 +1201,35 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
               </div>
             </div>
           ) : displayLenders && displayLenders.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-              {displayLenders.map((helper, index) => (
-                <HelperCard
-                  key={helper.id}
-                  id={helper.id}
-                  name={helper.name}
-                  interestRate={helper.interest_rate.toString()}
-                  maxLoan={formatCurrency(helper.loanAmount)}
-                  loanIssued={helper.loans_issued.toString()}
-                  amountIssued={formatCurrency(helper.amount_issued)}
-                  profileImage={helper.profile_image_url || "/vibrant-street-market.png"}
-                  rating={helper.rating || 4.5 - index * 0.2}
-                  loanAmount={helper.loanAmount}
-                  repaymentTime={helper.repayment_time}
-                  repaymentUnit={helper.repayment_unit}
-                  currentUser={userProfile}
-                />
-              ))}
+            <div>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                {normalizedLenders.map((helper) => (
+                  <HelperCard
+                    key={helper.id}
+                    id={helper.id}
+                    name={helper.name}
+                    interestRate={helper.interestRate.toString()}
+                    maxLoan={formatCurrency(helper.maxLoanAmount)}
+                    loanIssued={helper.loanIssued.toString()}
+                    amountIssued={formatCurrency(helper.amountIssued)}
+                    profileImage={helper.profileImage}
+                    rating={helper.rating}
+                    loanAmount={helper.loanAmount}
+                    repaymentTime={helper.repaymentTime}
+                    repaymentUnit={helper.repaymentUnit}
+                    currentUser={userProfile}
+                  />
+                ))}
+              </div>
+
+              <div ref={searchResultsSentinelRef} className="h-1 w-full" aria-hidden="true" />
+
+              {isLoadingMoreLenders && (
+                <div className="flex items-center justify-center py-5 text-sm text-gray-500">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin text-blue-500" />
+                  Loading more lenders...
+                </div>
+              )}
             </div>
           ) : (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 text-center">
