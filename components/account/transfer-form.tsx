@@ -14,16 +14,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { transferFromAccount } from "@/lib/actions/account"
 import { ReceiptModal } from "@/components/receipts/receipt-modal"
-import { v4 as uuidv4 } from "uuid"
 
 // Form schema
 const formSchema = z.object({
-  amount: z.number().min(1000, "Minimum transfer amount is ₦1,000").max(1000000, "Maximum transfer amount is ₦1,000,000"),
+  amount: z
+    .number()
+    .min(1000, "Minimum withdrawal amount is ₦1,000")
+    .max(1000000, "Maximum withdrawal amount is ₦1,000,000"),
+  beneficiaryId: z.string().min(1, "Please select a beneficiary"),
   reason: z.string().min(1, "Please enter a reason for this transfer"),
-  mode: z.enum(["beneficiary", "manual"]),
-  beneficiaryId: z.string().optional(),
-  accountNumber: z.string().optional(),
-  bankCode: z.string().optional(),
 })
 
 type FormValues = z.infer<typeof formSchema>
@@ -37,9 +36,24 @@ export function TransferForm({ currentBalance }: TransferFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
-  const [transactionDetails, setTransactionDetails] = useState<any>(null)
+  const [transactionDetails, setTransactionDetails] = useState<{
+    id: string
+    reference: string
+    amount: number
+    type: string
+    description: string
+    status: string
+    created_at: string
+    newBalance: number
+    recipient?: {
+      bankName?: string
+      accountNumber?: string
+      accountName?: string
+    }
+    fee?: number
+  } | null>(null)
 
-  // Beneficiaries
+  // State for beneficiaries
   const [beneficiaries, setBeneficiaries] = useState<any[]>([])
   const [beneficiariesLoading, setBeneficiariesLoading] = useState(true)
   const [beneficiariesError, setBeneficiariesError] = useState<string | null>(null)
@@ -99,29 +113,18 @@ export function TransferForm({ currentBalance }: TransferFormProps) {
     }
   }
 
-  // Fetch banks on mount
-  useEffect(() => {
-    fetchBanks();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Form
+  // Initialize form
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       amount: undefined,
-      reason: "",
-      mode: "beneficiary",
       beneficiaryId: "",
-      accountNumber: "",
-      bankCode: "",
+      reason: "",
     },
   })
 
-  const mode = form.watch("mode")
+  // Watch amount for fee calculation
   const amount = form.watch("amount")
-  const accountNumber = form.watch("accountNumber")
-  const bankCode = form.watch("bankCode")
 
   // Validate account when account number and bank are set
   useEffect(() => {
@@ -168,14 +171,13 @@ export function TransferForm({ currentBalance }: TransferFormProps) {
 
   // Handle form submission
   async function onSubmit(values: FormValues) {
-    setIsSubmitting(true)
-    setError(null)
-    setSuccess(false)
-    setTransactionDetails(null)
     try {
+      setIsSubmitting(true)
+      setError(null)
+
+      // Check if amount is greater than current balance
       if (values.amount > currentBalance) {
         setError("Insufficient balance for this transfer")
-        setIsSubmitting(false)
         return
       }
 
@@ -285,51 +287,95 @@ export function TransferForm({ currentBalance }: TransferFormProps) {
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
-        {success && transactionDetails && (
-          <Alert variant="default" className="mb-6">
-            <CheckCircle className="h-4 w-4 text-green-600" />
-            <AlertTitle>Transfer Successful</AlertTitle>
-            <AlertDescription>
-              Transfer completed. Reference: {transactionDetails.reference || transactionDetails.transactionId}
-            </AlertDescription>
-          </Alert>
-        )}
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <div className="flex gap-4">
-              <Button
-                type="button"
-                variant={mode === "beneficiary" ? "default" : "outline"}
-                onClick={() => form.setValue("mode", "beneficiary")}
-              >
-                Choose Beneficiary
-              </Button>
-              <Button
-                type="button"
-                variant={mode === "manual" ? "default" : "outline"}
-                onClick={() => {
-                  form.setValue("mode", "manual")
-                  if (banks.length === 0) fetchBanks()
-                }}
-              >
-                Enter Account Number
-              </Button>
+
+        {success ? (
+          <div className="space-y-6">
+            <Alert className="bg-green-50 border-green-200">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <AlertTitle className="text-green-800">Transfer Successful</AlertTitle>
+              <AlertDescription className="text-green-700">
+                Your transfer request has been submitted successfully. It will be processed within the hour.
+              </AlertDescription>
+            </Alert>
+
+            <div className="bg-gray-50 p-6 rounded-lg space-y-4">
+              <h3 className="font-medium text-gray-900">Transaction Details</h3>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="text-gray-500">Reference:</div>
+                <div className="font-medium">{transactionDetails?.reference}</div>
+
+                <div className="text-gray-500">Amount:</div>
+                <div className="font-medium">{formatCurrency(transactionDetails?.amount || 0)}</div>
+
+                <div className="text-gray-500">Fee:</div>
+                <div className="font-medium">{formatCurrency(transactionDetails?.fee || 0)}</div>
+
+                <div className="text-gray-500">New Balance:</div>
+                <div className="font-medium">{formatCurrency(transactionDetails?.newBalance || 0)}</div>
+              </div>
             </div>
-            {mode === "beneficiary" ? (
+
+            {transactionDetails && (
+              <div className="flex justify-center">
+                <ReceiptModal transaction={transactionDetails} />
+              </div>
+            )}
+
+            <div className="flex justify-between">
+              <Button variant="outline" onClick={() => router.push("/home")}>
+                Back to Home
+              </Button>
+              <Button onClick={() => router.push("/transactions")}>View Transactions</Button>
+            </div>
+          </div>
+        ) : (
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <div className="bg-blue-50 p-4 rounded-lg mb-6">
+                <div className="flex justify-between items-center">
+                  <span className="text-blue-700 font-medium">Available Balance:</span>
+                  <span className="text-blue-800 font-bold">{formatCurrency(currentBalance)}</span>
+                </div>
+              </div>
+
+              <FormField
+                control={form.control}
+                name="amount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Amount to Transfer</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        placeholder="Enter amount"
+                        {...field}
+                        onChange={(e) => field.onChange(Number.parseFloat(e.target.value) || undefined)}
+                        min={1000}
+                        max={currentBalance}
+                      />
+                    </FormControl>
+                    <FormDescription>Minimum: ₦1,000 | Maximum: ₦1,000,000</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <FormField
                 control={form.control}
                 name="beneficiaryId"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Beneficiary</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value} disabled={beneficiariesLoading}>
-                      <SelectTrigger className="w-full py-2 px-3 text-sm border-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <SelectValue placeholder="Select a beneficiary" />
-                      </SelectTrigger>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={beneficiariesLoading || !!beneficiariesError}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder={beneficiariesLoading ? "Loading beneficiaries..." : beneficiariesError ? beneficiariesError : "Select a beneficiary"} />
+                        </SelectTrigger>
+                      </FormControl>
                       <SelectContent>
                         {beneficiaries.map((b) => (
                           <SelectItem key={b.id} value={b.id}>
-                            {b.account_name} ({b.bank_name} - {b.account_number})
+                            {b.bank_name} - {b.account_number} ({b.account_name})
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -338,102 +384,60 @@ export function TransferForm({ currentBalance }: TransferFormProps) {
                   </FormItem>
                 )}
               />
-            ) : (
-              <>
-                <FormField
-                  control={form.control}
-                  name="accountNumber"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Account Number</FormLabel>
-                      <FormControl>
-                        <Input {...field} maxLength={10} placeholder="Enter account number" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="bankCode"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Bank</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                        disabled={banksLoading || !accountNumber || accountNumber.length < 10}
-                      >
-                        <SelectTrigger className="w-full py-2 px-3 text-sm border-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                          <SelectValue placeholder="Select a bank" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {banks.map((bank) => (
-                            <SelectItem key={bank.code} value={bank.code}>
-                              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                {bank.logo && (
-                                  <img src={bank.logo} alt={bank.name} style={{ width: 24, height: 24, objectFit: 'contain', borderRadius: 4, marginRight: 8 }} />
-                                )}
-                                {bank.name}
-                              </span>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                {accountValidationLoading && <div className="text-sm text-gray-500">Validating account...</div>}
-                {accountValidationError && <div className="text-sm text-red-500">{accountValidationError}</div>}
-                {accountName && <div className="text-sm text-green-600">Account Name: {accountName}</div>}
-              </>
-            )}
-            <FormField
-              control={form.control}
-              name="amount"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Amount</FormLabel>
-                  <FormControl>
-                    <Input
-                      {...field}
-                      type="number"
-                      min={1000}
-                      max={1000000}
-                      step={100}
-                      placeholder="Enter amount"
-                      onChange={e => field.onChange(Number(e.target.value))}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
+
+              <FormField
+                control={form.control}
+                name="reason"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Transfer Reason</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="text"
+                        placeholder="Enter reason for transfer"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>State the purpose of this transfer.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {amount > 0 && (
+                <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+                  <h3 className="font-medium text-gray-900">Transaction Summary</h3>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div className="text-gray-500">Transfer Amount:</div>
+                    <div className="font-medium">{formatCurrency(amount)}</div>
+
+                    <div className="text-gray-500">Processing Fee:</div>
+                    <div className="font-medium">{formatCurrency(fee)}</div>
+
+                    <div className="text-gray-500 font-medium">Total Amount:</div>
+                    <div className="font-bold">{formatCurrency(totalAmount)}</div>
+                  </div>
+                </div>
               )}
-            />
-            {nipChargeLoading && <div className="text-sm text-gray-500">Fetching NIP charge...</div>}
-            {nipChargeError && <div className="text-sm text-red-500">{nipChargeError}</div>}
-            {nipCharge !== null && !nipChargeLoading && (
-              <div className="text-sm text-blue-600">NIP Charge: ₦{nipCharge.toLocaleString()}</div>
-            )}
-            <FormField
-              control={form.control}
-              name="reason"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Reason</FormLabel>
-                  <FormControl>
-                    <Input {...field} placeholder="Enter reason for transfer" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? "Processing..." : "Transfer"}
-            </Button>
-          </form>
-        </Form>
+
+              <Button type="submit" className="w-full" 
+                disabled={
+                  isSubmitting ||
+                  beneficiariesLoading ||
+                  !form.getValues("beneficiaryId")
+                }
+              >
+                {isSubmitting ? "Processing..." : "Transfer Funds"}
+              </Button>
+            </form>
+          </Form>
+        )}
       </CardContent>
+      <CardFooter className="flex justify-between border-t pt-6">
+        <p className="text-xs text-gray-500">
+          Note: Transfers are processed within 24 hours. A 0.5% processing fee applies to all transfers.
+        </p>
+      </CardFooter>
     </Card>
   )
 }
