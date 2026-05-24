@@ -10,7 +10,7 @@ async function getUserProfileInfo(userId: string) {
     const adminClient = createAdminClient()
     const { data, error } = await adminClient
       .from("profiles")
-      .select("id, first_name, last_name, email, profile_picture_url")
+      .select("id, username, first_name, last_name, email, profile_picture_url")
       .eq("id", userId)
       .single()
 
@@ -151,16 +151,15 @@ export async function followUser(followingId: string) {
         const followerProfile = await getUserProfileInfo(followerId)
 
         if (followerProfile) {
-          const followerName =
-            `${followerProfile.first_name || ""} ${followerProfile.last_name || ""}`.trim() || "Someone"
+          const followerName = followerProfile.username || `${followerProfile.first_name || ""} ${followerProfile.last_name || ""}`.trim() || "Someone"
 
-          // Create notification with the correct schema
+          // Create notification with the correct schema (use username where available)
           await createNotification({
             userId: followingId,
             type: "follow",
             content: `${followerName} is now following you!`,
             actorId: followerId,
-            referenceId: followerId, // Using follower ID as reference
+            referenceId: followerId,
             data: {
               followerName,
               followerProfilePicture: followerProfile.profile_picture_url,

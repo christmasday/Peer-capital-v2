@@ -37,6 +37,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 interface User {
   id: string
   email: string
+  username?: string | null
   first_name: string
   last_name: string
   phone_number: string
@@ -297,7 +298,7 @@ export default function UserManagement() {
                       <td className="py-3 px-4">
                         <div>
                           <div className="font-medium text-gray-900">
-                            {user.first_name} {user.last_name}
+                            {user.username ? `@${user.username}` : `${user.first_name} ${user.last_name}`}
                           </div>
                           <div className="text-sm text-gray-500">ID: {user.id.slice(0, 8)}...</div>
                         </div>

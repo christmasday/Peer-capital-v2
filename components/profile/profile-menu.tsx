@@ -38,7 +38,7 @@ export function ProfileMenu({ userId }: ProfileMenuProps) {
       icon: <Bell className="h-4 w-4" />,
     },
     {
-      name: "Loan Goal Settings",
+      name: "Lending Goals",
       href: "/profile/loan-helper",
       active: pathname === "/profile/loan-helper",
       icon: <Wallet className="h-4 w-4" />,

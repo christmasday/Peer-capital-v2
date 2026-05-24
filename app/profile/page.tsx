@@ -81,7 +81,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
     .single()
 
   // Format name
-  const fullName = `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "User"
+  const fullName = profile.username ? `@${profile.username}` : `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "User"
 
   // Default banner image or user's banner if they have one
   const bannerImage = profile.banner_image_url || "/abstract-geometric-shapes.png"
@@ -181,7 +181,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
             {loanHelperSettings && profile.lending_license_url && (
               <div className="flex items-center mt-1.5 md:mt-0">
                 <div className="flex flex-col items-end">
-                  <Badge className="bg-green-500 hover:bg-green-600 mb-1">Loan Goal</Badge>
+                  <Badge className="bg-green-500 hover:bg-green-600 mb-1">Lending Goals</Badge>
                   <div className="flex items-center text-sm text-green-700 bg-green-50 px-3 py-1 rounded-md whitespace-nowrap">
                     <Wallet className="h-4 w-4 mr-2" />
                     <span>
@@ -279,8 +279,8 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
               {activeTab === "about" && loanHelperSettings && (
                 <Card>
                   <CardHeader>
-                    <div className="flex justify-between items-center">
-                      <CardTitle className="text-lg">Loan Goal Settings</CardTitle>
+                      <div className="flex justify-between items-center">
+                        <CardTitle className="text-lg">Lending Goals Settings</CardTitle>
                       <Link href="/profile/loan-helper">
                         <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                           <Edit className="h-4 w-4" />

@@ -21,8 +21,8 @@ export async function searchUsers(query: string) {
     // First try with the regular client
     let { data, error } = await supabase
       .from("profiles")
-      .select("id, first_name, last_name, email, profile_picture_url")
-      .or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`)
+      .select("id, username, first_name, last_name, email, profile_picture_url")
+      .or(`username.ilike.%${searchTerm}%,first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`)
       .limit(10)
 
     // Log the results for debugging
@@ -33,8 +33,8 @@ export async function searchUsers(query: string) {
 
       const { data: adminData, error: adminError } = await adminClient
         .from("profiles")
-        .select("id, first_name, last_name, email, profile_picture_url")
-        .or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`)
+        .select("id, username, first_name, last_name, email, profile_picture_url")
+        .or(`username.ilike.%${searchTerm}%,first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`)
         .limit(10)
 
 
@@ -53,18 +53,19 @@ export async function searchUsers(query: string) {
       // Try a more flexible search as a fallback
       const { data: fallbackData, error: fallbackError } = await supabase
         .from("profiles")
-        .select("id, first_name, last_name, email, profile_picture_url")
+        .select("id, username, first_name, last_name, email, profile_picture_url")
         .limit(10)
 
       if (fallbackError) {
       } else if (fallbackData && fallbackData.length > 0) {
         // Filter the results manually
         data = fallbackData.filter((user) => {
+          const username = (user.username || "").toLowerCase()
           const firstName = (user.first_name || "").toLowerCase()
           const lastName = (user.last_name || "").toLowerCase()
           const email = (user.email || "").toLowerCase()
 
-          return firstName.includes(searchTerm) || lastName.includes(searchTerm) || email.includes(searchTerm)
+          return username.includes(searchTerm) || firstName.includes(searchTerm) || lastName.includes(searchTerm) || email.includes(searchTerm)
         })
       }
     }
@@ -73,8 +74,7 @@ export async function searchUsers(query: string) {
     return (data || []).map((user) => ({
       id: user.id,
       email: user.email || "",
-      displayName:
-        `${user.first_name || ""} ${user.last_name || ""}`.trim() || (user.email ? user.email.split("@")[0] : "User"),
+      displayName: user.username ? `@${user.username}` : `${user.first_name || ""} ${user.last_name || ""}`.trim() || (user.email ? user.email.split("@")[0] : "User"),
       avatarUrl: user.profile_picture_url,
     }))
   } catch (error) {

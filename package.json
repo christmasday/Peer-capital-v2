@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "backfill:usernames": "tsx scripts/backfill-usernames.ts"
   },
   "dependencies": {
     "@coinbase/cdp-sdk": "latest",

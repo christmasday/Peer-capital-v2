@@ -128,15 +128,15 @@ export function ContactsList() {
               <Link key={c.id} href={`/profile/${c.id}`} className="block p-4 border rounded-lg hover:shadow-lg transition-shadow hover:border-blue-400">
                 <div className="flex flex-col items-center text-center">
                   <Avatar className="h-16 w-16 mb-3">
-                    <AvatarImage src={c.profile_picture_url || ""} alt={`${c.first_name || ""} ${c.last_name || ""}`} />
-                    <AvatarFallback>{((c.first_name || "")[0] || "U") + ((c.last_name || "")[0] || "")}</AvatarFallback>
+                    <AvatarImage src={c.profile_picture_url || ""} alt={c.username ? `@${c.username}` : `${c.first_name || ""} ${c.last_name || ""}`} />
+                    <AvatarFallback>{c.username ? (c.username.slice(0,2).toUpperCase()) : ((c.first_name || "")[0] || "U") + ((c.last_name || "")[0] || "")}</AvatarFallback>
                   </Avatar>
-                  <p className="font-semibold text-sm">{[c.first_name, c.last_name].filter(Boolean).join(" ") || "User"}</p>
+                  <p className="font-semibold text-sm">{c.username ? `@${c.username}` : [c.first_name, c.last_name].filter(Boolean).join(" ") || "User"}</p>
                   {c.bio && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{c.bio}</p>}
 
                   {c.loan_goal && (
                     <div className="mt-3 w-full">
-                      <Badge className="bg-green-500 hover:bg-green-600 mb-2">Loan Goal</Badge>
+                      <Badge className="bg-green-500 hover:bg-green-600 mb-2">Lending Goals</Badge>
                       <div className="text-xs text-green-700 bg-green-50 px-2 py-1 rounded-md whitespace-nowrap">
                         {formatCurrency(c.loan_goal.loan_amount)} @ {c.loan_goal.interest_rate}%
                       </div>

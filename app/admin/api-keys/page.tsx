@@ -53,6 +53,7 @@ interface APIKey {
   is_active: boolean
   created_by: string
   profiles: {
+    username?: string | null
     first_name: string
     last_name: string
     email: string
@@ -403,7 +404,7 @@ export default function APIKeyManagement() {
                       {key.last_rotated_at && (
                         <span>Rotated {formatDate(key.last_rotated_at)}</span>
                       )}
-                      <span>by {key.profiles.first_name} {key.profiles.last_name}</span>
+                      <span>by {key.profiles.username ? `@${key.profiles.username}` : `${key.profiles.first_name} ${key.profiles.last_name}`}</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">

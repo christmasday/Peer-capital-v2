@@ -1214,6 +1214,7 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
                     amountIssued={formatCurrency(helper.amountIssued)}
                     profileImage={helper.profileImage}
                     rating={helper.rating}
+                    displayMetric="loans-issued"
                     loanAmount={helper.loanAmount}
                     repaymentTime={helper.repaymentTime}
                     repaymentUnit={helper.repaymentUnit}

@@ -19,7 +19,7 @@ export default async function NotificationsPage() {
 
   return (
     <MainLayout
-      userName={userProfile.profile?.first_name || "User"}
+      userName={userProfile.profile?.username ? `@${userProfile.profile.username}` : userProfile.profile?.first_name || "User"}
       userImage={userProfile.profile?.profile_picture_url || "/vibrant-street-market.png"}
     >
       <div className="max-w-6xl mx-auto">

@@ -108,15 +108,19 @@ export function LoanRequestsList({ loanRequests: initialLoanRequests, currentUse
           <CardHeader className="flex flex-row items-center gap-4 pb-2">
             <Avatar className="h-10 w-10">
               {req.borrower?.profile_picture_url ? (
-                <AvatarImage src={req.borrower.profile_picture_url} alt={`${req.borrower.first_name || ""} ${req.borrower.last_name || ""}`} />
+                <AvatarImage src={req.borrower.profile_picture_url} alt={req.borrower.username ? `@${req.borrower.username}` : `${req.borrower.first_name || ""} ${req.borrower.last_name || ""}`} />
               ) : (
                 <AvatarFallback className="bg-blue-100">
-                  <UserRound className="h-5 w-5 text-blue-500" />
+                  {req.borrower?.username ? (
+                    req.borrower.username.slice(0, 2).toUpperCase()
+                  ) : (
+                    <UserRound className="h-5 w-5 text-blue-500" />
+                  )}
                 </AvatarFallback>
               )}
             </Avatar>
             <div>
-              <div className="font-semibold text-gray-900">{`${req.borrower?.first_name || ""} ${req.borrower?.last_name || ""}`.trim() || "User"}</div>
+              <div className="font-semibold text-gray-900">{req.borrower?.username ? `@${req.borrower.username}` : `${req.borrower?.first_name || ""} ${req.borrower?.last_name || ""}`.trim() || "User"}</div>
               <div className="text-xs text-gray-500">Requested on {new Date(req.created_at).toLocaleDateString()}</div>
             </div>
             <div className="ml-auto text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-700">

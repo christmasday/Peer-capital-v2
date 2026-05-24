@@ -29,6 +29,7 @@ export type LenderResult = {
 
 type ProfileRow = {
   id: string
+  username: string | null
   first_name: string | null
   last_name: string | null
   profile_picture_url: string | null
@@ -116,6 +117,9 @@ function getLocationRank(origin: ProfileRow | null, target: ProfileRow | null): 
 function buildDisplayName(profile: ProfileRow | null, fallbackName: string | null | undefined = null): string {
   const fallback = fallbackName?.trim() || "Loan Helper"
   if (!profile) return fallback
+  if (profile.username) {
+    return `@${profile.username}`
+  }
   const name = `${profile.first_name || ""} ${profile.last_name || ""}`.trim()
   return name || fallback
 }
@@ -154,7 +158,7 @@ export async function findLenders({ loanAmount, loanDuration, loanDurationUnit =
 
     const { data: currentProfile } = await adminClient
       .from("profiles")
-      .select("id, first_name, last_name, profile_picture_url, address, city, state, country")
+      .select("id, username, first_name, last_name, profile_picture_url, address, city, state, country")
       .eq("id", currentUserId)
       .maybeSingle()
 
@@ -179,7 +183,7 @@ export async function findLenders({ loanAmount, loanDuration, loanDurationUnit =
     const [profilesResult, helpersResult] = await Promise.all([
       adminClient
         .from("profiles")
-        .select("id, first_name, last_name, profile_picture_url, address, city, state, country, lending_license_url, phone_number, bank_name, account_number, bvn, date_of_birth")
+        .select("id, username, first_name, last_name, profile_picture_url, address, city, state, country, lending_license_url, phone_number, bank_name, account_number, bvn, date_of_birth")
         .in("id", userIds),
       adminClient
         .from("loan_helpers")

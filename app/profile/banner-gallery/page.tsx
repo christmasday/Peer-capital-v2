@@ -45,7 +45,7 @@ export default async function BannerGalleryPage() {
   }
 
   // Get user's full name for the layout
-  const fullName = [profile.first_name, profile.last_name].filter(Boolean).join(" ")
+  const fullName = profile.username ? `@${profile.username}` : [profile.first_name, profile.last_name].filter(Boolean).join(" ")
 
   return (
     <MainLayout userName={fullName} userImage={profile.profile_picture_url}>

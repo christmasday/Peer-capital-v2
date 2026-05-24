@@ -51,7 +51,7 @@ export default async function HomePage() {
                 className="object-cover"
               />
             </div>
-            <h1 className="text-2xl font-bold text-blue-700">Hi, {userProfile.profile?.first_name || "User"}</h1>
+            <h1 className="text-2xl font-bold text-blue-700">Hi, {userProfile.profile?.username ? `@${userProfile.profile.username}` : userProfile.profile?.first_name || "User"}</h1>
           </div>
           {/* Removed the Bell notification icon button here */}
         </div>
@@ -80,6 +80,7 @@ export default async function HomePage() {
             loanIssued="80"
             amountIssued="N50M"
             profileImage="/placeholder.svg?height=100&width=100"
+            displayMetric="loans-issued"
             repaymentTime={12}
             repaymentUnit="months"
           />
@@ -92,6 +93,7 @@ export default async function HomePage() {
             loanIssued="60"
             amountIssued="N35M"
             profileImage="/placeholder.svg?height=100&width=100"
+            displayMetric="loans-issued"
             repaymentTime={6}
             repaymentUnit="months"
           />

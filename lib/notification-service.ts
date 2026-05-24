@@ -138,7 +138,7 @@ export async function getUserProfile(userId: string) {
     
     const { data, error } = await adminClient
       .from("profiles")
-      .select("email, first_name, last_name")
+      .select("email, username, first_name, last_name")
       .eq("id", userId)
       .single()
 
@@ -196,7 +196,7 @@ export async function sendNotificationEmail(event: NotificationEvent): Promise<b
 
     // Generate email content
     const emailHtml = getAccountActivityEmailTemplate({
-      userName: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'User',
+      userName: profile.username ? `@${profile.username}` : `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'User',
       eventTitle: event.title,
       eventDescription: event.description,
       eventType: event.type,

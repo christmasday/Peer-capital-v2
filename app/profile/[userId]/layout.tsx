@@ -21,12 +21,12 @@ export default async function UserProfileLayout({ children }: { children: ReactN
   if (session?.user?.id) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("first_name, last_name, profile_picture_url")
+      .select("username, first_name, last_name, profile_picture_url")
       .eq("id", session.user.id)
       .single()
 
     if (profile) {
-      userName = `${profile.first_name || ""} ${profile.last_name || ""}`.trim()
+      userName = profile.username ? `@${profile.username}` : `${profile.first_name || ""} ${profile.last_name || ""}`.trim()
       userImage = profile.profile_picture_url
     }
   }

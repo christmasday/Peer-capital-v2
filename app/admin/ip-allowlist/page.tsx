@@ -45,6 +45,7 @@ interface IPAddress {
   updated_at: string
   created_by: string
   profiles: {
+    username?: string | null
     first_name: string
     last_name: string
     email: string
@@ -343,7 +344,7 @@ export default function IPAllowlistManagement() {
                       <p className="text-sm text-gray-600 mt-1">{ip.description}</p>
                     )}
                     <p className="text-xs text-gray-500 mt-1">
-                      Added by {ip.profiles.first_name} {ip.profiles.last_name} ({ip.profiles.email})
+                      Added by {ip.profiles.username ? `@${ip.profiles.username}` : `${ip.profiles.first_name} ${ip.profiles.last_name}`} ({ip.profiles.email})
                     </p>
                   </div>
                   <AlertDialog>
