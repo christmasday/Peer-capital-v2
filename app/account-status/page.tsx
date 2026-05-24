@@ -42,7 +42,7 @@ export default async function AccountStatusPage() {
     .single()
 
   // Format name
-  const fullName = `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "User"
+  const fullName = profile.username ? `@${profile.username}` : `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "User"
 
   // Define verification requirements
   const verificationRequirements = [

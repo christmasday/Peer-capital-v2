@@ -75,6 +75,7 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
     twitter_url: profile.twitter_url || "",
     website: profile.website || "",
   })
+  const [usernameValue, setUsernameValue] = useState(profile.username || "")
   const [isSavingContact, setIsSavingContact] = useState(false)
   const [monthlyIncomeValue, setMonthlyIncomeValue] = useState<string>(
     profile.monthly_income !== undefined && profile.monthly_income !== null ? String(profile.monthly_income) : ""
@@ -211,14 +212,14 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
 
   const sections = [
     { id: "overview", name: "Overview", icon: Info },
+    { id: "loan-helper", name: "Lending Goals Settings", icon: Briefcase },
+    { id: "contact", name: "Contact and basic info", icon: Phone },
     { id: "work", name: "Work and education", icon: Briefcase },
     { id: "places", name: "Places lived", icon: MapPin },
-    { id: "contact", name: "Contact and basic info", icon: Phone },
     { id: "details", name: "Details about you", icon: User },
     { id: "lending-licence", name: "Lending Licence", icon: Briefcase },
     { id: "wallets", name: "Wallets", icon: Wallet },
     { id: "bank", name: "Repayment Account", icon: Briefcase },
-    { id: "loan-helper", name: "Loan Goal Settings", icon: Briefcase },
   ]
 
   useEffect(() => {
@@ -352,6 +353,17 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
   const handleSaveContact = async () => {
     setIsSavingContact(true)
     console.log("Saving social media data:", socialMediaData)
+
+    // If username changed, update it first
+    if ((usernameValue || "").trim() !== (profile.username || "")) {
+      const usernameResult = await updateProfile({ username: usernameValue.trim() }, profile.id)
+      if (!usernameResult.success) {
+        setIsSavingContact(false)
+        // Optionally, show an error toast
+        toast({ title: "Failed to update username", description: usernameResult.error || "Please choose a different username." })
+        return
+      }
+    }
 
     // Call the server action to update social media links
     const result = await updateSocialMedia(profile.id, socialMediaData)
@@ -2703,6 +2715,29 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
               </div>
             </div>
             <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700">Username</label>
+              <div className="flex items-center gap-2 mt-1 justify-between">
+                {isEditingContact ? (
+                  <input
+                    type="text"
+                    id="username"
+                    name="username"
+                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                    value={usernameValue}
+                    onChange={(e) => setUsernameValue(e.target.value)}
+                    placeholder="Choose a username"
+                  />
+                ) : (
+                  <>
+                    <span>{profile.username ? `@${profile.username}` : "Not set"}</span>
+                    {isCurrentUser && (
+                      <Button size="sm" variant="ghost" className="ml-auto" onClick={() => { setIsEditingContact(true); setIsEditingFullName(false); setIsEditingPhone(false); setIsEditingEmail(false); }}><Edit className="h-4 w-4" /></Button>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+            <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700">Twitter Profile URL</label>
               <div className="flex items-center gap-2 mt-1 justify-between">
                 {isEditingContact ? (
@@ -2991,7 +3026,7 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
         {activeSection === "loan-helper" && (
           <div className={`space-y-8 ${!profile.lending_license_url && loanAmount ? 'opacity-50 pointer-events-none select-none' : ''}`}>
             <h2 className="text-xl font-medium flex items-center justify-between">
-              Loan Goal Settings
+              Lending Goals Settings
               {isCurrentUser && !isEditingLoanHelper && profile.lending_license_url && (
                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setIsEditingLoanHelper(true)}>
                   <Edit className="h-4 w-4" />

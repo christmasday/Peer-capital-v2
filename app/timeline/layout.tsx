@@ -21,8 +21,8 @@ export default async function TimelineLayout({
   }
 
   const admin = createAdminClient()
-  const { data: profile } = await admin.from("profiles").select("first_name, last_name, profile_picture_url").eq("id", userId).maybeSingle()
-  const fullName = `${profile?.first_name || ""} ${profile?.last_name || ""}`.trim() || undefined
+  const { data: profile } = await admin.from("profiles").select("username, first_name, last_name, profile_picture_url").eq("id", userId).maybeSingle()
+  const fullName = profile?.username ? `@${profile.username}` : `${profile?.first_name || ""} ${profile?.last_name || ""}`.trim() || undefined
 
   return (
     <MainLayout userName={fullName} userImage={profile?.profile_picture_url} requireAuth={false}>

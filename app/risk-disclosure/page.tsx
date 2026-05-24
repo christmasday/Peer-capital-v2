@@ -14,7 +14,7 @@ export default async function RiskDisclosurePage() {
   let userImage = "/vibrant-street-market.png"
   if (auth.authenticated) {
     const userProfile = await getUserProfile()
-    userName = `${userProfile?.profile?.first_name || ""} ${userProfile?.profile?.last_name || ""}`.trim() || "User"
+    userName = userProfile?.profile?.username ? `@${userProfile.profile.username}` : `${userProfile?.profile?.first_name || ""} ${userProfile?.profile?.last_name || ""}`.trim() || "User"
     userImage = userProfile?.profile?.profile_picture_url || "/vibrant-street-market.png"
   }
 

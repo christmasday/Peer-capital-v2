@@ -4,7 +4,7 @@ import type { ReactNode } from "react"
 
 export default async function SettingsLayout({ children }: { children: ReactNode }) {
   const { profile } = await getUserProfile()
-  const userName = profile ? `${profile.first_name || ""} ${profile.last_name || ""}`.trim() : "User"
+  const userName = profile ? (profile.username ? `@${profile.username}` : `${profile.first_name || ""} ${profile.last_name || ""}`.trim()) : "User"
   const userImage = profile?.profile_picture_url || "/vibrant-street-market.png"
 
   return (

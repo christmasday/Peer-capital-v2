@@ -105,7 +105,7 @@ export default async function UserProfilePage({
     .eq("follower_id", userId)
 
   // Format name
-  const fullName = `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "User"
+  const fullName = profile.username ? `@${profile.username}` : `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "User"
 
   // Default banner image if user doesn't have one
   const defaultBannerImage = "/banners/abstract-blue.png"
@@ -209,7 +209,7 @@ export default async function UserProfilePage({
           {loanHelperSettings && profile.lending_license_url && loanHelperSettings.loan_amount && loanHelperSettings.interest_rate && loanHelperSettings.repayment_time && (
             <div className="flex items-center gap-4 mt-2">
               <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
-                Loan Goal
+                Lending Goals
               </span>
               <span className="ml-auto text-xs text-green-900 bg-green-50 px-3 py-1 rounded-md whitespace-nowrap">
                 ₦{loanHelperSettings.loan_amount?.toLocaleString()} at {loanHelperSettings.interest_rate}% for {loanHelperSettings.repayment_time} months

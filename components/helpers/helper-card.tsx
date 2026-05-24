@@ -18,6 +18,7 @@ interface HelperCardProps {
   amountIssued: string
   profileImage: string
   rating?: number
+  displayMetric?: "rating" | "loans-issued"
   loanAmount?: number
   repaymentTime?: number
   repaymentUnit?: string
@@ -33,12 +34,14 @@ export function HelperCard({
   amountIssued,
   profileImage,
   rating = 4.5,
+  displayMetric = "loans-issued",
   loanAmount,
   repaymentTime,
   repaymentUnit,
 }: HelperCardProps) {
   const [isHovered, setIsHovered] = useState(false)
   const [open, setOpen] = useState(false)
+  const loansIssuedLabel = Number(loanIssued) === 1 ? "loan Issued" : "loans Issued"
 
   const formatTenor = (time?: number, unit?: string, fallback?: string) => {
     if (time === undefined || time === null) return fallback || null
@@ -72,24 +75,28 @@ export function HelperCard({
                   className="object-cover"
                 />
               </div>
-              <div className="absolute -bottom-1 -right-1 bg-blue-600 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-white">
-                {rating}
+              <div className="absolute -bottom-1 -right-1 bg-blue-600 text-white text-xs font-bold rounded-full h-5 min-w-5 px-1 flex items-center justify-center border-2 border-white">
+                {displayMetric === "rating" ? rating : loanIssued}
               </div>
             </div>
             <div>
               <h3 className="text-sm sm:text-base font-bold text-gray-900 line-clamp-1">{name}</h3>
-              <div className="flex items-center mt-1">
-                <div className="flex">
-                  {[...Array(5)].map((_, i) => (
-                    <Star
-                      key={i}
-                      size={12}
-                      className={i < Math.floor(rating) ? "text-yellow-400 fill-yellow-400" : "text-gray-300"}
-                    />
-                  ))}
+              {displayMetric === "rating" ? (
+                <div className="flex items-center mt-1">
+                  <div className="flex">
+                    {[...Array(5)].map((_, i) => (
+                      <Star
+                        key={i}
+                        size={12}
+                        className={i < Math.floor(rating) ? "text-yellow-400 fill-yellow-400" : "text-gray-300"}
+                      />
+                    ))}
+                  </div>
+                  <span className="text-xs text-gray-500 ml-1">{rating} rating</span>
                 </div>
-                <span className="text-xs text-gray-500 ml-1">{rating} rating</span>
-              </div>
+              ) : (
+                <div className="mt-1 text-xs text-gray-500">{loanIssued} {loansIssuedLabel}</div>
+              )}
             </div>
           </div>
           {/* top-right interest badge removed per design */}

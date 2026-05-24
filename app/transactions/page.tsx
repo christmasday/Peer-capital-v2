@@ -9,7 +9,7 @@ export default async function TransactionsPage() {
   await checkAuth()
 
   const userProfile = await getUserProfile()
-  const fullName = `${userProfile.profile.first_name || ""} ${userProfile.profile.last_name || ""}`.trim() || userProfile.user.email || "User"
+  const fullName = userProfile.profile.username ? `@${userProfile.profile.username}` : `${userProfile.profile.first_name || ""} ${userProfile.profile.last_name || ""}`.trim() || userProfile.user.email || "User"
 
   return (
     <MainLayout userName={fullName} userImage={userProfile.profile.profile_picture_url || ""}>

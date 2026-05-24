@@ -10,7 +10,7 @@ export default async function UserReviewsPage({ params }: { params: { userId: st
   // Check if user exists
   const { data: profile, error } = await supabase
     .from("profiles")
-    .select("id, first_name, last_name")
+    .select("id, username, first_name, last_name")
     .eq("id", params.userId)
     .single()
 
@@ -21,7 +21,7 @@ export default async function UserReviewsPage({ params }: { params: { userId: st
   return (
     <div className="container max-w-4xl mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold mb-6">
-        Reviews for {profile.first_name} {profile.last_name}
+        Reviews for {profile.username ? `@${profile.username}` : `${profile.first_name} ${profile.last_name}`}
       </h1>
 
       <Card>

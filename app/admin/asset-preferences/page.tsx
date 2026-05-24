@@ -27,6 +27,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 
 interface User {
   id: string
+  username?: string | null
   first_name: string
   last_name: string
   email: string
@@ -154,6 +155,7 @@ export default function AssetPreferencesManagement() {
   }
 
   const filteredUsers = users.filter(user => 
+    (user.username || "").toLowerCase().includes(search.toLowerCase()) ||
     user.first_name.toLowerCase().includes(search.toLowerCase()) ||
     user.last_name.toLowerCase().includes(search.toLowerCase()) ||
     user.email.toLowerCase().includes(search.toLowerCase())
@@ -254,7 +256,7 @@ export default function AssetPreferencesManagement() {
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
                       <div className="font-medium text-gray-900">
-                        {user.first_name} {user.last_name}
+                        {user.username ? `@${user.username}` : `${user.first_name} ${user.last_name}`}
                       </div>
                       {user.asset_preferences ? (
                         <Badge variant="default" className="bg-green-100 text-green-800">

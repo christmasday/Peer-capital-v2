@@ -28,7 +28,7 @@ export default async function AdminMigrationsPage() {
 
   return (
     <MainLayout
-      userName={userProfile.profile?.first_name || "Admin"}
+      userName={userProfile.profile?.username ? `@${userProfile.profile.username}` : userProfile.profile?.first_name || "Admin"}
       userImage={userProfile.profile?.profile_picture_url || "/vibrant-street-market.png"}
     >
       <div className="max-w-6xl mx-auto">

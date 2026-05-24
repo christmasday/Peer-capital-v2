@@ -46,7 +46,7 @@ export default async function HomePage() {
             enabledOffers.map(async (offer: any) => {
               const { data: profileArr } = await adminClient
                 .from("profiles")
-                .select("first_name, last_name, profile_picture_url")
+                .select("username, first_name, last_name, profile_picture_url")
                 .eq("id", offer.user_id)
               const profile = profileArr && profileArr[0]
               // Fetch computed stats from loan_history
@@ -54,7 +54,7 @@ export default async function HomePage() {
               const totalAmountGiven = await getTotalAmountGivenByLender(offer.user_id)
               return {
                 id: offer.user_id,
-                name: `${profile?.first_name || ""} ${profile?.last_name || ""}`.trim(),
+                name: profile?.username ? `@${profile.username}` : `${profile?.first_name || ""} ${profile?.last_name || ""}`.trim(),
                 interest_rate: offer.interest_rate || 0,
                 max_loan_amount: maxLoanAmount,
                 loans_issued: 0, // Optionally fetch

@@ -57,7 +57,7 @@ export default async function LoansPage() {
 
   return (
     <MainLayout
-      userName={userProfile.profile?.first_name || "User"}
+      userName={userProfile.profile?.username ? `@${userProfile.profile.username}` : userProfile.profile?.first_name || "User"}
       userImage={userProfile.profile?.profile_picture_url || "/vibrant-street-market.png"}
     >
       <div className="max-w-4xl mx-auto">

@@ -19,6 +19,7 @@ export interface Database {
           zip_code: string | null
           country: string | null
           profile_picture_url: string | null
+          username?: string | null
           created_at: string
           updated_at: string
           // ID verification fields
@@ -68,6 +69,7 @@ export interface Database {
           zip_code?: string | null
           country?: string | null
           profile_picture_url?: string | null
+          username?: string | null
           created_at?: string
           updated_at?: string
           // ID verification fields
@@ -117,6 +119,7 @@ export interface Database {
           zip_code?: string | null
           country?: string | null
           profile_picture_url?: string | null
+          username?: string | null
           created_at?: string
           updated_at?: string
           id_type?: string | null

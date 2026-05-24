@@ -9,6 +9,7 @@ export async function POST(req: NextRequest) {
     const email = (body?.email || "").toString().trim().toLowerCase()
     const firstName = (body?.firstName || "").toString().trim()
     const lastName = (body?.lastName || "").toString().trim()
+    const username = (body?.username || "").toString().trim() || null
     const phoneNumber = (body?.phoneNumber || "").toString().trim()
     const middleName = (body?.middleName || "").toString().trim() || null
     const dateOfBirth = body?.dateOfBirth || null
@@ -117,6 +118,24 @@ export async function POST(req: NextRequest) {
       }, { status: 400 })
     }
 
+    // Validate username if provided
+    if (username) {
+      if (!/^[a-zA-Z0-9_-]{3,24}$/.test(username)) {
+        return NextResponse.json({ error: "Username must be 3-24 characters and contain only letters, numbers, hyphens or underscores." }, { status: 400 })
+      }
+
+      // Check username uniqueness (case-insensitive)
+      const { data: usernameExisting, error: usernameError } = await admin
+        .from("profiles")
+        .select("id")
+        .ilike("username", username)
+        .maybeSingle()
+
+      if (!usernameError && usernameExisting && usernameExisting.id) {
+        return NextResponse.json({ error: "This username is already taken. Please choose another." }, { status: 400 })
+      }
+    }
+
         const userId = crypto.randomUUID()
         const now = new Date().toISOString()
         const tempPassword = `Temp${Math.random().toString(36).slice(-8)}!`
@@ -139,6 +158,7 @@ export async function POST(req: NextRequest) {
             first_name: firstName,
             last_name: lastName,
             phone_number: phoneNumber,
+            username: username,
           },
           is_super_admin: false,
           created_at: now,
@@ -163,6 +183,7 @@ export async function POST(req: NextRequest) {
       first_name: firstName,
       middle_name: middleName,
       last_name: lastName,
+      username: username,
       phone_number: phoneNumber,
       date_of_birth: dateOfBirth,
       referral_code: referralCode,

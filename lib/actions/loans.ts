@@ -8,6 +8,7 @@ import { getJWTFromCookies, verifyJWT } from "@/lib/jwt"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/lib/supabase/database.types"
 import { createNotification } from "@/lib/actions/notifications"
+import { getBlockedUsers } from "@/lib/actions/connections"
 
 // Mock data for fallback
 const mockLoanRequests = [
@@ -341,7 +342,7 @@ export async function getAllLoanRequests() {
     if (userIds.length > 0) {
       const { data: profiles, error: profilesError } = await adminClient
         .from("profiles")
-        .select("id, first_name, last_name, profile_picture_url")
+        .select("id, username, first_name, last_name, profile_picture_url")
         .in("id", userIds);
       if (!profilesError && profiles) {
         profilesMap = profiles.reduce((acc: Record<string, any>, p: any) => {

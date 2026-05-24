@@ -34,7 +34,7 @@ export default async function HomeLayout({
     }
 
     // Get the full name from the user data
-    const fullName = user?.full_name || `${user?.first_name || ""} ${user?.last_name || ""}`.trim()
+    const fullName = user?.username ? `@${user.username}` : user?.full_name || `${user?.first_name || ""} ${user?.last_name || ""}`.trim()
 
     return (
       <MainLayout userName={fullName} userImage={user?.profile_picture_url} requireAuth={false}>

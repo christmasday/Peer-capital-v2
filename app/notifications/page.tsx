@@ -14,7 +14,7 @@ export default async function NotificationsPage() {
   const { notifications = [], unreadCount = 0, error } = await getNotifications(1, 20, true)
 
   return (
-    <MainLayout userName={`${userProfile.profile?.first_name || ""} ${userProfile.profile?.last_name || ""}`.trim() || "User"} userImage={userProfile.profile?.profile_picture_url}>
+    <MainLayout userName={userProfile.profile?.username ? `@${userProfile.profile.username}` : `${userProfile.profile?.first_name || ""} ${userProfile.profile?.last_name || ""}`.trim() || "User"} userImage={userProfile.profile?.profile_picture_url}>
       <div className="container max-w-3xl mx-auto py-10">
         <div className="mx-auto">
           <NotificationsClient initialNotifications={notifications} initialUnreadCount={unreadCount} error={error} />

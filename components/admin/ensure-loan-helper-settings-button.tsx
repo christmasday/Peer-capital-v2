@@ -18,12 +18,12 @@ export function EnsureLoanHelperSettingsButton() {
       if (result.success) {
         toast({
           title: "Success",
-          description: "Loan goal settings table has been created or verified.",
+          description: "Lending goals settings table has been created or verified.",
         })
       } else {
         toast({
           title: "Error",
-          description: result.error || "Failed to create loan helper settings table.",
+          description: result.error || "Failed to create lending goals settings table.",
           variant: "destructive",
         })
       }
@@ -43,10 +43,10 @@ export function EnsureLoanHelperSettingsButton() {
       {isLoading ? (
         <>
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          Creating Loan Goal Settings Table...
+          Creating Lending Goals Settings Table...
         </>
       ) : (
-        "Ensure Loan Goal Settings Table"
+        "Ensure Lending Goals Settings Table"
       )}
     </Button>
   )
