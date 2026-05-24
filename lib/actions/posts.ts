@@ -6,7 +6,6 @@ import { cookies } from "next/headers"
 import { revalidatePath } from "next/cache"
 import { v4 as uuidv4 } from "uuid"
 import { createProfileActivityNotification } from "./activity-notifications"
-import { getBlockedUsers } from "@/lib/actions/connections"
 
 // Function to get the current user ID
 async function getCurrentUserId() {
@@ -183,14 +182,8 @@ export async function getUserPosts(userId: string, limit = 10, offset = 0) {
       return { error: "User ID is required", posts: [] }
     }
 
-    const adminClient = createAdminClient()
 
-    // Get blocked users for the current user
-    const { blocked } = await getBlockedUsers();
-    // If the user is blocked by the current user, return no posts
-    if (blocked && blocked.includes(userId)) {
-      return { posts: [] };
-    }
+    const adminClient = createAdminClient()
 
     // Try to directly query the posts table
     try {

@@ -5,7 +5,6 @@ import { cookies } from "next/headers"
 import type { Database } from "../supabase/database.types"
 import { createNotification } from "./notifications"
 import { revalidatePath } from "next/cache"
-import { getBlockedUsers } from "@/lib/actions/connections"
 
 type LenderReview = {
   id: string
@@ -131,6 +130,7 @@ export async function submitLenderReview(formData: FormData) {
         reviewId: result.data[0].id,
         previewText: comment.substring(0, 50) + (comment.length > 50 ? "..." : ""),
       },
+      message: notificationMessage,
     })
   } catch (error) {
     // Don't fail the review submission if notification fails
@@ -162,11 +162,7 @@ export async function getLenderReviews(lenderId: string) {
     return { error: "Failed to fetch reviews" }
   }
 
-  // Filter out reviews from blocked users
-  const { blocked } = await getBlockedUsers();
-  const filtered = (data as LenderReview[]).filter((review) => !blocked.includes(review.reviewer_id));
-
-  return { data: filtered }
+  return { data: data as LenderReview[] }
 }
 
 export async function getUserReviewForLender(lenderId: string) {

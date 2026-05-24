@@ -8,9 +8,6 @@ import { getJWTFromCookies, verifyJWT } from "@/lib/jwt"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/lib/supabase/database.types"
 import { createNotification } from "@/lib/actions/notifications"
-import { getBorrowerMaxAmount, getLenderMaxAmount, getBorrowerPolicyForAmount, getLenderTierForLender } from "@/lib/loan-policies.server"
-import { durationToDays } from "@/lib/loan-limits"
-import { getBlockedUsers } from "@/lib/actions/connections"
 
 // Mock data for fallback
 const mockLoanRequests = [

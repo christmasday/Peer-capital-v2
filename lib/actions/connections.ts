@@ -3,7 +3,6 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { revalidatePath } from "next/cache"
 import { createNotification } from "@/lib/actions/notifications"
 import { getCurrentUserId } from "@/lib/auth-utils"
-// import { getBlockedUsers } from "@/lib/actions/connections"
 
 // Helper function to get user profile info
 async function getUserProfileInfo(userId: string) {
@@ -159,7 +158,9 @@ export async function followUser(followingId: string) {
           await createNotification({
             userId: followingId,
             type: "follow",
+            content: `${followerName} is now following you!`,
             actorId: followerId,
+            referenceId: followerId, // Using follower ID as reference
             data: {
               followerName,
               followerProfilePicture: followerProfile.profile_picture_url,
@@ -356,7 +357,7 @@ export async function getFollowers(userId: string, page = 1, limit = 10) {
     })
 
     // Combine the connection and profile data
-    let followers = connections.map((connection) => {
+    const followers = connections.map((connection) => {
       const profile = profilesMap.get(connection.follower_id) || {}
       return {
         connectionId: connection.id,
@@ -368,9 +369,7 @@ export async function getFollowers(userId: string, page = 1, limit = 10) {
         followedAt: connection.created_at,
       }
     })
-    // Filter out blocked users
-    const { blocked } = await getBlockedUsers();
-    followers = followers.filter((f) => !blocked.includes(f.userId));
+
     return { followers }
   } catch (error) {
     return { error: "An unexpected error occurred" }
@@ -425,7 +424,7 @@ export async function getFollowing(userId: string, page = 1, limit = 10) {
     })
 
     // Combine the connection and profile data
-    let following = connections.map((connection) => {
+    const following = connections.map((connection) => {
       const profile = profilesMap.get(connection.following_id) || {}
       return {
         connectionId: connection.id,
@@ -437,68 +436,9 @@ export async function getFollowing(userId: string, page = 1, limit = 10) {
         followedAt: connection.created_at,
       }
     })
-    // Filter out blocked users
-    const { blocked } = await getBlockedUsers();
-    following = following.filter((f) => !blocked.includes(f.userId));
+
     return { following }
   } catch (error) {
     return { error: "An unexpected error occurred" }
-  }
-}
-
-// Block a user
-export async function blockUser(blockedUserId: string) {
-  try {
-    const blockerId = await getCurrentUserId();
-    if (!blockerId) return { error: "You must be logged in to block users" };
-    if (blockerId === blockedUserId) return { error: "You cannot block yourself" };
-    const adminClient = createAdminClient();
-    const { error } = await adminClient.from("blocked_users").upsert({ user_id: blockerId, blocked_user_id: blockedUserId });
-    if (error) return { error: "Failed to block user" };
-    return { success: true };
-  } catch (error) {
-    return { error: "An unexpected error occurred" };
-  }
-}
-
-// Unblock a user
-export async function unblockUser(blockedUserId: string) {
-  try {
-    const blockerId = await getCurrentUserId();
-    if (!blockerId) return { error: "You must be logged in to unblock users" };
-    const adminClient = createAdminClient();
-    const { error } = await adminClient.from("blocked_users").delete().eq("user_id", blockerId).eq("blocked_user_id", blockedUserId);
-    if (error) return { error: "Failed to unblock user" };
-    return { success: true };
-  } catch (error) {
-    return { error: "An unexpected error occurred" };
-  }
-}
-
-// Check if a user is blocked by the current user
-export async function isUserBlocked(blockedUserId: string) {
-  try {
-    const blockerId = await getCurrentUserId();
-    if (!blockerId) return false;
-    const adminClient = createAdminClient();
-    const { data, error } = await adminClient.from("blocked_users").select("id").eq("user_id", blockerId).eq("blocked_user_id", blockedUserId).maybeSingle();
-    if (error) return false;
-    return !!data;
-  } catch (error) {
-    return false;
-  }
-}
-
-// Get all users blocked by the current user
-export async function getBlockedUsers() {
-  try {
-    const blockerId = await getCurrentUserId();
-    if (!blockerId) return { blocked: [] };
-    const adminClient = createAdminClient();
-    const { data, error } = await adminClient.from("blocked_users").select("blocked_user_id").eq("user_id", blockerId);
-    if (error) return { blocked: [] };
-    return { blocked: data?.map((row: any) => row.blocked_user_id) || [] };
-  } catch (error) {
-    return { blocked: [] };
   }
 }

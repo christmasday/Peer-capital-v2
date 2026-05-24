@@ -1,0 +1,12 @@
+-- Add new address fields to profiles table
+ALTER TABLE profiles
+  ADD COLUMN IF NOT EXISTS building_number TEXT,
+  ADD COLUMN IF NOT EXISTS apartment TEXT,
+  ADD COLUMN IF NOT EXISTS street TEXT,
+  ADD COLUMN IF NOT EXISTS town TEXT,
+  ADD COLUMN IF NOT EXISTS lga TEXT,
+  ADD COLUMN IF NOT EXISTS lcda TEXT,
+  ADD COLUMN IF NOT EXISTS landmark TEXT,
+  ADD COLUMN IF NOT EXISTS additional_information TEXT,
+  ADD COLUMN IF NOT EXISTS full_address TEXT,
+  ADD COLUMN IF NOT EXISTS postal_code TEXT; 
