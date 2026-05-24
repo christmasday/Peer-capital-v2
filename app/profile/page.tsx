@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation"
+import { Suspense } from "react"
 import { createServerClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { cookies } from "next/headers"
@@ -35,11 +36,11 @@ import { getUserPosts } from "@/lib/actions/posts"
 import { PostsList } from "@/components/profile/posts-list"
 import { ProfileAbout } from "@/components/profile/profile-about"
 import { ProfilePostsWrapper } from "@/components/profile/profile-posts-wrapper"
-import { ConnectionsList } from "@/components/profile/connections-list"
 import { getFollowersCount, getFollowingCount } from "@/lib/actions/connections"
 import { updateProfile } from "@/lib/actions/profile"
 import { LoanRequestsList } from "@/components/loans/LoanRequestsList"
 import { getAllLoanRequests } from "@/lib/actions/loans"
+import { ContactsList } from "@/components/profile/contacts-list"
 // Removed Paystack virtual account integration
 
 export const dynamic = "force-dynamic"
@@ -48,6 +49,9 @@ export const revalidate = 0
 export default async function ProfilePage({ searchParams }: { searchParams: { tab?: string } }) {
   // Check authentication with a more reliable method
   await checkAuth()
+
+  // Await searchParams since it's a Promise in Next.js 13+
+  const params = await searchParams
 
   const userProfile = await getUserProfile()
 
@@ -101,7 +105,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
   const followingCount = followingResult.count || 0
 
   // Get active tab from search params or default to "about"
-  const activeTab = searchParams?.tab || "about"
+  const activeTab = params?.tab || "about"
 
   // Fetch all loan requests for the 'Loan Requests' tab
   let allLoanRequests: any[] = []
@@ -171,18 +175,13 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
                 )}
                 {profile.employer_name && <span>at {profile.employer_name}</span>}
               </div>
-              <div className="flex items-center gap-2 mt-1 text-gray-600">
-                <span className="flex items-center">
-                  Followed by {followersCount} {followersCount === 1 ? "person" : "people"}
-                </span>
-              </div>
             </div>
 
             {/* Right side - Loan helper info */}
             {loanHelperSettings && profile.lending_license_url && (
               <div className="flex items-center mt-1.5 md:mt-0">
                 <div className="flex flex-col items-end">
-                  <Badge className="bg-green-500 hover:bg-green-600 mb-1">Loan Helper</Badge>
+                  <Badge className="bg-green-500 hover:bg-green-600 mb-1">Loan Goal</Badge>
                   <div className="flex items-center text-sm text-green-700 bg-green-50 px-3 py-1 rounded-md whitespace-nowrap">
                     <Wallet className="h-4 w-4 mr-2" />
                     <span>
@@ -200,7 +199,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
           <div className="flex space-x-1 overflow-x-auto justify-center">
             {[
               { name: "About", href: "/profile?tab=about", active: activeTab === "about" },
-              { name: "Friends", href: "/profile/?tab=friends", active: activeTab === "friends" },
+              { name: "Contacts", href: "/profile?tab=contacts", active: activeTab === "contacts" },
               { name: "Loan Requests", href: "/profile?tab=loan-requests", active: activeTab === "loan-requests" },
             ].map((tab) => (
               <Link
@@ -223,18 +222,17 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
           </div>
         </div>
 
-        {activeTab === "friends" ? (
-          <ConnectionsList
-            userId={user.id}
-            initialFollowersCount={followersCount}
-            initialFollowingCount={followingCount}
-          />
+        {activeTab === "contacts" ? (
+          <Suspense fallback={<div className="p-8 text-center">Loading contacts...</div>}>
+            <ContactsList />
+          </Suspense>
         ) : activeTab === "about" ? (
           <ProfileAbout profile={profile} isCurrentUser={true} virtualAccount={null} initialSection="about" />
         ) : activeTab === "loan-requests" ? (
           <div className="lg:col-span-12">
             <h2 className="text-xl font-bold mb-4">All Loan Requests</h2>
-            <LoanRequestsList loanRequests={allLoanRequests} currentUserId={user.id} showAdminActions highlight={searchParams?.highlight} />
+            <LoanRequestsList loanRequests={allLoanRequests} currentUserId={user.id} showAdminActions highlight={params?.highlight} />
+                      <LoanRequestsList loanRequests={allLoanRequests} currentUserId={user.id} showAdminActions highlight={params?.highlight} />
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6" id="overview">
@@ -272,7 +270,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
                   </div>
 
                   <Button variant="outline" className="w-full mt-4" asChild>
-                    <Link href="/profile/edit">Edit details</Link>
+                    <Link href="/profile">Edit details</Link>
                   </Button>
                 </CardContent>
               </Card>
@@ -282,7 +280,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
                 <Card>
                   <CardHeader>
                     <div className="flex justify-between items-center">
-                      <CardTitle className="text-lg">Loan Helper Settings</CardTitle>
+                      <CardTitle className="text-lg">Loan Goal Settings</CardTitle>
                       <Link href="/profile/loan-helper">
                         <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                           <Edit className="h-4 w-4" />

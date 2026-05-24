@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { ArrowRight, Star, Shield, TrendingUp } from "lucide-react"
+import { ArrowRight, Star, Clock, TrendingUp, Percent } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { motion } from "framer-motion"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -39,6 +39,17 @@ export function HelperCard({
 }: HelperCardProps) {
   const [isHovered, setIsHovered] = useState(false)
   const [open, setOpen] = useState(false)
+
+  const formatTenor = (time?: number, unit?: string, fallback?: string) => {
+    if (time === undefined || time === null) return fallback || null
+    // If no unit provided, just return the number
+    if (!unit) return `${time}`
+    const u = unit.toLowerCase()
+    let base = u.includes("month") ? "month" : u.includes("week") ? "week" : u.includes("day") ? "day" : unit
+    // pluralize
+    const label = time === 1 ? base : `${base}s`
+    return `${time} ${label}`
+  }
 
   return (
     <motion.div
@@ -81,9 +92,7 @@ export function HelperCard({
               </div>
             </div>
           </div>
-          <div className="bg-blue-50 px-2 py-1 rounded-full">
-            <p className="text-blue-700 font-semibold text-xs">{interestRate}% interest</p>
-          </div>
+          {/* top-right interest badge removed per design */}
         </div>
 
         <div className="grid grid-cols-3 gap-2 mb-4">
@@ -96,17 +105,17 @@ export function HelperCard({
           </div>
           <div className="bg-gray-50 rounded-lg p-2 text-center">
             <div className="flex justify-center mb-1">
-              <Shield size={14} className="text-blue-600" />
+              <Clock size={14} className="text-blue-600" />
             </div>
-            <p className="text-xs sm:text-sm font-bold text-gray-900 line-clamp-1">{loanIssued}</p>
-            <p className="text-xs text-gray-500">Loans Issued</p>
+            <p className="text-xs sm:text-sm font-bold text-gray-900 line-clamp-1">{formatTenor(repaymentTime, repaymentUnit, loanIssued)}</p>
+            <p className="text-xs text-gray-500">Loan Tenor</p>
           </div>
           <div className="bg-gray-50 rounded-lg p-2 text-center">
             <div className="flex justify-center mb-1">
-              <Star size={14} className="text-blue-600" />
+              <Percent size={14} className="text-blue-600" />
             </div>
-            <p className="text-xs sm:text-sm font-bold text-gray-900 line-clamp-1">{amountIssued}</p>
-            <p className="text-xs text-gray-500">Amount Issued</p>
+            <p className="text-xs sm:text-sm font-bold text-blue-600 line-clamp-1">{interestRate ? (interestRate.toString().includes("%") ? interestRate : `${interestRate}%`) : amountIssued}</p>
+            <p className="text-xs text-gray-500">Interest Rate</p>
           </div>
         </div>
 

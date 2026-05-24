@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { Bell } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { getUnreadNotificationsCount } from "@/lib/actions/notifications"
+import { useNotificationRealtime } from "@/hooks/use-notification-realtime"
 
 interface NotificationBadgeProps {
   className?: string
@@ -14,33 +15,44 @@ export function NotificationBadge({ className }: NotificationBadgeProps) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    const fetchUnreadCount = async () => {
-      try {
-        setLoading(true)
-        setError(null)
+  const fetchUnreadCount = async () => {
+    try {
+      setLoading(true)
+      setError(null)
 
-        const result = await getUnreadNotificationsCount()
+      const result = await getUnreadNotificationsCount()
 
-        if (result.success && result.count !== undefined) {
-          setUnreadCount(result.count)
-        } else if (result.error) {
-          setError(result.error)
-        }
-      } catch (error) {
-        setError("Failed to load notifications")
-      } finally {
-        setLoading(false)
+      if (result.success && result.count !== undefined) {
+        setUnreadCount(result.count)
+      } else if (result.error) {
+        setError(result.error)
       }
+    } catch (error) {
+      setError("Failed to load notifications")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const { isRealtimeConnected } = useNotificationRealtime(() => {
+    void fetchUnreadCount()
+  })
+
+  useEffect(() => {
+    void fetchUnreadCount()
+  }, [])
+
+  useEffect(() => {
+    if (isRealtimeConnected) {
+      return
     }
 
-    fetchUnreadCount()
-
-    // Set up polling to check for new notifications every minute
-    const intervalId = setInterval(fetchUnreadCount, 60000)
+    const intervalId = setInterval(() => {
+      void fetchUnreadCount()
+    }, 300000)
 
     return () => clearInterval(intervalId)
-  }, [])
+  }, [isRealtimeConnected])
 
   return (
     <div className={`relative ${className || ""}`}>

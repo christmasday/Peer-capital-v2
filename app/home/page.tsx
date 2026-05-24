@@ -62,8 +62,11 @@ export default async function HomePage() {
                 profile_image_url: profile?.profile_picture_url || null,
                 rating: 4.5, // Optionally fetch
                 loanAmount: offer.loan_amount,
+                maxLoanAmount: offer.loan_amount,
                 repaymentTime: offer.repayment_time,
+                repayment_time: offer.repayment_time,
                 repaymentUnit: offer.repayment_unit,
+                repayment_unit: offer.repayment_unit,
               }
             })
           )

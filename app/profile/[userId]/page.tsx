@@ -196,9 +196,9 @@ export default async function UserProfilePage({
             <h1 className="text-3xl font-bold">{fullName}</h1>
             <div className="flex items-center gap-2 ml-auto">
               <FollowButton userId={userId || ""} initialFollowingState={initialFollowingState} />
-              <Link href={`/messages/${userId}`}>
+              <Link href={`/support-inbox`}>
                 <Button variant="outline" className="bg-gray-200 border-gray-300 hover:bg-gray-300 text-black">
-                  <span className="mr-2">Message</span>
+                  <span className="mr-2">Contact</span>
                 </Button>
               </Link>
             </div>
@@ -209,7 +209,7 @@ export default async function UserProfilePage({
           {loanHelperSettings && profile.lending_license_url && loanHelperSettings.loan_amount && loanHelperSettings.interest_rate && loanHelperSettings.repayment_time && (
             <div className="flex items-center gap-4 mt-2">
               <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
-                Loan Helper
+                Loan Goal
               </span>
               <span className="ml-auto text-xs text-green-900 bg-green-50 px-3 py-1 rounded-md whitespace-nowrap">
                 ₦{loanHelperSettings.loan_amount?.toLocaleString()} at {loanHelperSettings.interest_rate}% for {loanHelperSettings.repayment_time} months

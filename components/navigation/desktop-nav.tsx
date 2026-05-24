@@ -144,7 +144,7 @@ export function DesktopNav({ userName, userImage }: DesktopNavProps) {
                   <span>Profile</span>
                 </DropdownMenuItem>
               </Link>
-              <Link href="/profile/edit">
+              <Link href="/profile">
                 <DropdownMenuItem>
                   <User className="mr-2 h-4 w-4" />
                   <span>Edit Profile</span>
@@ -181,7 +181,7 @@ export function DesktopNav({ userName, userImage }: DesktopNavProps) {
                   <span>Profile</span>
                 </DropdownMenuItem>
               </Link>
-              <Link href="/profile/edit">
+              <Link href="/profile">
                 <DropdownMenuItem>
                   <User className="mr-2 h-4 w-4" />
                   <span>Edit Profile</span>

@@ -62,9 +62,31 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Failed to fetch users" }, { status: 500 })
     }
 
+    const userIds = (users || []).map((user) => user.id)
+    const { data: authUsers } = userIds.length
+      ? await admin
+          .from('auth_users')
+          .select('id, banned_until')
+          .in('id', userIds)
+      : { data: [] }
+
+    const authById = new Map((authUsers || []).map((user) => [user.id, user]))
+
+    const usersWithSuspension = (users || []).map((user) => {
+      const authUser = authById.get(user.id)
+      const bannedUntil = authUser?.banned_until || null
+      const isSuspended = Boolean(bannedUntil && new Date(bannedUntil) > new Date())
+
+      return {
+        ...user,
+        suspended: isSuspended,
+        banned_until: bannedUntil,
+      }
+    })
+
     return NextResponse.json({
       success: true,
-      users: users || [],
+      users: usersWithSuspension,
       pagination: {
         page,
         limit,
@@ -103,16 +125,55 @@ export async function PATCH(req: NextRequest) {
 
     switch (action) {
       case 'suspend':
-        updateData = { suspended: true, suspended_at: new Date().toISOString() }
+        {
+          const bannedUntil = new Date()
+          bannedUntil.setFullYear(bannedUntil.getFullYear() + 100)
+
+          const { error: banError } = await admin
+            .from('auth_users')
+            .update({
+              banned_until: bannedUntil.toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', userId)
+
+          if (banError) {
+            console.error('Error suspending user:', banError)
+            return NextResponse.json({ error: 'Failed to suspend user' }, { status: 500 })
+          }
+
+          return NextResponse.json({
+            success: true,
+            message: 'User suspended successfully',
+          })
+        }
         break
       case 'unsuspend':
-        updateData = { suspended: false, suspended_at: null }
+        {
+          const { error: unbanError } = await admin
+            .from('auth_users')
+            .update({
+              banned_until: null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', userId)
+
+          if (unbanError) {
+            console.error('Error unsuspending user:', unbanError)
+            return NextResponse.json({ error: 'Failed to unsuspend user' }, { status: 500 })
+          }
+
+          return NextResponse.json({
+            success: true,
+            message: 'User unsuspended successfully',
+          })
+        }
         break
       case 'disable':
-        updateData = { disabled: true, disabled_at: new Date().toISOString() }
+        return NextResponse.json({ error: 'Disable action is not supported' }, { status: 400 })
         break
       case 'enable':
-        updateData = { disabled: false, disabled_at: null }
+        return NextResponse.json({ error: 'Enable action is not supported' }, { status: 400 })
         break
       case 'make_staff':
         updateData = { is_staff: true }
