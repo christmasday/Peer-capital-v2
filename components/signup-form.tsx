@@ -12,7 +12,6 @@ import { AlertCircle, ArrowLeft, CheckCircle, Loader2, Mail } from "lucide-react
 type SignupDetails = {
   firstName: string
   lastName: string
-  username?: string
   email: string
   phoneNumber: string
 }
@@ -37,12 +36,6 @@ function DetailsStep({
 
     if (!details.firstName.trim()) nextErrors.firstName = "First name is required"
     if (!details.lastName.trim()) nextErrors.lastName = "Last name is required"
-
-    if (!details.username || !details.username.trim()) {
-      nextErrors.username = "Username is required"
-    } else if (!/^[a-zA-Z0-9_-]{3,24}$/.test(details.username)) {
-      nextErrors.username = "Username must be 3-24 characters and contain only letters, numbers, hyphens or underscores"
-    }
 
     if (!details.email.trim()) {
       nextErrors.email = "Email is required"
@@ -100,19 +93,6 @@ function DetailsStep({
             />
             {fieldErrors.lastName && <p className="mt-1 text-sm text-red-600">{fieldErrors.lastName}</p>}
           </div>
-        </div>
-
-        <div>
-          <Label htmlFor="username" className="text-sm font-medium text-gray-700">Username</Label>
-          <Input
-            id="username"
-            value={details.username}
-            onChange={(e) => setDetails((prev) => ({ ...prev, username: e.target.value }))}
-            className="mt-1"
-            disabled={loading}
-            placeholder="Choose a username (e.g. alex_smith)"
-          />
-          {fieldErrors.username && <p className="mt-1 text-sm text-red-600">{fieldErrors.username}</p>}
         </div>
 
         <div>
@@ -272,7 +252,6 @@ export function SignupForm() {
   const [details, setDetails] = useState<SignupDetails>({
     firstName: "",
     lastName: "",
-    username: "",
     email: "",
     phoneNumber: "",
   })
@@ -330,7 +309,6 @@ export function SignupForm() {
         body: JSON.stringify({
           email: details.email,
           phoneNumber: details.phoneNumber,
-          username: details.username,
         }),
       })
 
@@ -341,11 +319,7 @@ export function SignupForm() {
       }
 
       if (!availabilityData.available) {
-        if (availabilityData.usernameExists) {
-          setError("This username is already taken. Please choose another.")
-        } else {
-          setError(availabilityData.message || "An account with these details already exists. Please sign in instead.")
-        }
+        setError(availabilityData.message || "An account with these details already exists. Please sign in instead.")
         return
       }
 
@@ -403,7 +377,6 @@ export function SignupForm() {
         body: JSON.stringify({
           firstName: details.firstName,
           lastName: details.lastName,
-          username: details.username,
           email: details.email,
           phoneNumber: details.phoneNumber,
         }),

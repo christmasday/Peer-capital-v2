@@ -22,6 +22,7 @@ import {
   Shield,
   User,
   Star,
+  Search,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -121,6 +122,10 @@ export function NotificationItem({ notification, onUpdate }: NotificationItemPro
       case "loan_approved":
       case "loan_rejected":
         return <CreditCard className="h-5 w-5 text-green-500" />
+      case "loan_offer":
+      case "loan_offer_accepted":
+      case "loan_offer_rejected":
+        return <CreditCard className="h-5 w-5 text-cyan-500" />
       case "transaction":
         return <CreditCard className="h-5 w-5 text-purple-500" />
       case "deposit":
@@ -142,6 +147,8 @@ export function NotificationItem({ notification, onUpdate }: NotificationItemPro
         return <Shield className="h-5 w-5 text-red-500" />
       case "review":
         return <Star className="h-5 w-5 text-amber-500" />
+      case "loan_search_match":
+        return <Search className="h-5 w-5 text-cyan-500" />
       case "system":
       default:
         return <Bell className="h-5 w-5 text-gray-500" />
@@ -164,6 +171,13 @@ export function NotificationItem({ notification, onUpdate }: NotificationItemPro
         return notification.reference_id
           ? `/profile?tab=loan-requests&highlight=${notification.reference_id}`
           : "/profile?tab=loan-requests"
+      case "loan_search_match":
+        return notification.data?.targetPath || "/home"
+      case "loan_offer":
+        return notification.data?.loanRequestId ? `/loan-offers/${notification.data.loanRequestId}` : "/loans"
+      case "loan_offer_accepted":
+      case "loan_offer_rejected":
+        return notification.data?.loanRequestId ? `/loan-offers/${notification.data.loanRequestId}` : "/loans"
       case "loan_approved":
       case "loan_rejected":
         return notification.reference_id ? `/loans/${notification.reference_id}` : "/loans"
@@ -244,6 +258,14 @@ export function NotificationItem({ notification, onUpdate }: NotificationItemPro
         return "Security Alert"
       case "review":
         return `New ${notification.data?.rating || ""}-Star Review`
+      case "loan_search_match":
+        return "Search Match"
+      case "loan_offer":
+        return "Loan Offer"
+      case "loan_offer_accepted":
+        return "Offer Accepted"
+      case "loan_offer_rejected":
+        return "Offer Rejected"
       case "system":
         return "System Notification"
       default:
@@ -281,7 +303,7 @@ export function NotificationItem({ notification, onUpdate }: NotificationItemPro
 
         <div className="flex gap-2 mt-2">
           <Button variant="outline" size="sm" asChild>
-            <Link href={getActionLink()}>View</Link>
+            <Link href={getActionLink()}>{notification.type === "loan_offer" ? "View this offer" : "View"}</Link>
           </Button>
 
           {!notification.is_read && (

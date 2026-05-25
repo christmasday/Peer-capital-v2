@@ -44,6 +44,8 @@ import PublicProfileAbout from "@/components/profile/PublicProfileAbout"
 import { checkAuth } from "@/lib/auth-utils"
 import { getUserProfile } from "@/lib/actions/auth"
 import { LoanHistorySection } from "@/components/profile/LoanHistorySection"
+import { getProfileMetrics } from "@/lib/actions/profile-metrics"
+import { ProfileMetricsCard } from "@/components/profile/profile-metrics-card"
 
 export const dynamic = "force-dynamic"
 
@@ -92,6 +94,8 @@ export default async function UserProfilePage({
   if (error || !profile) {
     notFound()
   }
+
+  const profileMetrics = await getProfileMetrics(userId)
 
   // Get followers and following counts
   const { data: followersCount } = await adminClient
@@ -221,6 +225,11 @@ export default async function UserProfilePage({
           </div>
         </div>
 
+        {/* Compact profile metrics under header */}
+        <div>
+          <ProfileMetricsCard metrics={profileMetrics} compact />
+        </div>
+
         {/* Navigation tabs */}
         <div className="border-b border-gray-300">
           <div className="flex space-x-1 overflow-x-auto justify-center">
@@ -256,9 +265,9 @@ export default async function UserProfilePage({
         <div className="grid grid-cols-12 gap-4 mt-4">
           {/* Left sidebar with About tab section links */}
           {activeTab === "about" && (
-            <div className="col-span-12">
+            <div className="col-span-12 space-y-6">
               <PublicProfileAbout profile={profile} initialSection="about" />
-                    </div>
+            </div>
                   )}
           {activeTab === "loan-history" && showLoanHistoryTab && (
             <div className="col-span-12">

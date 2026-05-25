@@ -41,6 +41,8 @@ import { updateProfile } from "@/lib/actions/profile"
 import { LoanRequestsList } from "@/components/loans/LoanRequestsList"
 import { getAllLoanRequests } from "@/lib/actions/loans"
 import { ContactsList } from "@/components/profile/contacts-list"
+import { getProfileMetrics } from "@/lib/actions/profile-metrics"
+import { ProfileMetricsCard } from "@/components/profile/profile-metrics-card"
 // Removed Paystack virtual account integration
 
 export const dynamic = "force-dynamic"
@@ -61,6 +63,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
 
   const profile = userProfile.profile
   const user = userProfile.user
+  const profileMetrics = await getProfileMetrics(user.id)
 
   const cookieStore = cookies()
   const supabase = await createServerClient()
@@ -194,6 +197,11 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
           </div>
         </div>
 
+        {/* Compact profile metrics under header */}
+        <div>
+          <ProfileMetricsCard metrics={profileMetrics} compact />
+        </div>
+
         {/* Tabs (removed Posts tab) */}
         <div className="border-b border-gray-300 mb-6">
           <div className="flex space-x-1 overflow-x-auto justify-center">
@@ -227,12 +235,13 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
             <ContactsList />
           </Suspense>
         ) : activeTab === "about" ? (
-          <ProfileAbout profile={profile} isCurrentUser={true} virtualAccount={null} initialSection="about" />
+          <div className="space-y-6">
+            <ProfileAbout profile={profile} isCurrentUser={true} virtualAccount={null} initialSection="about" />
+          </div>
         ) : activeTab === "loan-requests" ? (
           <div className="lg:col-span-12">
             <h2 className="text-xl font-bold mb-4">All Loan Requests</h2>
             <LoanRequestsList loanRequests={allLoanRequests} currentUserId={user.id} showAdminActions highlight={params?.highlight} />
-                      <LoanRequestsList loanRequests={allLoanRequests} currentUserId={user.id} showAdminActions highlight={params?.highlight} />
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6" id="overview">

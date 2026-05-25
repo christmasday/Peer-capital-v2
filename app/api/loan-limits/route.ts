@@ -18,10 +18,21 @@ export async function GET() {
       policySnapshot.borrowerPolicies.find((policy) => borrowerMaxAmount >= policy.min && borrowerMaxAmount <= policy.max) ??
       policySnapshot.borrowerPolicies[policySnapshot.borrowerPolicies.length - 1]
 
+    const lenderInterestRateLimits = policySnapshot.lenderTiers.length > 0
+      ? {
+          min_pct: policySnapshot.lenderTiers[0].interestMinPct ?? 5,
+          max_pct: policySnapshot.lenderTiers[0].interestMaxPct ?? 20,
+        }
+      : {
+          min_pct: 5,
+          max_pct: 20,
+        }
+
     return NextResponse.json({
       borrowerMaxAmount,
       borrowerPolicies: policySnapshot.borrowerPolicies,
       currentBorrowerPolicy,
+      lenderInterestRateLimits,
     })
   } catch (error) {
     console.error("Failed to load loan limits:", error)

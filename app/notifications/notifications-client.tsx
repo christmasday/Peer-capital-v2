@@ -104,7 +104,7 @@ export function NotificationsClient() {
       )
     } else if (activeTab === "loans") {
       return notifications.filter((notification) =>
-        ["loan_request", "loan_approved", "loan_rejected"].includes(notification.type),
+        ["loan_request", "loan_approved", "loan_rejected", "loan_search_match", "loan_offer", "loan_offer_accepted", "loan_offer_rejected"].includes(notification.type),
       )
     } else if (activeTab === "messages") {
       return notifications.filter((notification) => notification.type === "message")

@@ -1,10 +1,10 @@
 import { createServerClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { sendEmail, getAccountActivityEmailTemplate } from "@/lib/email-service"
+import { sendEmail, getAccountActivityEmailTemplate, getLoanOfferEmailTemplate, getSearchAlertEmailTemplate } from "@/lib/email-service"
 import { cookies } from "next/headers"
 
 export interface NotificationEvent {
-  type: 'login' | 'password_change' | 'account_funding' | 'withdrawal' | 'loan_request' | 'loan_repayment' | 'verification' | 'security_alert'
+  type: 'login' | 'password_change' | 'account_funding' | 'withdrawal' | 'loan_request' | 'loan_repayment' | 'verification' | 'security_alert' | 'loan_search_match' | 'loan_offer' | 'loan_offer_accepted' | 'loan_offer_rejected'
   userId: string
   title: string
   description: string
@@ -174,6 +174,10 @@ export async function sendNotificationEmail(event: NotificationEvent): Promise<b
       'withdrawal': 'transaction_activity',
       'loan_request': 'loan_activity',
       'loan_repayment': 'loan_activity',
+      'loan_search_match': 'loan_activity',
+      'loan_offer': 'loan_activity',
+      'loan_offer_accepted': 'loan_activity',
+      'loan_offer_rejected': 'loan_activity',
       'verification': 'verification_activity',
       'security_alert': 'security_alerts',
     }
@@ -195,19 +199,45 @@ export async function sendNotificationEmail(event: NotificationEvent): Promise<b
     const isLoggedIn = await isUserLoggedIn(event.userId)
 
     // Generate email content
-    const emailHtml = getAccountActivityEmailTemplate({
-      userName: profile.username ? `@${profile.username}` : `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'User',
-      eventTitle: event.title,
-      eventDescription: event.description,
-      eventType: event.type,
-      metadata: event.metadata,
-      isLoggedIn,
-    })
+    const userName = profile.username ? `@${profile.username}` : `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'User'
+    const emailHtml = event.type === 'loan_search_match'
+      ? getSearchAlertEmailTemplate({
+          userName,
+          eventTitle: event.title,
+          eventDescription: event.description,
+          metadata: event.metadata,
+          isLoggedIn,
+        })
+      : event.type === 'loan_offer'
+        ? getLoanOfferEmailTemplate({
+            userName,
+            lenderName: String(event.metadata?.lenderName || event.title || 'A lender'),
+            amount: Number(event.metadata?.amount || 0),
+            interestRate: Number(event.metadata?.interestRate || 0),
+            duration: Number(event.metadata?.duration || event.metadata?.durationMonths || 0),
+            durationUnit: String(event.metadata?.durationUnit || 'months'),
+            purpose: String(event.metadata?.purpose || 'Loan offer'),
+            offerUrl: String(event.metadata?.targetPath || `${process.env.NEXT_PUBLIC_APP_URL || "https://peercapital.com.ng"}/loans`),
+          })
+      : getAccountActivityEmailTemplate({
+          userName,
+          eventTitle: event.title,
+          eventDescription: event.description,
+          eventType: event.type,
+          metadata: event.metadata,
+          isLoggedIn,
+        })
+
+    const subject = event.type === 'loan_search_match'
+      ? `New match for your saved search: ${event.title}`
+      : event.type === 'loan_offer'
+        ? `New loan offer from ${String(event.metadata?.lenderName || event.title || 'PeerCapital')}`
+        : `PeerCapital - ${event.title}`
 
     // Send email
     const result = await sendEmail({
       to: profile.email,
-      subject: `PeerCapital - ${event.title}`,
+      subject,
       html: emailHtml,
     })
 

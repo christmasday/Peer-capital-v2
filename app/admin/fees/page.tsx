@@ -11,6 +11,8 @@ export default function AdminFeesPage() {
   const { toast } = useToast()
   const [lenderFee, setLenderFee] = useState("")
   const [borrowerFee, setBorrowerFee] = useState("")
+  const [lenderInterestRateMin, setLenderInterestRateMin] = useState("5")
+  const [lenderInterestRateMax, setLenderInterestRateMax] = useState("20")
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [onrampPercentage, setOnrampPercentage] = useState("")
@@ -40,6 +42,8 @@ export default function AdminFeesPage() {
       if (data.success) {
         setLenderFee(data.fees.lender_fee.toString())
         setBorrowerFee(data.fees.borrower_fee.toString())
+        setLenderInterestRateMin(data.lender_interest_rate_limits?.min_pct?.toString() || "5")
+        setLenderInterestRateMax(data.lender_interest_rate_limits?.max_pct?.toString() || "20")
       }
     } catch (error) {
       toast({
@@ -202,6 +206,8 @@ export default function AdminFeesPage() {
     // Validation
     const lenderVal = parseFloat(lenderFee)
     const borrowerVal = parseFloat(borrowerFee)
+    const lenderInterestMinVal = parseFloat(lenderInterestRateMin)
+    const lenderInterestMaxVal = parseFloat(lenderInterestRateMax)
     
     if (isNaN(lenderVal) || lenderVal < 0 || lenderVal > 10) {
       toast({
@@ -221,6 +227,33 @@ export default function AdminFeesPage() {
       return
     }
 
+    if (isNaN(lenderInterestMinVal) || lenderInterestMinVal < 0 || lenderInterestMinVal > 20) {
+      toast({
+        title: "Invalid Lender Interest Minimum",
+        description: "Minimum interest rate must be between 0% and 20%",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (isNaN(lenderInterestMaxVal) || lenderInterestMaxVal < 0 || lenderInterestMaxVal > 20) {
+      toast({
+        title: "Invalid Lender Interest Maximum",
+        description: "Maximum interest rate must be between 0% and 20%",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (lenderInterestMinVal > lenderInterestMaxVal) {
+      toast({
+        title: "Invalid Lender Interest Range",
+        description: "Minimum interest rate cannot exceed maximum interest rate",
+        variant: "destructive",
+      })
+      return
+    }
+
     setSaving(true)
     try {
       const res = await fetch('/api/admin/fees', {
@@ -229,7 +262,9 @@ export default function AdminFeesPage() {
         credentials: 'include',
         body: JSON.stringify({
           lender_fee: lenderVal,
-          borrower_fee: borrowerVal
+          borrower_fee: borrowerVal,
+          lender_interest_rate_min_pct: lenderInterestMinVal,
+          lender_interest_rate_max_pct: lenderInterestMaxVal,
         })
       })
       
@@ -343,149 +378,195 @@ export default function AdminFeesPage() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-start pt-8">
-      <div className="w-full max-w-2xl mx-auto px-6">
+      <div className="w-full max-w-6xl mx-auto px-6">
         <h1 className="text-2xl font-bold mb-6 text-center">Admin Fee Configuration</h1>
-        
-        <Card>
-          <CardHeader>
-            <CardTitle>Loan Transaction Fees</CardTitle>
-            <CardDescription>
-              Configure percentage fees charged to lenders and borrowers on loan disbursement
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="lenderFee">Lender Fee (%)</Label>
-              <Input
-                id="lenderFee"
-                type="number"
-                step="0.01"
-                min="0"
-                max="10"
-                value={lenderFee}
-                onChange={(e) => setLenderFee(e.target.value)}
-                placeholder="1.50"
-                disabled={loading}
-              />
-              <p className="text-sm text-gray-500">
-                Percentage charged to the lender when approving a loan
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="borrowerFee">Borrower Fee (%)</Label>
-              <Input
-                id="borrowerFee"
-                type="number"
-                step="0.01"
-                min="0"
-                max="10"
-                value={borrowerFee}
-                onChange={(e) => setBorrowerFee(e.target.value)}
-                placeholder="1.50"
-                disabled={loading}
-              />
-              <p className="text-sm text-gray-500">
-                Percentage charged to the borrower when receiving a loan
-              </p>
-            </div>
-
-            <Button
-              onClick={handleSave}
-              disabled={loading || saving}
-              className="w-full"
-            >
-              {saving ? "Saving..." : "Save Configuration"}
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle>Onramp & Offramp Transaction Fees</CardTitle>
-            <CardDescription>
-              Configure Stablesrail onramp and offramp fee percentages and caps
-            </CardDescription>
-            {(!onrampPercentage && !offrampPercentage) && (
-              <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                <p className="text-sm text-yellow-800">
-                  <strong>No fee configuration found.</strong> Enter values below to create a new configuration.
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle>Loan Transaction Fees</CardTitle>
+              <CardDescription>
+                Configure percentage fees charged to lenders and borrowers on loan disbursement
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="lenderFee">Lender Fee (%)</Label>
+                <Input
+                  id="lenderFee"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="10"
+                  value={lenderFee}
+                  onChange={(e) => setLenderFee(e.target.value)}
+                  placeholder="1.50"
+                  disabled={loading}
+                />
+                <p className="text-sm text-gray-500">
+                  Percentage charged to the lender when approving a loan
                 </p>
               </div>
-            )}
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-4 border-b pb-4">
-              <h3 className="font-semibold">Onramp Fee</h3>
+
               <div className="space-y-2">
-                <Label htmlFor="onrampPercentage">Percentage Fee (%)</Label>
+                <Label htmlFor="borrowerFee">Borrower Fee (%)</Label>
                 <Input
-                  id="onrampPercentage"
+                  id="borrowerFee"
                   type="number"
                   step="0.01"
                   min="0"
-                  value={onrampPercentage}
-                  onChange={(e) => setOnrampPercentage(e.target.value)}
-                  placeholder="1.5"
+                  max="10"
+                  value={borrowerFee}
+                  onChange={(e) => setBorrowerFee(e.target.value)}
+                  placeholder="1.50"
                   disabled={loading}
                 />
+                <p className="text-sm text-gray-500">
+                  Percentage charged to the borrower when receiving a loan
+                </p>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="onrampCap">Cap Fee</Label>
-                <Input
-                  id="onrampCap"
-                  type="number"
-                  step="1"
-                  min="0"
-                  value={onrampCap}
-                  onChange={(e) => setOnrampCap(e.target.value)}
-                  placeholder="500"
-                  disabled={loading}
-                />
-              </div>
-            </div>
 
-            <div className="space-y-4">
-              <h3 className="font-semibold">Offramp Fee</h3>
+              <Button
+                onClick={handleSave}
+                disabled={loading || saving}
+                className="w-full"
+              >
+                {saving ? "Saving..." : "Save Configuration"}
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle>Lender Interest Rate Limits</CardTitle>
+              <CardDescription>
+                Configure the minimum and maximum interest rates lenders can set on their loan offers
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="offrampPercentage">Percentage Fee (%)</Label>
+                <Label htmlFor="lenderInterestRateMin">Minimum Interest Rate (%)</Label>
                 <Input
-                  id="offrampPercentage"
+                  id="lenderInterestRateMin"
                   type="number"
                   step="0.01"
                   min="0"
-                  value={offrampPercentage}
-                  onChange={(e) => setOfframpPercentage(e.target.value)}
-                  placeholder="2.0"
+                  max="20"
+                  value={lenderInterestRateMin}
+                  onChange={(e) => setLenderInterestRateMin(e.target.value)}
+                  placeholder="5.00"
                   disabled={loading}
                 />
               </div>
+
               <div className="space-y-2">
-                <Label htmlFor="offrampCap">Cap Fee</Label>
+                <Label htmlFor="lenderInterestRateMax">Maximum Interest Rate (%)</Label>
                 <Input
-                  id="offrampCap"
+                  id="lenderInterestRateMax"
                   type="number"
-                  step="1"
+                  step="0.01"
                   min="0"
-                  value={offrampCap}
-                  onChange={(e) => setOfframpCap(e.target.value)}
-                  placeholder="1000"
+                  max="20"
+                  value={lenderInterestRateMax}
+                  onChange={(e) => setLenderInterestRateMax(e.target.value)}
+                  placeholder="20.00"
                   disabled={loading}
                 />
               </div>
-            </div>
 
-            <Button
-              onClick={handleSaveStablesrailFees}
-              disabled={loading || savingStablesrail}
-              className="w-full"
-            >
-              {savingStablesrail ? "Saving..." : "Save Configuration"}
-            </Button>
-          </CardContent>
-        </Card>
+              <p className="text-sm text-gray-500">
+                These limits are enforced when lenders save loan offers and when loans are approved.
+              </p>
+            </CardContent>
+          </Card>
 
-        <Card className="mt-6">
+          <Card className="h-full lg:col-span-2">
+            <CardHeader>
+              <CardTitle>Onramp & Offramp Transaction Fees</CardTitle>
+              <CardDescription>
+                Configure Stablesrail onramp and offramp fee percentages and caps
+              </CardDescription>
+              {(!onrampPercentage && !offrampPercentage) && (
+                <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                  <p className="text-sm text-yellow-800">
+                    <strong>No fee configuration found.</strong> Enter values below to create a new configuration.
+                  </p>
+                </div>
+              )}
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                <div className="space-y-4 border-b pb-4 md:border-b-0 md:pb-0 md:pr-6 md:border-r">
+                  <h3 className="font-semibold">Onramp Fee</h3>
+                  <div className="space-y-2">
+                    <Label htmlFor="onrampPercentage">Percentage Fee (%)</Label>
+                    <Input
+                      id="onrampPercentage"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={onrampPercentage}
+                      onChange={(e) => setOnrampPercentage(e.target.value)}
+                      placeholder="1.5"
+                      disabled={loading}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="onrampCap">Cap Fee</Label>
+                    <Input
+                      id="onrampCap"
+                      type="number"
+                      step="1"
+                      min="0"
+                      value={onrampCap}
+                      onChange={(e) => setOnrampCap(e.target.value)}
+                      placeholder="500"
+                      disabled={loading}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="font-semibold">Offramp Fee</h3>
+                  <div className="space-y-2">
+                    <Label htmlFor="offrampPercentage">Percentage Fee (%)</Label>
+                    <Input
+                      id="offrampPercentage"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={offrampPercentage}
+                      onChange={(e) => setOfframpPercentage(e.target.value)}
+                      placeholder="2.0"
+                      disabled={loading}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="offrampCap">Cap Fee</Label>
+                    <Input
+                      id="offrampCap"
+                      type="number"
+                      step="1"
+                      min="0"
+                      value={offrampCap}
+                      onChange={(e) => setOfframpCap(e.target.value)}
+                      placeholder="1000"
+                      disabled={loading}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <Button
+                onClick={handleSaveStablesrailFees}
+                disabled={loading || savingStablesrail}
+                className="w-full"
+              >
+                {savingStablesrail ? "Saving..." : "Save Configuration"}
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="h-full lg:col-span-2">
           <CardHeader>
             <CardTitle>Admin Wallet Address</CardTitle>
             <CardDescription>
@@ -518,6 +599,7 @@ export default function AdminFeesPage() {
             </Button>
           </CardContent>
         </Card>
+        </div>
       </div>
     </div>
   )

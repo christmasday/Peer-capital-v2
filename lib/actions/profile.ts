@@ -344,30 +344,8 @@ export async function updateProfile(input: UpdateProfileInput, userIdOverride?: 
     if (input.fraud_screened_at !== undefined) updateData.fraud_screened_at = input.fraud_screened_at;
     if (input.srUserId !== undefined) updateData.sr_user_id = input.srUserId;
     if (input.correlationId !== undefined) updateData.correlation_id = input.correlationId;
-    // Handle username updates with validation and uniqueness check
     if (input.username !== undefined) {
-      const proposed = String(input.username || "").trim()
-      if (proposed.length === 0) {
-        updateData.username = null
-      } else {
-        // Validate username format: 3-24 chars, letters, numbers, underscore, hyphen
-        if (!/^[a-zA-Z0-9_-]{3,24}$/.test(proposed)) {
-          return { success: false, error: "Username must be 3-24 characters and contain only letters, numbers, hyphens or underscores." };
-        }
-
-        // Check uniqueness (case-insensitive)
-        const { data: existingUsername, error: existingUsernameError } = await adminClient
-          .from("profiles")
-          .select("id")
-          .ilike("username", proposed)
-          .maybeSingle();
-
-        if (!existingUsernameError && existingUsername && existingUsername.id && existingUsername.id !== userId) {
-          return { success: false, error: "This username is already taken. Please choose another." };
-        }
-
-        updateData.username = proposed;
-      }
+      return { success: false, error: "Username is system-generated and cannot be changed." }
     }
 
     if (Object.keys(updateData).length === 0) {

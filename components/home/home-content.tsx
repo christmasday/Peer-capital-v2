@@ -281,6 +281,9 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
             variant: "destructive",
           })
           setSearchResults([])
+          if (replaceResults && query && error.toLowerCase().includes("no lenders found")) {
+            void persistSearchAlert(query)
+          }
         } else {
           toast({
             title: "Search Paused",
@@ -297,6 +300,9 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
           const message = "No lenders found matching your criteria. Try adjusting your search."
           setSearchError(message)
           setSearchResults([])
+          if (query) {
+            void persistSearchAlert(query)
+          }
           toast({
             title: "No Matches Found",
             description: message,
@@ -330,6 +336,31 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
     } finally {
       setIsSearching(false)
       setIsLoadingMoreLenders(false)
+    }
+  }
+
+  const persistSearchAlert = async (query: NonNullable<typeof searchQuery>) => {
+    try {
+      const res = await fetch("/api/search-alerts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          searchKind: "lender_search",
+          loanAmount: query.loanAmount,
+          loanDuration: query.loanDuration,
+          loanDurationUnit: query.loanDurationUnit,
+        }),
+      })
+
+      if (res.ok) {
+        toast({
+          title: "Search saved",
+          description: "We’ll alert you for the next 7 days if a lender matches your criteria.",
+        })
+      }
+    } catch {
+      // Best-effort only.
     }
   }
 

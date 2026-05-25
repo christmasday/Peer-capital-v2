@@ -30,6 +30,10 @@ export type NotificationType =
   | "review" // Added review notification type
   | "loan_helper_set"
   | "loan_search"
+  | "loan_search_match"
+  | "loan_offer"
+  | "loan_offer_accepted"
+  | "loan_offer_rejected"
 
 export interface Notification {
   id: string
@@ -207,11 +211,13 @@ export async function createNotification({
   userId,
   actorId,
   type,
+  content,
   data = {},
 }: {
   userId: string
   actorId?: string
   type: NotificationType
+  content?: string
   data?: NotificationData
 }) {
   try {
@@ -280,6 +286,7 @@ export async function createNotification({
         user_id: userId,
         actor_id: null, // Always set to null to avoid foreign key issues
         type,
+        content: content || null,
         data: notificationData,
         is_read: false,
         created_at: now,
@@ -309,6 +316,7 @@ export async function createNotificationsForUsers({ userIds, actorId, type, data
       user_id: uid,
       actor_id: null,
       type,
+      content: null,
       data: { ...data, ...(actorId ? { original_actor_id: actorId } : {}) },
       is_read: false,
       created_at: now,

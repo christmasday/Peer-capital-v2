@@ -5,6 +5,8 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { revalidatePath } from "next/cache"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/lib/supabase/database.types"
+import { scanLenderSearchAlertsForUser } from "@/lib/actions/search-alerts"
+import { getLenderInterestRateLimits } from "@/lib/loan-policies.server"
 
 export type LoanHelperSettings = {
   id: string
@@ -50,6 +52,14 @@ export async function updateLoanHelperSettings(
 ): Promise<{ success: boolean; error: string | null }> {
   try {
     const adminClient = createAdminClient()
+    const interestRateLimits = await getLenderInterestRateLimits()
+
+    if (interestRate < interestRateLimits.minPct || interestRate > interestRateLimits.maxPct) {
+      return {
+        success: false,
+        error: `Interest rate must be between ${interestRateLimits.minPct}% and ${interestRateLimits.maxPct}%`,
+      }
+    }
 
     const { data: existingSettings, error: checkError } = await adminClient
       .from("loan_helper_settings")
@@ -123,6 +133,12 @@ export async function updateLoanHelperSettings(
       } catch (notifyErr) {
         console.error("Failed to broadcast loan helper set notification:", notifyErr)
       }
+
+      try {
+        await scanLenderSearchAlertsForUser(userId)
+      } catch (searchAlertError) {
+        console.error("Failed to scan search alerts for lender update:", searchAlertError)
+      }
     } else {
       const { error: insertError } = await adminClient.from("loan_helper_settings").insert(settingsData)
 
@@ -169,6 +185,12 @@ export async function updateLoanHelperSettings(
         }
       } catch (notifyErr) {
         console.error("Failed to broadcast loan helper set notification:", notifyErr)
+      }
+
+      try {
+        await scanLenderSearchAlertsForUser(userId)
+      } catch (searchAlertError) {
+        console.error("Failed to scan search alerts for lender update:", searchAlertError)
       }
     }
 
