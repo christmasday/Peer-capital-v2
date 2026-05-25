@@ -9,6 +9,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/lib/supabase/database.types"
 import { createNotification } from "@/lib/actions/notifications"
 import { getBlockedUsers } from "@/lib/actions/connections"
+import { scanLoanRequestSearchAlertsForRequest } from "@/lib/actions/search-alerts"
 
 // Mock data for fallback
 const mockLoanRequests = [
@@ -185,6 +186,12 @@ export async function createLoanRequest({
     if (transactionError) {
       console.error("Error creating transaction record:", transactionError)
       // We don't return an error here as the loan request was successful
+    }
+
+    try {
+      await scanLoanRequestSearchAlertsForRequest(loanId)
+    } catch (searchAlertError) {
+      console.error("Failed to scan search alerts for new loan request:", searchAlertError)
     }
 
     revalidatePath("/loans")

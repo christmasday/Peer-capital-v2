@@ -3,6 +3,32 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export interface Database {
   public: {
     Tables: {
+      admin_config: {
+        Row: {
+          id: string
+          config_key: string
+          config_value: string
+          created_at: string | null
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          config_key: string
+          config_value: string
+          created_at?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          id?: string
+          config_key?: string
+          config_value?: string
+          created_at?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+      }
       profiles: {
         Row: {
           id: string
@@ -615,12 +641,104 @@ export interface Database {
           updated_at?: string
         }
       }
+      search_alert_subscriptions: {
+        Row: {
+          id: string
+          user_id: string
+          search_kind: string
+          criteria: Json
+          criteria_hash: string
+          status: string
+          expires_at: string
+          refreshed_at: string
+          last_scanned_at: string | null
+          last_matched_at: string | null
+          last_matched_entity_type: string | null
+          last_matched_entity_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          search_kind: string
+          criteria?: Json
+          criteria_hash: string
+          status?: string
+          expires_at: string
+          refreshed_at?: string
+          last_scanned_at?: string | null
+          last_matched_at?: string | null
+          last_matched_entity_type?: string | null
+          last_matched_entity_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          search_kind?: string
+          criteria?: Json
+          criteria_hash?: string
+          status?: string
+          expires_at?: string
+          refreshed_at?: string
+          last_scanned_at?: string | null
+          last_matched_at?: string | null
+          last_matched_entity_type?: string | null
+          last_matched_entity_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      search_alert_deliveries: {
+        Row: {
+          id: string
+          subscription_id: string
+          user_id: string
+          search_kind: string
+          entity_type: string
+          entity_id: string
+          notification_id: string | null
+          payload: Json
+          delivered_at: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          subscription_id: string
+          user_id: string
+          search_kind: string
+          entity_type: string
+          entity_id: string
+          notification_id?: string | null
+          payload?: Json
+          delivered_at?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          subscription_id?: string
+          user_id?: string
+          search_kind?: string
+          entity_type?: string
+          entity_id?: string
+          notification_id?: string | null
+          payload?: Json
+          delivered_at?: string
+          created_at?: string
+          updated_at?: string
+        }
+      }
       notifications: {
         Row: {
           id: string
           user_id: string
           actor_id: string | null // Updated to be nullable
           type: string
+          content?: string | null
           data: Json | null
           read: boolean
           created_at: string
@@ -630,6 +748,7 @@ export interface Database {
           user_id: string
           actor_id?: string | null // Updated to be nullable
           type: string
+          content?: string | null
           data?: Json | null
           read?: boolean
           created_at?: string
@@ -639,6 +758,7 @@ export interface Database {
           user_id?: string
           actor_id?: string | null // Updated to be nullable
           type?: string
+          content?: string | null
           data?: Json | null
           read?: boolean
           created_at?: string

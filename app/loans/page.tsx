@@ -42,6 +42,8 @@ export default async function LoansPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
+      case "offer_pending":
+        return "bg-yellow-100 text-yellow-800"
       case "approved":
         return "bg-green-100 text-green-800"
       case "pending":
@@ -95,7 +97,9 @@ export default async function LoansPage() {
                       </div>
                     </div>
                     <Badge className={getStatusColor(loan.status)}>
-                      {loan.status.charAt(0).toUpperCase() + loan.status.slice(1)}
+                      {loan.status === "offer_pending"
+                        ? "Pending Offer"
+                        : loan.status.charAt(0).toUpperCase() + loan.status.slice(1)}
                     </Badge>
                   </div>
                 </CardHeader>
@@ -114,7 +118,15 @@ export default async function LoansPage() {
                     <div className="text-sm font-medium">{loan.purpose}</div>
                   </div>
 
-                  {loan.status === "pending" && <CancelLoanButton loanId={loan.id} />}
+                  {loan.status === "offer_pending" ? (
+                    <div className="flex justify-end">
+                      <Link href={`/loan-offers/${loan.id}`}>
+                        <Button>View this offer</Button>
+                      </Link>
+                    </div>
+                  ) : loan.status === "pending" ? (
+                    <CancelLoanButton loanId={loan.id} />
+                  ) : null}
                 </CardContent>
               </Card>
             ))}

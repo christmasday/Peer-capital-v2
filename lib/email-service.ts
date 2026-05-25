@@ -41,6 +41,70 @@ export async function sendEmail({
   }
 }
 
+function formatMoney(amount: unknown): string | null {
+  if (typeof amount !== "number" || !Number.isFinite(amount) || amount <= 0) {
+    return null
+  }
+
+  return `₦${amount.toLocaleString()}`
+}
+
+function formatDuration(metadata?: Record<string, any>): string | null {
+  const duration = metadata?.loanDuration ?? metadata?.repaymentTime ?? metadata?.durationMonths
+  if (typeof duration !== "number" || !Number.isFinite(duration) || duration <= 0) {
+    return null
+  }
+
+  const unit = typeof metadata?.loanDurationUnit === "string"
+    ? metadata.loanDurationUnit
+    : typeof metadata?.repaymentUnit === "string"
+      ? metadata.repaymentUnit
+      : typeof metadata?.durationUnit === "string"
+        ? metadata.durationUnit
+        : "months"
+
+  const label = duration === 1 ? unit.replace(/s$/, "") : unit
+  return `${duration} ${label}`
+}
+
+function formatPercent(amount: unknown): string | null {
+  if (typeof amount !== "number" || !Number.isFinite(amount)) {
+    return null
+  }
+
+  const value = amount > 1 ? amount : amount * 100
+  return `${value.toFixed(value % 1 === 0 ? 0 : 2)}%`
+}
+
+function buildSearchAlertHighlights(metadata?: Record<string, any>): string[] {
+  const highlights: string[] = []
+
+  const amount = formatMoney(metadata?.amount ?? metadata?.loanAmount)
+  if (amount) {
+    highlights.push(`Amount: ${amount}`)
+  }
+
+  const duration = formatDuration(metadata)
+  if (duration) {
+    highlights.push(`Repayment: ${duration}`)
+  }
+
+  const purpose = typeof metadata?.purpose === "string" ? metadata.purpose.trim() : ""
+  if (purpose) {
+    highlights.push(`Purpose: ${purpose}`)
+  }
+
+  return highlights
+}
+
+function formatInterestRate(rate: unknown): string | null {
+  if (typeof rate !== "number" || !Number.isFinite(rate) || rate <= 0) {
+    return null
+  }
+
+  return `${rate}%`
+}
+
 /**
  * Email templates
  */
@@ -195,6 +259,8 @@ export function getAccountActivityEmailTemplate({
         return '📋'
       case 'loan_repayment':
         return '✅'
+      case 'loan_search_match':
+        return '🎯'
       case 'verification':
         return '✅'
       case 'security_alert':
@@ -217,6 +283,7 @@ export function getAccountActivityEmailTemplate({
         return '#10b981'
       case 'loan_request':
       case 'loan_repayment':
+      case 'loan_search_match':
         return '#8b5cf6'
       case 'verification':
         return '#f59e0b'
@@ -295,6 +362,137 @@ export function getAccountActivityEmailTemplate({
       <div style="background-color: #f3f4f6; padding: 15px; text-align: center; font-size: 12px; color: #6b7280;">
         <p>&copy; ${new Date().getFullYear()} PeerCapital. All rights reserved.</p>
         <p>Lagos, Nigeria</p>
+      </div>
+    </div>
+  `
+}
+
+export function getSearchAlertEmailTemplate({
+  userName,
+  eventTitle,
+  eventDescription,
+  metadata,
+  isLoggedIn = false,
+}: {
+  userName: string
+  eventTitle: string
+  eventDescription: string
+  metadata?: Record<string, any>
+  isLoggedIn?: boolean
+}): string {
+  const searchKind = metadata?.searchKind === "lender_search" || metadata?.searchKind === "loan_request_search"
+    ? metadata.searchKind
+    : "lender_search"
+  const targetPath = typeof metadata?.offerActionUrl === "string" && metadata.offerActionUrl.trim()
+    ? metadata.offerActionUrl.trim()
+    : typeof metadata?.targetPath === "string" && metadata.targetPath.trim()
+    ? metadata.targetPath.trim()
+    : "/home"
+  const highlights = buildSearchAlertHighlights(metadata)
+  const highlightRows = highlights
+    .map((highlight) => `<li style="margin: 8px 0;">${highlight}</li>`)
+    .join("")
+
+  const eventIcon = searchKind === "loan_request_search" ? "📬" : "🎯"
+  const accentColor = "#0f766e"
+  const ctaLabel = searchKind === "loan_request_search"
+    ? "Review borrower request"
+    : "Send offer"
+  const urgencyCopy = searchKind === "loan_request_search"
+    ? "Borrowers move quickly when the right lender appears. Open this before the opportunity disappears."
+    : "A borrower's search parameters now closely match your lending goal. Send an offer before the opportunity gets picked up by another lender."
+  const headerCopy = searchKind === "loan_request_search"
+    ? "PeerCapital search alert"
+    : "PeerCapital lender search alert"
+  const introCopy = searchKind === "loan_request_search"
+    ? "This borrower search is a strong fit for your saved criteria."
+    : "A borrower's search is closely aligned with the loan goal you set."
+
+  return `
+    <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto; background: #f8fafc; padding: 24px;">
+      <div style="background: linear-gradient(135deg, #0f172a 0%, #0f766e 100%); padding: 24px; text-align: center; border-radius: 16px 16px 0 0;">
+        <div style="font-size: 40px; line-height: 1; margin-bottom: 8px;">${eventIcon}</div>
+        <h1 style="color: white; margin: 0; font-size: 24px;">${headerCopy}</h1>
+      </div>
+      <div style="padding: 28px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 16px 16px; background: white;">
+        <p style="margin-top: 0; color: #0f172a; font-size: 18px; font-weight: 700;">${eventTitle}</p>
+        <p style="color: #334155; line-height: 1.7; font-size: 15px;">Hello ${userName},</p>
+        <p style="color: #334155; line-height: 1.7; font-size: 15px;">${introCopy}</p>
+        <p style="color: #334155; line-height: 1.7; font-size: 15px;">${eventDescription}</p>
+
+        <div style="background: #f8fafc; border: 1px solid #dbeafe; border-left: 4px solid ${accentColor}; border-radius: 12px; padding: 16px 18px; margin: 24px 0;">
+          <p style="margin: 0 0 10px 0; color: #0f172a; font-weight: 700;">Why this matters</p>
+          <ul style="margin: 0; padding-left: 20px; color: #334155; line-height: 1.7;">
+            ${highlightRows || `<li style="margin: 8px 0;">A fresh match is waiting for you right now.</li>`}
+          </ul>
+        </div>
+
+        <p style="color: #334155; line-height: 1.7; font-size: 15px; margin-bottom: 24px;">${urgencyCopy}</p>
+
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${targetPath.startsWith("http") ? targetPath : `${process.env.NEXT_PUBLIC_APP_URL || "https://peercapital.com.ng"}${targetPath.startsWith("/") ? targetPath : `/${targetPath}`}`}" style="background: ${accentColor}; color: white; padding: 14px 26px; text-decoration: none; border-radius: 999px; display: inline-block; font-weight: 700; letter-spacing: 0.2px;">${ctaLabel}</a>
+        </div>
+
+        <p style="color: #64748b; font-size: 13px; line-height: 1.6; margin-bottom: 0;">You can also open PeerCapital directly and go to your alerts. ${isLoggedIn ? "You are currently active in the app, so this match is ready to inspect immediately." : "If you are not logged in, the link will take you straight to the match."}</p>
+      </div>
+      <div style="padding: 16px; text-align: center; font-size: 12px; color: #94a3b8;">
+        <p style="margin: 0;">&copy; ${new Date().getFullYear()} PeerCapital. All rights reserved.</p>
+      </div>
+    </div>
+  `
+}
+
+export function getLoanOfferEmailTemplate({
+  userName,
+  lenderName,
+  offerAmount,
+  interestRate,
+  repaymentTime,
+  repaymentUnit,
+  offerUrl,
+}: {
+  userName: string
+  lenderName: string
+  offerAmount: number
+  interestRate: number
+  repaymentTime: number
+  repaymentUnit: string
+  offerUrl: string
+}): string {
+  const amount = formatMoney(offerAmount) || "₦0"
+  const formattedRate = formatInterestRate(interestRate) || "0%"
+  const durationLabel = `${repaymentTime} ${repaymentTime === 1 ? repaymentUnit.replace(/s$/, "") : repaymentUnit}`
+
+  return `
+    <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto; background: #f8fafc; padding: 24px;">
+      <div style="background: linear-gradient(135deg, #0f172a 0%, #0f766e 100%); padding: 24px; text-align: center; border-radius: 16px 16px 0 0;">
+        <div style="font-size: 40px; line-height: 1; margin-bottom: 8px;">💼</div>
+        <h1 style="color: white; margin: 0; font-size: 24px;">New loan offer</h1>
+      </div>
+      <div style="padding: 28px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 16px 16px; background: white;">
+        <p style="margin-top: 0; color: #0f172a; font-size: 18px; font-weight: 700;">A lender has sent you an offer</p>
+        <p style="color: #334155; line-height: 1.7; font-size: 15px;">Hello ${userName},</p>
+        <p style="color: #334155; line-height: 1.7; font-size: 15px;">${lenderName} thinks your search request is a strong fit for their loan goal and has sent a formal offer for you to review.</p>
+
+        <div style="background: #f8fafc; border: 1px solid #dbeafe; border-left: 4px solid #0f766e; border-radius: 12px; padding: 16px 18px; margin: 24px 0;">
+          <p style="margin: 0 0 10px 0; color: #0f172a; font-weight: 700;">Offer details</p>
+          <div style="display: grid; gap: 8px; color: #334155; line-height: 1.7;">
+            <div><strong>Amount:</strong> ${amount}</div>
+            <div><strong>Interest rate:</strong> ${formattedRate}</div>
+            <div><strong>Repayment:</strong> ${durationLabel}</div>
+          </div>
+        </div>
+
+        <p style="color: #334155; line-height: 1.7; font-size: 15px; margin-bottom: 24px;">Open the offer to review the terms and decide whether to accept or reject it.</p>
+
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${offerUrl}" style="background: #0f766e; color: white; padding: 14px 26px; text-decoration: none; border-radius: 999px; display: inline-block; font-weight: 700; letter-spacing: 0.2px;">View this offer</a>
+        </div>
+
+        <p style="color: #64748b; font-size: 13px; line-height: 1.6; margin-bottom: 0;">You can review the lender's offer in your account and choose to accept or reject it from the offer page.</p>
+      </div>
+      <div style="padding: 16px; text-align: center; font-size: 12px; color: #94a3b8;">
+        <p style="margin: 0;">&copy; ${new Date().getFullYear()} PeerCapital. All rights reserved.</p>
       </div>
     </div>
   `

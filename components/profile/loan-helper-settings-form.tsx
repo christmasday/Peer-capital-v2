@@ -34,6 +34,7 @@ export function LoanHelperSettingsForm({ userId, onSave, onCancel, lendingLicens
   const { toast } = useToast()
   const [isHelperEnabled, setIsHelperEnabled] = useState(false)
   const [accountBalance, setAccountBalance] = useState<number | null>(null)
+  const [interestRateLimits, setInterestRateLimits] = useState<{ minPct: number; maxPct: number } | null>(null)
   const isDisabled = !lendingLicenseUrl;
 
   useEffect(() => {
@@ -60,6 +61,26 @@ export function LoanHelperSettingsForm({ userId, onSave, onCancel, lendingLicens
 
     fetchSettings()
   }, [userId])
+
+  useEffect(() => {
+    async function fetchInterestRateLimits() {
+      try {
+        const response = await fetch("/api/loan-limits", { credentials: "include" })
+        const data = await response.json()
+
+        if (response.ok && data?.lenderInterestRateLimits) {
+          setInterestRateLimits({
+            minPct: Number(data.lenderInterestRateLimits.min_pct ?? 5),
+            maxPct: Number(data.lenderInterestRateLimits.max_pct ?? 20),
+          })
+        }
+      } catch (error) {
+        setInterestRateLimits({ minPct: 5, maxPct: 20 })
+      }
+    }
+
+    fetchInterestRateLimits()
+  }, [])
 
   useEffect(() => {
     // Fetch if user is currently a loan helper
@@ -94,6 +115,14 @@ export function LoanHelperSettingsForm({ userId, onSave, onCancel, lendingLicens
     setIsLoading(true)
     setError(null)
     setSuccess(false)
+
+    if (interestRateLimits) {
+      if (interestRate < interestRateLimits.minPct || interestRate > interestRateLimits.maxPct) {
+        setError(`Interest rate must be between ${interestRateLimits.minPct}% and ${interestRateLimits.maxPct}%`)
+        setIsLoading(false)
+        return
+      }
+    }
 
     try {
       if (isHelperEnabled) {
@@ -193,8 +222,13 @@ export function LoanHelperSettingsForm({ userId, onSave, onCancel, lendingLicens
                 placeholder="Enter interest rate"
                 value={interestRate}
                 onChange={(e) => setInterestRate(Number(e.target.value))}
+                min={interestRateLimits?.minPct ?? 5}
+                max={interestRateLimits?.maxPct ?? 20}
                 disabled={isDisabled}
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                Allowed range: {interestRateLimits?.minPct ?? 5}% - {interestRateLimits?.maxPct ?? 20}%
+              </p>
             </div>
             <div>
               <Label htmlFor="repaymentTime">Repayment Duration</Label>

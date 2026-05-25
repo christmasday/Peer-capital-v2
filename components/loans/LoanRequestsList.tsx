@@ -102,9 +102,9 @@ export function LoanRequestsList({ loanRequests: initialLoanRequests, currentUse
   }
 
   return (
-    <div className="space-y-4">
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
       {loanRequests.map((req) => (
-        <Card key={req.id} id={`loan-request-${req.id}`} className={"shadow-sm " + (highlight === req.id ? "ring-2 ring-blue-500 ring-offset-2 animate-pulse" : "") }>
+        <Card key={req.id} id={`loan-request-${req.id}`} className={"h-full shadow-sm " + (highlight === req.id ? "ring-2 ring-blue-500 ring-offset-2 animate-pulse" : "") }>
           <CardHeader className="flex flex-row items-center gap-4 pb-2">
             <Avatar className="h-10 w-10">
               {req.borrower?.profile_picture_url ? (
@@ -123,12 +123,12 @@ export function LoanRequestsList({ loanRequests: initialLoanRequests, currentUse
               <div className="font-semibold text-gray-900">{req.borrower?.username ? `@${req.borrower.username}` : `${req.borrower?.first_name || ""} ${req.borrower?.last_name || ""}`.trim() || "User"}</div>
               <div className="text-xs text-gray-500">Requested on {new Date(req.created_at).toLocaleDateString()}</div>
             </div>
-            <div className="ml-auto text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-700">
+            <div className="ml-auto text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-700 whitespace-nowrap">
               {req.status.charAt(0).toUpperCase() + req.status.slice(1)}
             </div>
           </CardHeader>
-          <CardContent className="pt-0">
-            <div className="flex flex-col md:flex-row md:items-center md:gap-8 gap-2">
+          <CardContent className="pt-0 flex-1">
+            <div className="flex h-full flex-col gap-4">
               <div>
                 <div className="text-lg font-bold text-blue-700">₦{req.amount.toLocaleString()}</div>
                 <div className="text-xs text-gray-500">Duration: {req.duration_months} months</div>
@@ -138,7 +138,7 @@ export function LoanRequestsList({ loanRequests: initialLoanRequests, currentUse
                 <div className="text-sm text-gray-700">Purpose: {req.purpose}</div>
               </div>
               {showAdminActions && req.status === "pending" ? (
-                <div className="flex gap-2 mt-2 md:mt-0">
+                <div className="flex gap-2 pt-2">
                   <Button variant="default" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => handleApprove(req.id)}>
                     Approve
                   </Button>
@@ -147,7 +147,7 @@ export function LoanRequestsList({ loanRequests: initialLoanRequests, currentUse
                   </Button>
                 </div>
               ) : currentUserId === req.user_id && req.status === "pending" ? (
-                <div className="mt-2 md:mt-0">
+                <div className="pt-2">
                   <CancelLoanButton loanId={req.id} />
                 </div>
               ) : null}
