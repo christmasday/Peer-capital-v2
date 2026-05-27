@@ -19,10 +19,9 @@ interface LoanHelperSettingsFormProps {
   userId: string
   onSave?: () => void
   onCancel?: () => void
-  lendingLicenseUrl?: string | null
 }
 
-export function LoanHelperSettingsForm({ userId, onSave, onCancel, lendingLicenseUrl }: LoanHelperSettingsFormProps) {
+export function LoanHelperSettingsForm({ userId, onSave, onCancel }: LoanHelperSettingsFormProps) {
   const [loanAmount, setLoanAmount] = useState<number>(0)
   const [interestRate, setInterestRate] = useState<number>(0)
   const [repaymentTime, setRepaymentTime] = useState<number>(12)
@@ -35,7 +34,6 @@ export function LoanHelperSettingsForm({ userId, onSave, onCancel, lendingLicens
   const [isHelperEnabled, setIsHelperEnabled] = useState(false)
   const [accountBalance, setAccountBalance] = useState<number | null>(null)
   const [interestRateLimits, setInterestRateLimits] = useState<{ minPct: number; maxPct: number } | null>(null)
-  const isDisabled = !lendingLicenseUrl;
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -139,8 +137,8 @@ export function LoanHelperSettingsForm({ userId, onSave, onCancel, lendingLicens
         setError(error)
         } else {
           toast({
-            title: "Lending Goals Settings Updated",
-            description: "Your lending goals settings have been updated successfully.",
+            title: "Lending goals updated",
+            description: "Your lending goals have been updated successfully.",
           })
         }
       } else {
@@ -148,8 +146,8 @@ export function LoanHelperSettingsForm({ userId, onSave, onCancel, lendingLicens
         await fetch(`/api/loan-helper-status?userId=${userId}`, { method: "DELETE" })
         if (onSave) onSave()
         toast({
-          title: "Lending Goals Disabled",
-          description: "You are no longer listed in Lending Goals.",
+          title: "Lending goals disabled",
+          description: "You are no longer listed in lending goals.",
         })
       }
     } catch (e: any) {
@@ -168,21 +166,14 @@ export function LoanHelperSettingsForm({ userId, onSave, onCancel, lendingLicens
         <CardDescription>Configure the settings for your loan offering to other users.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {isDisabled && (
-          <Alert variant="default">
-            <AlertDescription>
-              You must upload a valid lending license to your profile before you can enable or edit Lending Goals.
-            </AlertDescription>
-          </Alert>
-        )}
         <div className="flex items-center gap-3 mb-2">
-          <Switch checked={isHelperEnabled} onCheckedChange={setIsHelperEnabled} id="helper-enabled-switch" disabled={isDisabled || accountBalance === 0} />
-          <Label htmlFor="helper-enabled-switch">Enable Lending Goals</Label>
+          <Switch checked={isHelperEnabled} onCheckedChange={setIsHelperEnabled} id="helper-enabled-switch" disabled={accountBalance === 0} />
+          <Label htmlFor="helper-enabled-switch">Enable lending goals</Label>
         </div>
         {accountBalance === 0 && (
           <Alert variant="default">
             <AlertDescription>
-              You too need help. You must have a positive account balance before you can offer loans.
+              You must have a positive account balance before you can offer loans.
             </AlertDescription>
           </Alert>
         )}
@@ -194,7 +185,6 @@ export function LoanHelperSettingsForm({ userId, onSave, onCancel, lendingLicens
         {loanAmountExceedsBalance && (
           <Alert variant="destructive">
             <AlertDescription>
-              You no get money to lend. Who you wan impress?
               Loan offer cannot exceed your account balance (₦{accountBalance?.toLocaleString()}).
             </AlertDescription>
           </Alert>
@@ -211,7 +201,6 @@ export function LoanHelperSettingsForm({ userId, onSave, onCancel, lendingLicens
                 placeholder="Enter loan amount"
                 value={loanAmount}
                 onChange={(e) => setLoanAmount(Number(e.target.value))}
-                disabled={isDisabled}
               />
             </div>
             <div>
@@ -224,7 +213,6 @@ export function LoanHelperSettingsForm({ userId, onSave, onCancel, lendingLicens
                 onChange={(e) => setInterestRate(Number(e.target.value))}
                 min={interestRateLimits?.minPct ?? 5}
                 max={interestRateLimits?.maxPct ?? 20}
-                disabled={isDisabled}
               />
               <p className="text-xs text-muted-foreground mt-1">
                 Allowed range: {interestRateLimits?.minPct ?? 5}% - {interestRateLimits?.maxPct ?? 20}%
@@ -240,9 +228,8 @@ export function LoanHelperSettingsForm({ userId, onSave, onCancel, lendingLicens
                   value={repaymentTime}
                   onChange={(e) => setRepaymentTime(Number(e.target.value))}
                   min={1}
-                  disabled={isDisabled}
                 />
-                <Select value={repaymentUnit} onValueChange={setRepaymentUnit} disabled={isDisabled}>
+                <Select value={repaymentUnit} onValueChange={setRepaymentUnit}>
                   <SelectTrigger className="w-28">
                     <SelectValue placeholder="Unit" />
                   </SelectTrigger>
@@ -261,14 +248,13 @@ export function LoanHelperSettingsForm({ userId, onSave, onCancel, lendingLicens
                 placeholder="Enter terms and conditions"
                 value={termsAndConditions}
                 onChange={(e) => setTermsAndConditions(e.target.value)}
-                disabled={isDisabled}
               />
             </div>
             <div className="flex gap-2 justify-end">
-              <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading || isDisabled}>
+              <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={isLoading || isDisabled || loanAmountExceedsBalance}>
+              <Button type="submit" disabled={isLoading || loanAmountExceedsBalance}>
                 {isLoading ? "Saving..." : "Save Settings"}
               </Button>
             </div>

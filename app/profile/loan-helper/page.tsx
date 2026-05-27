@@ -27,7 +27,7 @@ export default function LoanHelperSettingsPage() {
       userImage={userProfile.profile?.profile_picture_url || "/vibrant-street-market.png"}
     >
       <div className="max-w-6xl mx-auto">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">Lending Goals Settings</h1>
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">Lending goals</h1>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="md:col-span-1">

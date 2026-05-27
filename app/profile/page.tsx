@@ -143,7 +143,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
         </div>
 
         {/* Container for profile image and action buttons */}
-        <div className="container max-w-6xl">
+        <div className="container max-w-6xl mx-auto">
           {/* Profile Image with Avatar Upload Dialog */}
           <div className="absolute -bottom-16 left-8 md:left-12">
             <div className="relative">
@@ -163,7 +163,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
       </div>
 
       {/* Main Content */}
-      <div className="container max-w-7xl pt-24 pb-12">
+      <div className="container max-w-7xl mx-auto pt-24 pb-12">
         {/* Profile Header with reorganized layout */}
         <div className="mb-8">
           <div className="flex justify-between items-start">
@@ -180,7 +180,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
               </div>
             </div>
 
-            {/* Right side - Loan helper info */}
+            {/* Right side - Loan goals badge */}
             {loanHelperSettings && profile.lending_license_url && (
               <div className="flex items-center mt-1.5 md:mt-0">
                 <div className="flex flex-col items-end">
@@ -289,7 +289,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: { ta
                 <Card>
                   <CardHeader>
                       <div className="flex justify-between items-center">
-                        <CardTitle className="text-lg">Lending Goals Settings</CardTitle>
+                        <CardTitle className="text-lg">Lending goals</CardTitle>
                       <Link href="/profile/loan-helper">
                         <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                           <Edit className="h-4 w-4" />
