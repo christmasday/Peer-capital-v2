@@ -43,6 +43,7 @@ const navigation = [
   { name: "Fee Configuration", href: "/admin/fees", icon: DollarSign },
   { name: "API Keys", href: "/admin/api-keys", icon: Key },
   { name: "Webhooks", href: "/admin/webhooks", icon: Webhook },
+  { name: "Dojah Webhooks", href: "/admin/dojah-webhooks", icon: Webhook },
 ]
 
 export default function AdminLayout({ children }: AdminLayoutProps) {

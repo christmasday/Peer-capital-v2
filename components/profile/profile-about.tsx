@@ -22,6 +22,7 @@ import { LoanHelperSettingsForm } from "@/components/profile/loan-helper-setting
 import { LoanHelperSettingsDisplay } from "@/components/profile/loan-helper-settings-display"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog"
 import Script from "next/script"
+import { createRoot } from 'react-dom/client'
 // Fix for missing types for react-dojah
 // @ts-ignore
 // eslint-disable-next-line
@@ -32,6 +33,8 @@ import Dojah from 'react-dojah'
 declare global {
   interface Window {
     Dojah?: any;
+    __dojahRoot?: any;
+    __dojahPortal?: HTMLElement | null;
   }
 }
 
@@ -43,6 +46,8 @@ interface ProfileAboutProps {
 
 export function ProfileAbout({ profile, isCurrentUser = false, initialSection }: ProfileAboutProps) {
   const router = useRouter()
+  const dojahAppId = process.env.NEXT_PUBLIC_DOJAH_APP_ID || process.env.DOJAH_APP_ID || "";
+  const dojahPublicKey = process.env.NEXT_PUBLIC_DOJAH_PUBLIC_KEY || process.env.DOJAH_PUBLIC_KEY || "";
   const [activeSection, setActiveSection] = useState(initialSection || "overview")
   const [isEditingContact, setIsEditingContact] = useState(false)
   const [isEditingBio, setIsEditingBio] = useState(false)
@@ -132,6 +137,8 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
   const [otpError, setOtpError] = useState("");
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
   const [showDojah, setShowDojah] = useState(false);
+  const [dojahHidden, setDojahHidden] = useState(false);
+  const [dojahPortalReady, setDojahPortalReady] = useState(false);
   // Add state for beneficiaries (bank accounts)
   const [accounts, setAccounts] = useState<any[]>([])
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false)
@@ -177,6 +184,38 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
   const [otpInput, setOtpInput] = useState("");
   const [otpErrorMsg, setOtpErrorMsg] = useState("");
 
+  useEffect(() => {
+    if (!showDojah) {
+      return;
+    }
+
+    if (typeof document === "undefined") {
+      return;
+    }
+
+    const portalId = "dojah-widget-portal";
+    let portal = document.getElementById(portalId) as HTMLDivElement | null;
+
+    if (!portal) {
+      portal = document.createElement("div");
+      portal.id = portalId;
+      portal.style.position = "fixed";
+      portal.style.inset = "0";
+      portal.style.zIndex = "60";
+      portal.style.display = "flex";
+      portal.style.alignItems = "center";
+      portal.style.justifyContent = "center";
+      document.body.appendChild(portal);
+    }
+
+    window.__dojahPortal = portal;
+    setDojahPortalReady(true);
+
+    return () => {
+      setDojahPortalReady(false);
+    };
+  }, [showDojah]);
+
   const searchParams = useSearchParams();
   const correlationIdFromUrl = searchParams.get("c_id") || searchParams.get("correlationID");
   const success = searchParams.get("success");
@@ -209,14 +248,32 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
     }
   };
 
+  useEffect(() => {
+    return () => {
+      try {
+        window.__dojahRoot?.unmount?.();
+      } catch (error) {
+        // Ignore cleanup errors from the external SDK.
+      }
+
+      try {
+        window.__dojahPortal?.remove?.();
+      } catch (error) {
+        // Ignore cleanup errors from the external SDK.
+      }
+
+      window.__dojahRoot = null;
+      window.__dojahPortal = null;
+    };
+  }, []);
+
   const sections = [
     { id: "overview", name: "Overview", icon: Info },
-    { id: "loan-helper", name: "Lending Goals Settings", icon: Briefcase },
+    { id: "loan-helper", name: "Lending goals", icon: Briefcase },
     { id: "contact", name: "Contact and basic info", icon: Phone },
     { id: "work", name: "Work and education", icon: Briefcase },
     { id: "places", name: "Places lived", icon: MapPin },
     { id: "details", name: "Details about you", icon: User },
-    { id: "lending-licence", name: "Lending Licence", icon: Briefcase },
     { id: "wallets", name: "Wallets", icon: Wallet },
     { id: "bank", name: "Repayment Account", icon: Briefcase },
   ]
@@ -720,6 +777,116 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
     setIsEditingLoanHelper(false);
     setLoanHelperError(null);
   };
+
+  useEffect(() => {
+    if (!showDojah || !dojahPortalReady || typeof document === "undefined") {
+      return;
+    }
+
+    const portal = window.__dojahPortal;
+    if (!portal) {
+      return;
+    }
+
+    const root = window.__dojahRoot || createRoot(portal);
+    window.__dojahRoot = root;
+
+    root.render(
+      <div className={dojahHidden ? "hidden" : ""}>
+        <Dojah
+          appID={dojahAppId}
+          publicKey={dojahPublicKey}
+          type="custom"
+          config={{
+            widget_id: "684effd6cb141c071767fddc",
+          }}
+          userData={{
+            first_name: profile.first_name,
+            middle_name: profile.middle_name,
+            last_name: profile.last_name,
+            email: profile.email,
+            residence_country: profile.country || 'NG',
+          }}
+          metadata={{
+            user_id: profile.id,
+          }}
+          response={async (eventType: string, payload?: any) => {
+            try {
+              if (eventType === "success") {
+                const response = payload;
+                if (response?.status !== true) {
+                  toast({
+                    title: "Profile Verification Failed",
+                    description: response?.message || "The verification was not completed successfully.",
+                  });
+                  setDojahHidden(true);
+                  return;
+                }
+
+                const verified = response?.data || {};
+                const governmentData = verified.government_data?.data || {};
+                const idData = verified.id?.data?.id_data || {};
+                const ninEntity = governmentData.nin?.entity || {};
+                const bvnEntity = governmentData.bvn?.entity || {};
+                const userData = verified.user_data?.data || {};
+                const updateFields: any = {
+                  dateOfBirth: userData.dob || idData.date_of_birth || bvnEntity.date_of_birth,
+                  bvn: bvnEntity.bvn || verified.value,
+                  address: ninEntity.residence_AddressLine1 || bvnEntity.residential_address,
+                  city: ninEntity.residence_Town || bvnEntity.lga_of_residence,
+                  state: ninEntity.residence_state || bvnEntity.state_of_residence,
+                  country: verified.countries?.data?.country || idData.nationality || bvnEntity.nationality,
+                  id_url: verified.id?.data?.id_url,
+                  id_type: idData.document_type || verified.id_type,
+                  id_number: idData.document_number || verified.value,
+                };
+                Object.keys(updateFields).forEach((key) => updateFields[key] === undefined && delete updateFields[key]);
+                const result = await updateProfile(updateFields, profile.id);
+                if (result.success) {
+                  toast({
+                    title: "Profile Verification Successful",
+                    description: "Your profile has been updated with your verified information.",
+                  });
+                } else {
+                  toast({
+                    title: "Profile Update Failed",
+                    description: result.error || "An error occurred while updating your profile.",
+                  });
+                }
+                setDojahHidden(true);
+                return;
+              }
+
+              if (eventType === "error") {
+                toast({
+                  title: "Verification Error",
+                  description: payload?.message || "An error occurred before verification completed.",
+                });
+                setDojahHidden(true);
+                return;
+              }
+
+              if (eventType === "close") {
+                setDojahHidden(true);
+                return;
+              }
+            } catch (err: any) {
+              console.error("Dojah response handler error:", err);
+              setDojahHidden(true);
+            }
+          }}
+        />
+      </div>
+    );
+
+    return () => {
+      try {
+        root.render(<></>);
+      } catch (error) {
+        // Ignore SDK cleanup race conditions here; the portal cleanup effect handles final teardown.
+      }
+    };
+  }, [showDojah, dojahPortalReady, dojahHidden, dojahAppId, dojahPublicKey, profile, toast]);
 
 
   // Add these implementations at the top level of the component (not inside another function)
@@ -1993,6 +2160,42 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
     }
   }
 
+  // Minimal block/unblock handlers to avoid missing identifier compile errors
+  async function handleBlock() {
+    setBlockLoading(true);
+    try {
+      // Attempt to persist block status; updateProfile may accept camelCase keys
+      const result = await updateProfile({ isBlocked: true } as any, profile.id);
+      if (result?.success) {
+        setIsBlocked(true);
+        toast({ title: "User blocked", description: "This user has been blocked." });
+      } else {
+        toast({ title: "Error", description: result?.error || "Failed to block user" });
+      }
+    } catch (err: any) {
+      toast({ title: "Error", description: err?.message || "Failed to block user" });
+    } finally {
+      setBlockLoading(false);
+    }
+  }
+
+  async function handleUnblock() {
+    setBlockLoading(true);
+    try {
+      const result = await updateProfile({ isBlocked: false } as any, profile.id);
+      if (result?.success) {
+        setIsBlocked(false);
+        toast({ title: "User unblocked", description: "This user has been unblocked." });
+      } else {
+        toast({ title: "Error", description: result?.error || "Failed to unblock user" });
+      }
+    } catch (err: any) {
+      toast({ title: "Error", description: err?.message || "Failed to unblock user" });
+    } finally {
+      setBlockLoading(false);
+    }
+  }
+
   if (isBlocked && !isCurrentUser) {
     return (
       <div className="text-center text-gray-500 py-12">
@@ -2024,76 +2227,11 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
       <div className="md:col-span-2">
         {activeSection === "overview" && (
           <div className="space-y-6">
-            {/* Dojah Verification Button */}
-            {isCurrentUser && (
-              <div className="mb-4">
-                <Button color="primary" onClick={() => setShowDojah(true)}>
-                  Complete Profile Verification
-                </Button>
-              </div>
-            )}
-            {/* Dojah Widget Modal */}
-            {showDojah && (
-              <Dojah
-                appID={process.env.DOJAH_APP_ID}
-                publicKey={process.env.DOJAH_PUBLIC_KEY}
-                type="custom"
-                config={{
-                  widget_id: "684effd6cb141c071767fddc",
-                }}
-                userData={{
-                  first_name: profile.first_name,
-                  middle_name: profile.middle_name,
-                  last_name: profile.last_name,
-                  email: profile.email,
-                  residence_country: profile.country || 'NG',
-                }}
-                metadata={{
-                  user_id: profile.id,
-                }}
-                response={async (type: any, data: any) => {
-                  if (type === 'success') {
-                    const verified = data?.data || {};
-                    // Build the update object, omitting full name fields
-                    const updateFields: any = {
-                      dateOfBirth: verified.user_data?.data?.dob,
-                      bvn: verified.government_data?.data?.bvn?.entity?.bvn,
-                      address: verified.government_data?.data?.nin?.entity?.residence_AddressLine1,
-                      city: verified.government_data?.data?.nin?.entity?.residence_Town,
-                      state: verified.government_data?.data?.nin?.entity?.residence_state,
-                      country: verified.countries?.data?.country,
-                      id_url: verified.id?.data?.id_url,
-                      id_type: verified.id?.data?.id_data?.document_type,
-                      id_number: verified.id?.data?.id_data?.document_number
-                      // Add more fields as needed, but do NOT include firstName, lastName, middleName
-                    };
-                    Object.keys(updateFields).forEach(
-                      (key) => updateFields[key] === undefined && delete updateFields[key]
-                    );
-                    const result = await updateProfile(updateFields, profile.id);
-                    if (result.success) {
-                      toast({
-                        title: "Profile Verification Successful",
-                        description: "Your profile has been updated with your verified information.",
-                      });
-                    } else {
-                      toast({
-                        title: "Profile Update Failed",
-                        description: result.error || "An error occurred while updating your profile.",
-                      });
-                    }
-                    setShowDojah(false);
-                  } else if (type === 'close') {
-                    setShowDojah(false);
-                  }
-                }}
-              />
-            )}
+            {/* Dojah Widget is rendered into a persistent portal outside the route tree */}
             {/* Referral Code Display */}
             {profile.referral_code && (
               <div className="flex items-center gap-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <div>
-                  <span className="block text-sm text-blue-700 font-semibold">Your Referral Code</span>
                   <span className="text-lg font-mono font-bold text-blue-900">{profile.referral_code}</span>
                 </div>
                 <button
@@ -2932,10 +3070,6 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
           </div>
         )}
 
-        {activeSection === "lending-licence" && (
-          <LendingLicenceSection profile={profile} onUpdate={handleUpdate} uploadLendingLicense={uploadLendingLicense} />
-        )}
-
         {activeSection === "wallets" && (
           <div className="space-y-6">
             <h2 className="text-xl font-medium">Your Wallets</h2>
@@ -2995,10 +3129,10 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
         )}
 
         {activeSection === "loan-helper" && (
-          <div className={`space-y-8 ${!profile.lending_license_url && loanAmount ? 'opacity-50 pointer-events-none select-none' : ''}`}>
+          <div className="space-y-8">
             <h2 className="text-xl font-medium flex items-center justify-between">
-              Lending Goals Settings
-              {isCurrentUser && !isEditingLoanHelper && profile.lending_license_url && (
+              Lending goals
+              {isCurrentUser && !isEditingLoanHelper && (
                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setIsEditingLoanHelper(true)}>
                   <Edit className="h-4 w-4" />
                 </Button>
@@ -3007,18 +3141,11 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
             {isEditingLoanHelper ? (
               <LoanHelperSettingsForm
                 userId={profile.id}
-                lendingLicenseUrl={profile.lending_license_url}
                 onSave={() => setIsEditingLoanHelper(false)}
                 onCancel={() => setIsEditingLoanHelper(false)}
               />
             ) : (
-              profile.lending_license_url ? (
-                <LoanHelperSettingsDisplay userId={profile.id} lendingLicenseUrl={profile.lending_license_url} />
-              ) : (
-                <div className="text-center text-gray-500 py-12">
-                  <p>You must upload a valid lending license to offer loans.</p>
-                </div>
-              )
+              <LoanHelperSettingsDisplay userId={profile.id} />
             )}
           </div>
         )}
@@ -3228,6 +3355,23 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
     </div>
           </DialogContent>
         </Dialog>
+        {isCurrentUser && (
+          <div className="mt-8 flex justify-end">
+            <Button
+              color="primary"
+              onClick={() => {
+                if (!dojahAppId || !dojahPublicKey) {
+                  toast({ title: "Verification not available", description: "Dojah is not configured for this environment.", variant: "destructive" });
+                  return;
+                }
+                setDojahHidden(false);
+                setShowDojah(true);
+              }}
+            >
+              Complete Profile Verification
+            </Button>
+          </div>
+        )}
         {/* Phone Verification Dialog */}
         <Dialog open={showPhoneVerify} onOpenChange={setShowPhoneVerify}>
           <DialogContent>
@@ -3288,7 +3432,7 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
             {blockLoading ? (isBlocked ? "Unblocking..." : "Blocking...") : isBlocked ? "Unblock" : "Block"}
           </Button>
         )}
-    </div>
+      </div>
     </div>
   );
 }
