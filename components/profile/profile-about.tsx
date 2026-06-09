@@ -21,22 +21,6 @@ import { useToast } from "@/hooks/use-toast"
 import { LoanHelperSettingsForm } from "@/components/profile/loan-helper-settings-form"
 import { LoanHelperSettingsDisplay } from "@/components/profile/loan-helper-settings-display"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog"
-import Script from "next/script"
-import { createRoot } from 'react-dom/client'
-// Fix for missing types for react-dojah
-// @ts-ignore
-// eslint-disable-next-line
-declare module 'react-dojah';
-import Dojah from 'react-dojah'
-
-// Add Dojah to window type
-declare global {
-  interface Window {
-    Dojah?: any;
-    __dojahRoot?: any;
-    __dojahPortal?: HTMLElement | null;
-  }
-}
 
 interface ProfileAboutProps {
   profile: any
@@ -45,9 +29,6 @@ interface ProfileAboutProps {
 }
 
 export function ProfileAbout({ profile, isCurrentUser = false, initialSection }: ProfileAboutProps) {
-  const router = useRouter()
-  const dojahAppId = process.env.NEXT_PUBLIC_DOJAH_APP_ID || process.env.DOJAH_APP_ID || "";
-  const dojahPublicKey = process.env.NEXT_PUBLIC_DOJAH_PUBLIC_KEY || process.env.DOJAH_PUBLIC_KEY || "";
   const [activeSection, setActiveSection] = useState(initialSection || "overview")
   const [isEditingContact, setIsEditingContact] = useState(false)
   const [isEditingBio, setIsEditingBio] = useState(false)
@@ -66,6 +47,9 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
   const [locationAddress, setLocationAddress] = useState(profile.address || "")
   const [locationCity, setLocationCity] = useState(profile.city || "")
   const [locationState, setLocationState] = useState(profile.state || "")
+  const [locationStreet, setLocationStreet] = useState(profile.street || profile.address || "")
+  const [locationLga, setLocationLga] = useState(profile.lga || profile.city || "")
+  const [locationLandmark, setLocationLandmark] = useState(profile.landmark || "")
   const [workOverviewJobTitle, setWorkOverviewJobTitle] = useState(profile.job_title || "")
   const [workOverviewEmployerName, setWorkOverviewEmployerName] = useState(profile.employer_name || "")
   const [workOverviewEmployerAddress, setWorkOverviewEmployerAddress] = useState(profile.employer_address || "")
@@ -136,9 +120,20 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
   const [otp, setOtp] = useState("");
   const [otpError, setOtpError] = useState("");
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
-  const [showDojah, setShowDojah] = useState(false);
-  const [dojahHidden, setDojahHidden] = useState(false);
-  const [dojahPortalReady, setDojahPortalReady] = useState(false);
+  const [phoneOtpReferenceId, setPhoneOtpReferenceId] = useState<string | null>(null);
+  const [isSendingPhoneOtp, setIsSendingPhoneOtp] = useState(false);
+  const [phoneVerified, setPhoneVerified] = useState(profile.phone_verified ?? false)
+  const [showEmailVerify, setShowEmailVerify] = useState(false)
+  const [emailOtp, setEmailOtp] = useState("")
+  const [emailOtpError, setEmailOtpError] = useState("")
+  const [isSendingEmailOtp, setIsSendingEmailOtp] = useState(false)
+  const [isVerifyingEmailOtp, setIsVerifyingEmailOtp] = useState(false)
+  const [emailVerified, setEmailVerified] = useState(Boolean(profile.email_confirmed_at || profile.email_verified))
+  const [addressVerified, setAddressVerified] = useState(Boolean(profile.address_verified || profile.address_verified_at || profile.address_verification_status === "completed"))
+  const [addressVerificationStatus, setAddressVerificationStatus] = useState<string | null>(profile.address_verification_status || null)
+  const [addressVerificationReferenceId, setAddressVerificationReferenceId] = useState<string | null>(profile.address_verification_reference_id || null)
+  const [isVerifyingAddress, setIsVerifyingAddress] = useState(false)
+  const [addressVerificationError, setAddressVerificationError] = useState<string | null>(null)
   // Add state for beneficiaries (bank accounts)
   const [accounts, setAccounts] = useState<any[]>([])
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false)
@@ -184,38 +179,6 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
   const [otpInput, setOtpInput] = useState("");
   const [otpErrorMsg, setOtpErrorMsg] = useState("");
 
-  useEffect(() => {
-    if (!showDojah) {
-      return;
-    }
-
-    if (typeof document === "undefined") {
-      return;
-    }
-
-    const portalId = "dojah-widget-portal";
-    let portal = document.getElementById(portalId) as HTMLDivElement | null;
-
-    if (!portal) {
-      portal = document.createElement("div");
-      portal.id = portalId;
-      portal.style.position = "fixed";
-      portal.style.inset = "0";
-      portal.style.zIndex = "60";
-      portal.style.display = "flex";
-      portal.style.alignItems = "center";
-      portal.style.justifyContent = "center";
-      document.body.appendChild(portal);
-    }
-
-    window.__dojahPortal = portal;
-    setDojahPortalReady(true);
-
-    return () => {
-      setDojahPortalReady(false);
-    };
-  }, [showDojah]);
-
   const searchParams = useSearchParams();
   const correlationIdFromUrl = searchParams.get("c_id") || searchParams.get("correlationID");
   const success = searchParams.get("success");
@@ -226,20 +189,26 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
     setIsVerifyingOtp(true);
     setOtpError("");
     try {
-      const res = await fetch("/api/phone/verify-otp", {
+      if (!phoneOtpReferenceId) {
+        throw new Error("Please request a new OTP first.");
+      }
+
+      const res = await fetch("/api/dojah/validate-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: profile.phone_number, otp }),
+        body: JSON.stringify({ code: otp, referenceId: phoneOtpReferenceId }),
       });
       const data = await res.json();
-      if (res.ok && data.status === "success") {
+      if (res.ok && data?.entity?.valid === true) {
         await updateProfile({ phoneVerified: true, phoneVerifiedAt: new Date().toISOString() }, profile.id);
+        setPhoneVerified(true);
         setShowPhoneVerify(false);
+        setPhoneOtpReferenceId(null);
         setOtp("");
         // Optionally, trigger a profile refetch or reload
         window.location.reload();
       } else {
-        setOtpError(data.message || "Invalid OTP");
+        setOtpError(data?.message || data?.error || "Invalid OTP");
       }
     } catch (err) {
       setOtpError("Verification failed. Please try again.");
@@ -248,37 +217,133 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
     }
   };
 
+  const handleSendPhoneOtp = async () => {
+    if (!profile.phone_number) {
+      toast({ title: "Missing phone number", description: "Add a phone number before requesting a verification code.", variant: "destructive" });
+      return;
+    }
+
+    setIsSendingPhoneOtp(true);
+    setOtpError("");
+    try {
+      const res = await fetch("/api/dojah/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phoneNumber: profile.phone_number }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || data?.message || "Failed to send OTP");
+      }
+
+      setPhoneOtpReferenceId(data.referenceId || null);
+      setShowPhoneVerify(true);
+      toast({
+        title: "OTP sent",
+        description: `A verification code was sent to ${profile.phone_number}`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Unable to send OTP",
+        description: error?.message || "Failed to request a Dojah OTP",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSendingPhoneOtp(false);
+    }
+  };
+
+  const handleSendEmailOtp = async () => {
+    if (!profile.email) {
+      toast({
+        title: "Missing email",
+        description: "Add an email before requesting a verification code.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSendingEmailOtp(true)
+    setEmailOtpError("")
+
+    try {
+      const response = await fetch("/api/auth/send-confirmation-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: profile.email,
+          firstName: profile.first_name || "",
+        }),
+      })
+
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.error || data?.message || "Failed to send email verification code")
+      }
+
+      setShowEmailVerify(true)
+      toast({
+        title: "Code sent",
+        description: `A verification code was sent to ${profile.email}.`,
+      })
+    } catch (error: any) {
+      toast({
+        title: "Unable to send code",
+        description: error?.message || "Failed to request email verification code",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSendingEmailOtp(false)
+    }
+  }
+
+  const handleVerifyEmailOtp = async () => {
+    setIsVerifyingEmailOtp(true)
+    setEmailOtpError("")
+
+    try {
+      const response = await fetch("/api/auth/verify-confirmation-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: profile.email, code: emailOtp }),
+      })
+
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.error || data?.message || "Invalid verification code")
+      }
+
+      setEmailVerified(true)
+      setShowEmailVerify(false)
+      setEmailOtp("")
+      toast({ title: "Email verified", description: "Your email has been verified successfully." })
+    } catch (error: any) {
+      setEmailOtpError(error?.message || "Verification failed")
+    } finally {
+      setIsVerifyingEmailOtp(false)
+    }
+  }
+
   useEffect(() => {
-    return () => {
-      try {
-        window.__dojahRoot?.unmount?.();
-      } catch (error) {
-        // Ignore cleanup errors from the external SDK.
-      }
-
-      try {
-        window.__dojahPortal?.remove?.();
-      } catch (error) {
-        // Ignore cleanup errors from the external SDK.
-      }
-
-      window.__dojahRoot = null;
-      window.__dojahPortal = null;
-    };
+    return undefined;
   }, []);
 
   const sections = [
     { id: "overview", name: "Overview", icon: Info },
     { id: "loan-helper", name: "Lending goals", icon: Briefcase },
+    { id: "bank", name: "Linked Account", icon: Briefcase },
     { id: "contact", name: "Contact and basic info", icon: Phone },
     { id: "work", name: "Work and education", icon: Briefcase },
     { id: "places", name: "Places lived", icon: MapPin },
     { id: "details", name: "Details about you", icon: User },
     { id: "wallets", name: "Wallets", icon: Wallet },
-    { id: "bank", name: "Repayment Account", icon: Briefcase },
   ]
 
   useEffect(() => {
+    setPhoneVerified(profile.phone_verified ?? false)
+    setEmailVerified(Boolean(profile.email_confirmed_at || profile.email_verified))
     setSocialMediaData({
       facebook_url: profile.facebook_url || "",
       linkedin_url: profile.linkedin_url || "",
@@ -289,6 +354,9 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
     setLocationAddress(profile.address || "")
     setLocationCity(profile.city || "")
     setLocationState(profile.state || "")
+    setLocationStreet(profile.street || profile.address || "")
+    setLocationLga(profile.lga || profile.city || "")
+    setLocationLandmark(profile.landmark || "")
     setWorkOverviewJobTitle(profile.job_title || "")
     setWorkOverviewEmployerName(profile.employer_name || "")
     setWorkOverviewEmployerAddress(profile.employer_address || "")
@@ -324,6 +392,9 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
     setFullAddress(profile.fullAddress || "");
     setPostalCode(profile.postalCode || "");
     setResolvedSrUserId(profile.sr_user_id || null);
+    setAddressVerified(Boolean(profile.address_verified || profile.address_verified_at || profile.address_verification_status === "completed"))
+    setAddressVerificationStatus(profile.address_verification_status || null)
+    setAddressVerificationReferenceId(profile.address_verification_reference_id || null)
   }, [profile])
 
   useEffect(() => {
@@ -480,6 +551,9 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
       address: locationAddress,
       city: locationCity,
       state: locationState,
+      street: locationStreet || locationAddress,
+      lga: locationLga || locationCity,
+      landmark: locationLandmark,
       zipCode: profile.zip_code,
       profilePictureUrl: profile.profile_picture_url,
       bvn: profile.bvn,
@@ -498,11 +572,18 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
       bankName: profile.bank_name,
       accountNumber: profile.account_number,
       accountName: profile.account_name,
+      addressVerified: false,
+      addressVerifiedAt: null,
+      addressVerificationStatus: null,
+      addressVerificationReferenceId: null,
     });
 
     if (result.success) {
       console.log("Location updated successfully!");
       setIsEditingLocation(false);
+      setAddressVerified(false)
+      setAddressVerificationStatus(null)
+      setAddressVerificationReferenceId(null)
       // Revalidation should handle UI update
     } else {
       console.error("Failed to update location:", result.error);
@@ -516,6 +597,46 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
     setLocationAddress(profile.address || "");
     setLocationCity(profile.city || "");
     setLocationState(profile.state || "");
+    setLocationStreet(profile.street || profile.address || "");
+    setLocationLga(profile.lga || profile.city || "");
+    setLocationLandmark(profile.landmark || "");
+  };
+
+  const handleVerifyAddress = async () => {
+    setIsVerifyingAddress(true)
+    setAddressVerificationError(null)
+
+    try {
+      const response = await fetch("/api/dojah/address-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      })
+
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.error || data?.message || "Failed to verify address")
+      }
+
+      const nextStatus = String(data?.status || (data?.verified ? "completed" : "pending"))
+      const nextVerified = Boolean(data?.verified || nextStatus === "completed")
+
+      setAddressVerificationStatus(nextStatus)
+      setAddressVerificationReferenceId(data?.referenceId || null)
+      setAddressVerified(nextVerified)
+
+      if (nextVerified) {
+        toast({ title: "Address verified", description: "Your address has been verified successfully." })
+      } else {
+        toast({ title: "Verification submitted", description: "Address verification is in progress." })
+      }
+    } catch (error: any) {
+      const message = error?.message || "Address verification failed"
+      setAddressVerificationError(message)
+      toast({ title: "Unable to verify address", description: message, variant: "destructive" })
+    } finally {
+      setIsVerifyingAddress(false)
+    }
   };
 
   const handleSaveWorkOverview = async () => {
@@ -603,11 +724,19 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
       bankName: profile.bank_name,
       accountNumber: profile.account_number,
       accountName: profile.account_name,
+      addressVerified: false,
+      addressVerifiedAt: null,
+      addressVerificationStatus: null,
+      addressVerificationReferenceId: null,
     });
 
     if (result.success) {
       console.log("Phone number updated successfully!");
       setIsEditingPhone(false);
+      setPhoneVerified(false);
+      setAddressVerified(false)
+      setAddressVerificationStatus(null)
+      setAddressVerificationReferenceId(null)
     } else {
       console.error("Failed to update phone number:", result.error);
       // TODO: Show error message
@@ -778,117 +907,6 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
     setLoanHelperError(null);
   };
 
-  useEffect(() => {
-    if (!showDojah || !dojahPortalReady || typeof document === "undefined") {
-      return;
-    }
-
-    const portal = window.__dojahPortal;
-    if (!portal) {
-      return;
-    }
-
-    const root = window.__dojahRoot || createRoot(portal);
-    window.__dojahRoot = root;
-
-    root.render(
-      <div className={dojahHidden ? "hidden" : ""}>
-        <Dojah
-          appID={dojahAppId}
-          publicKey={dojahPublicKey}
-          type="custom"
-          config={{
-            widget_id: "684effd6cb141c071767fddc",
-          }}
-          userData={{
-            first_name: profile.first_name,
-            middle_name: profile.middle_name,
-            last_name: profile.last_name,
-            email: profile.email,
-            residence_country: profile.country || 'NG',
-          }}
-          metadata={{
-            user_id: profile.id,
-          }}
-          response={async (eventType: string, payload?: any) => {
-            try {
-              if (eventType === "success") {
-                const response = payload;
-                if (response?.status !== true) {
-                  toast({
-                    title: "Profile Verification Failed",
-                    description: response?.message || "The verification was not completed successfully.",
-                  });
-                  setDojahHidden(true);
-                  return;
-                }
-
-                const verified = response?.data || {};
-                const governmentData = verified.government_data?.data || {};
-                const idData = verified.id?.data?.id_data || {};
-                const ninEntity = governmentData.nin?.entity || {};
-                const bvnEntity = governmentData.bvn?.entity || {};
-                const userData = verified.user_data?.data || {};
-                const updateFields: any = {
-                  dateOfBirth: userData.dob || idData.date_of_birth || bvnEntity.date_of_birth,
-                  bvn: bvnEntity.bvn || verified.value,
-                  address: ninEntity.residence_AddressLine1 || bvnEntity.residential_address,
-                  city: ninEntity.residence_Town || bvnEntity.lga_of_residence,
-                  state: ninEntity.residence_state || bvnEntity.state_of_residence,
-                  country: verified.countries?.data?.country || idData.nationality || bvnEntity.nationality,
-                  id_url: verified.id?.data?.id_url,
-                  id_type: idData.document_type || verified.id_type,
-                  id_number: idData.document_number || verified.value,
-                };
-                Object.keys(updateFields).forEach((key) => updateFields[key] === undefined && delete updateFields[key]);
-                const result = await updateProfile(updateFields, profile.id);
-                if (result.success) {
-                  toast({
-                    title: "Profile Verification Successful",
-                    description: "Your profile has been updated with your verified information.",
-                  });
-                } else {
-                  toast({
-                    title: "Profile Update Failed",
-                    description: result.error || "An error occurred while updating your profile.",
-                  });
-                }
-                setDojahHidden(true);
-                return;
-              }
-
-              if (eventType === "error") {
-                toast({
-                  title: "Verification Error",
-                  description: payload?.message || "An error occurred before verification completed.",
-                });
-                setDojahHidden(true);
-                return;
-              }
-
-              if (eventType === "close") {
-                setDojahHidden(true);
-                return;
-              }
-            } catch (err: any) {
-              console.error("Dojah response handler error:", err);
-              setDojahHidden(true);
-            }
-          }}
-        />
-      </div>
-    );
-
-    return () => {
-      try {
-        root.render(<></>);
-      } catch (error) {
-        // Ignore SDK cleanup race conditions here; the portal cleanup effect handles final teardown.
-      }
-    };
-  }, [showDojah, dojahPortalReady, dojahHidden, dojahAppId, dojahPublicKey, profile, toast]);
-
-
   // Add these implementations at the top level of the component (not inside another function)
   async function uploadLendingLicense(file: File): Promise<string> {
     // Call the server action to upload the file
@@ -930,6 +948,8 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
     idNumber?: string;
     idExpirationDate?: string | null; // new
     idDateIssued?: string | null; // new
+    id_verified?: boolean | null;
+    idVerificationDate?: string | null;
   };
 
   type DetailsAboutYouProps = {
@@ -959,6 +979,9 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
     const [savingIdDoc, setSavingIdDoc] = useState(false);
     const [editIdDoc, setEditIdDoc] = useState(false);
     const [messageIdDoc, setMessageIdDoc] = useState<string | null>(null);
+    const [isVerifyingIdDoc, setIsVerifyingIdDoc] = useState(false);
+    const [idVerificationMsg, setIdVerificationMsg] = useState<string | null>(null);
+    const [idVerified, setIdVerified] = useState(profile.id_verified ?? false);
     const [idType, setIdType] = useState(profile.idType || profile.id_type || "");
     const [idNumber, setIdNumber] = useState(profile.idNumber || profile.id_number || "");
     const [idExpirationDate, setIdExpirationDate] = useState(profile.idExpirationDate || "");
@@ -1116,6 +1139,8 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
         setMessageIdDoc("Saved!");
         setIdDocFile(null);
         setEditIdDoc(false);
+        setIdVerified(false);
+        setIdVerificationMsg(null);
       } catch (err: any) {
         setMessageIdDoc(err?.message || "Save failed");
       } finally {
@@ -1129,6 +1154,44 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
       setIdNumber(profile.idNumber || profile.id_number || "");
       setEditIdDoc(false);
       setMessageIdDoc(null);
+    };
+
+    const handleVerifyIdDoc = async () => {
+      const documentUrl = (idDocUrl || profile.id_document_url || "").trim();
+
+      if (!documentUrl) {
+        setIdVerificationMsg("Upload an ID document first.");
+        return;
+      }
+
+      setIsVerifyingIdDoc(true);
+      setIdVerificationMsg(null);
+
+      try {
+        const response = await fetch("/api/dojah/document-analysis", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ documentUrl }),
+        });
+
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok || !data?.success || data?.overallStatus !== 1) {
+          setIdVerified(false);
+          setIdVerificationMsg(data?.error || data?.message || "ID verification failed.");
+          return;
+        }
+
+        await onUpdate({ id_verified: true, idVerificationDate: new Date().toISOString() });
+
+        setIdVerified(true);
+        setIdVerificationMsg("ID verified successfully.");
+      } catch (error: any) {
+        setIdVerified(false);
+        setIdVerificationMsg(error?.message || "ID verification failed.");
+      } finally {
+        setIsVerifyingIdDoc(false);
+      }
     };
 
     return (
@@ -1254,7 +1317,22 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
         {/* Valid Means of Identification */}
         <div>
           <div className="flex items-center justify-between">
-            <label className="font-semibold block mb-2">Valid Means of Identification</label>
+            <div className="flex items-center gap-2 mb-2">
+              <label className="font-semibold block">Valid Means of Identification</label>
+              {idVerified && <Badge className="bg-green-500 text-white">Verified</Badge>}
+              {!idVerified && isCurrentUser && profile.id_document_url && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 px-2 text-xs"
+                  onClick={handleVerifyIdDoc}
+                  disabled={isVerifyingIdDoc}
+                  type="button"
+                >
+                  {isVerifyingIdDoc ? "Verifying..." : "Verify"}
+                </Button>
+              )}
+            </div>
             {!editIdDoc && (
               <button
                 className="text-blue-600 flex items-center gap-1 text-sm"
@@ -1281,6 +1359,7 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
                 <div>ID Expiration Date: {profile.idExpirationDate ? new Date(profile.idExpirationDate).toLocaleDateString() : '-'}</div>
                 <div>ID Date Issued: {profile.idDateIssued ? new Date(profile.idDateIssued).toLocaleDateString() : '-'}</div>
               </div>
+              {idVerificationMsg && <div className="text-sm text-gray-500 mt-2">{idVerificationMsg}</div>}
             </div>
           ) : (
             <div className="space-y-2">
@@ -1451,62 +1530,6 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
     setBvnError(null);
   }
 
-  async function handleVerifyBvnWithDojah() {
-    const bvnValue = (bvnText || profile.bvn || "").trim();
-    if (!/^\d{11}$/.test(bvnValue)) {
-      setBvnError("Please enter a valid 11-digit BVN before verification.");
-      return;
-    }
-
-    setIsVerifyingBvn(true);
-    setBvnError(null);
-    setBvnVerificationMsg(null);
-
-    try {
-      if (bvnValue !== (profile.bvn || "")) {
-        const saved = await updateProfile({ bvn: bvnValue });
-        if (!saved?.success) {
-          setBvnError(saved?.error || "Failed to save BVN before verification");
-          return;
-        }
-      }
-
-      const res = await fetch("/api/dojah/kyc/bvn-full", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ bvn: bvnValue }),
-      });
-
-      const data = await res.json();
-      if (!res.ok || !data?.success || data?.verified !== true) {
-        setBvnVerified(false);
-        setBvnVerificationMsg(data?.error || "BVN verification failed. Please try again.");
-        return;
-      }
-
-      const updateResult = await updateProfile({
-        bvn: bvnValue,
-        bvn_verified: true,
-        bvn_verified_at: new Date().toISOString(),
-      });
-
-      if (!updateResult?.success) {
-        setBvnError(updateResult?.error || "BVN was validated, but profile update failed.");
-        return;
-      }
-
-      setBvnVerified(true);
-      setBvnVerificationMsg("BVN verified successfully.");
-      setIsEditingBvn(false);
-    } catch (error: any) {
-      setBvnVerified(false);
-      setBvnVerificationMsg("BVN verification failed. Please try again.");
-    } finally {
-      setIsVerifyingBvn(false);
-    }
-  }
-
   async function handleSaveNin() {
     setIsSavingNin(true);
     setNinError(null);
@@ -1544,9 +1567,20 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
     setIsSavingFullName(true);
     setFullNameError(null);
     try {
-      const result = await updateProfile({ firstName: firstNameText, middleName: middleNameText, lastName: lastNameText });
+      const result = await updateProfile({
+        firstName: firstNameText,
+        middleName: middleNameText,
+        lastName: lastNameText,
+        addressVerified: false,
+        addressVerifiedAt: null,
+        addressVerificationStatus: null,
+        addressVerificationReferenceId: null,
+      });
       if (result.success) {
         setIsEditingFullName(false);
+        setAddressVerified(false)
+        setAddressVerificationStatus(null)
+        setAddressVerificationReferenceId(null)
       } else {
         setFullNameError(result.error || "Failed to update name");
       }
@@ -2333,6 +2367,20 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
                        />
                        <input
                          type="text"
+                         value={locationStreet}
+                         onChange={(e) => setLocationStreet(e.target.value)}
+                         placeholder="Street"
+                         className="border-b-3 border-solid !important border-b-blue-600 !important focus-visible:border-b-green-600 !important rounded-none px-3 py-2 w-full"
+                       />
+                       <input
+                         type="text"
+                         value={locationLga}
+                         onChange={(e) => setLocationLga(e.target.value)}
+                         placeholder="LGA"
+                         className="border-b-3 border-solid !important border-b-blue-600 !important focus-visible:border-b-green-600 !important rounded-none px-3 py-2 w-full"
+                       />
+                       <input
+                         type="text"
                          value={locationCity}
                          onChange={(e) => setLocationCity(e.target.value)}
                          placeholder="City"
@@ -2346,9 +2394,16 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
                          <option value="">Select State</option>
                          {NIGERIAN_STATES.map(state => <option key={state} value={state}>{state}</option>)}
                        </select>
+                       <input
+                         type="text"
+                         value={locationLandmark}
+                         onChange={(e) => setLocationLandmark(e.target.value)}
+                         placeholder="Landmark (optional)"
+                         className="border-b-3 border-solid !important border-b-blue-600 !important focus-visible:border-b-green-600 !important rounded-none px-3 py-2 w-full"
+                       />
                        <div className="flex justify-end gap-2 mt-2">
                          <Button variant="outline" onClick={handleCancelEditLocation}>Cancel</Button>
-                         <Button onClick={handleSaveLocation} disabled={locationAddress === (profile.address || "") && locationCity === (profile.city || "") && locationState === (profile.state || "")}>Save</Button>
+                         <Button onClick={handleSaveLocation} disabled={locationAddress === (profile.address || "") && locationStreet === (profile.street || profile.address || "") && locationLga === (profile.lga || profile.city || "") && locationCity === (profile.city || "") && locationState === (profile.state || "") && locationLandmark === (profile.landmark || "")}>Save</Button>
                        </div>
                      </div>
                    ) : (
@@ -2356,7 +2411,17 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
                     <h3 className="text-lg font-medium">
                       Lives in {profile.city || "Not specified"}, {profile.state || "Not specified"}
                     </h3>
-                    <p className="text-gray-600">{profile.address}</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-gray-600">{profile.street || profile.address}</p>
+                      {addressVerified && <Badge className="bg-green-500 text-white">Verified</Badge>}
+                      {!addressVerified && addressVerificationStatus === "pending" && <Badge className="bg-amber-500 text-white">Pending</Badge>}
+                      {!addressVerified && addressVerificationStatus !== "pending" && isCurrentUser && (
+                        <Button size="sm" variant="outline" onClick={handleVerifyAddress} disabled={isVerifyingAddress}>
+                          {isVerifyingAddress ? "Verifying..." : "Verify"}
+                        </Button>
+                      )}
+                    </div>
+                    {addressVerificationError && <p className="text-sm text-red-500 mt-1">{addressVerificationError}</p>}
                   </div>
                    )}
                   {isCurrentUser && (
@@ -2383,7 +2448,7 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
                          onChange={(e) => setPhoneText(e.target.value)}
                          placeholder="Phone Number"
                          className="border-b-3 border-solid !important border-b-blue-600 !important focus-visible:border-b-green-600 !important rounded-none px-3 py-2 w-full"
-                        disabled={profile.phone_verified}
+                        disabled={phoneVerified}
                        />
                        <div className="flex justify-end gap-2 mt-2">
                          <Button variant="outline" onClick={handleCancelEditPhone}>Cancel</Button>
@@ -2393,15 +2458,19 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
                    ) : (
                     <div className="flex items-center w-full">
                       <h3 className="text-lg font-medium mr-2">{profile.phone_number || "No phone number added"}</h3>
-                      {profile.phone_verified && (
+                      {phoneVerified && (
                         <Badge className="bg-green-500 text-white ml-2">Verified</Badge>
                       )}
-                      {isCurrentUser && !profile.phone_verified && profile.phone_number && (
-                        <div className="ml-auto">
-                          <Button size="sm" variant="outline" style={{ transform: 'scale(0.75)' }} onClick={() => setShowPhoneVerify(true)}>
-                            Verify
-                          </Button>
-                        </div>
+                      {!phoneVerified && isCurrentUser && profile.phone_number && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="ml-2"
+                          onClick={handleSendPhoneOtp}
+                          disabled={isSendingPhoneOtp}
+                        >
+                          {isSendingPhoneOtp ? "Sending..." : "Verify"}
+                        </Button>
                       )}
                     </div>
                   )}
@@ -2434,7 +2503,20 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
                    ) : (
                      <div className="flex justify-between items-start w-full">
                   <div>
-                    <h3 className="text-lg font-medium">{profile.email || "No email added"}</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-lg font-medium">{profile.email || "No email added"}</h3>
+                      {emailVerified && <Badge className="bg-green-500 text-white">Verified</Badge>}
+                      {!emailVerified && isCurrentUser && profile.email && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={handleSendEmailOtp}
+                          disabled={isSendingEmailOtp}
+                        >
+                          {isSendingEmailOtp ? "Sending..." : "Verify"}
+                        </Button>
+                      )}
+                    </div>
                     <p className="text-gray-600">Email</p>
                   </div>
                 </div>
@@ -2583,42 +2665,53 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
                </div>
             </div>
 
-            {isCurrentUser && (
-              <div className="mt-2 text-gray-700 font-medium">
-                Monthly Income: {isEditingMonthlyIncome ? (
-                  <>
-                    <input
-                      type="number"
-                      min={0}
-                      className="border-b-2 border-blue-600 focus:border-green-600 outline-none px-3 py-2 w-full"
-                      value={monthlyIncomeValue}
-                      onChange={e => setMonthlyIncomeValue(e.target.value)}
-                      disabled={isSavingMonthlyIncome}
-                    />
-                    <div className="flex gap-2 mt-2 w-full">
-                      <Button variant="outline" className="w-1/2" onClick={handleCancelMonthlyIncome} type="button" disabled={isSavingMonthlyIncome}>Cancel</Button>
-                      <Button className="w-1/2" onClick={handleSaveMonthlyIncome} disabled={isSavingMonthlyIncome || Number(monthlyIncomeValue) === profile.monthly_income} type="button">
-                        {isSavingMonthlyIncome ? "Saving..." : "Save"}
-                      </Button>
+            <h2 className="text-xl font-medium mt-8">Monthly Income</h2>
+            <div className="flex items-start gap-4">
+              <div className="mt-1">
+                <Wallet className="h-10 w-10 p-2 bg-gray-100 text-gray-500 rounded-full" />
+              </div>
+              <div className="flex-grow">
+                <div className="flex justify-between items-start">
+                  {isCurrentUser && isEditingMonthlyIncome ? (
+                    <div className="space-y-2 w-full">
+                      <input
+                        type="number"
+                        min={0}
+                        className="border-b-2 border-blue-600 focus:border-green-600 outline-none px-3 py-2 w-full"
+                        value={monthlyIncomeValue}
+                        onChange={e => setMonthlyIncomeValue(e.target.value)}
+                        disabled={isSavingMonthlyIncome}
+                      />
+                      <div className="flex gap-2 mt-2 w-full">
+                        <Button variant="outline" className="w-1/2" onClick={handleCancelMonthlyIncome} type="button" disabled={isSavingMonthlyIncome}>Cancel</Button>
+                        <Button className="w-1/2" onClick={handleSaveMonthlyIncome} disabled={isSavingMonthlyIncome || Number(monthlyIncomeValue) === profile.monthly_income} type="button">
+                          {isSavingMonthlyIncome ? "Saving..." : "Save"}
+                        </Button>
+                      </div>
+                      {monthlyIncomeError && <div className="text-sm text-red-500 mt-2">{monthlyIncomeError}</div>}
                     </div>
-                    {monthlyIncomeError && <div className="text-sm text-red-500 mt-2">{monthlyIncomeError}</div>}
-                  </>
-                ) : (
-                  <>
-                    ₦{Number(profile.monthly_income).toLocaleString()}
-                    <Button variant="ghost" size="sm" className="ml-2 h-8 w-8 p-0" onClick={() => setIsEditingMonthlyIncome(true)}>
+                  ) : (
+                    <div>
+                      <h3 className="text-lg font-medium">
+                        ₦{Number(profile.monthly_income).toLocaleString()}
+                      </h3>
+                      <p className="text-gray-600">Monthly Income</p>
+                    </div>
+                  )}
+                  {isCurrentUser && !isEditingMonthlyIncome && (
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setIsEditingMonthlyIncome(true)}>
                       <Edit className="h-4 w-4" />
                     </Button>
-                  </>
-                )}
+                  )}
+                </div>
               </div>
-            )}
+            </div>
           </div>
         )}
 
         {activeSection === "places" && (
           <div className="space-y-6">
-            <h2 className="text-xl font-medium">Current City</h2>
+            <h2 className="text-xl font-medium">Current Address</h2>
             <div className="flex items-start gap-4">
               <div className="mt-1">
                 <MapPin className="h-10 w-10 p-2 bg-gray-100 text-gray-500 rounded-full" />
@@ -2636,6 +2729,20 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
                        />
                        <input
                          type="text"
+                         value={locationStreet}
+                         onChange={(e) => setLocationStreet(e.target.value)}
+                         placeholder="Street"
+                         className="border-b-3 border-solid !important border-b-blue-600 !important focus-visible:border-b-green-600 !important rounded-none px-3 py-2 w-full"
+                       />
+                       <input
+                         type="text"
+                         value={locationLga}
+                         onChange={(e) => setLocationLga(e.target.value)}
+                         placeholder="LGA"
+                         className="border-b-3 border-solid !important border-b-blue-600 !important focus-visible:border-b-green-600 !important rounded-none px-3 py-2 w-full"
+                       />
+                       <input
+                         type="text"
                          value={locationCity}
                          onChange={(e) => setLocationCity(e.target.value)}
                          placeholder="City"
@@ -2649,9 +2756,16 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
                          <option value="">Select State</option>
                          {NIGERIAN_STATES.map(state => <option key={state} value={state}>{state}</option>)}
                        </select>
+                       <input
+                         type="text"
+                         value={locationLandmark}
+                         onChange={(e) => setLocationLandmark(e.target.value)}
+                         placeholder="Landmark (optional)"
+                         className="border-b-3 border-solid !important border-b-blue-600 !important focus-visible:border-b-green-600 !important rounded-none px-3 py-2 w-full"
+                       />
                        <div className="flex justify-end gap-2 mt-2">
                          <Button variant="outline" onClick={handleCancelEditLocation}>Cancel</Button>
-                         <Button onClick={handleSaveLocation} disabled={locationAddress === (profile.address || "") && locationCity === (profile.city || "") && locationState === (profile.state || "")}>Save</Button>
+                         <Button onClick={handleSaveLocation} disabled={locationAddress === (profile.address || "") && locationStreet === (profile.street || profile.address || "") && locationLga === (profile.lga || profile.city || "") && locationCity === (profile.city || "") && locationState === (profile.state || "") && locationLandmark === (profile.landmark || "")}>Save</Button>
                        </div>
                      </div>
                    ) : (
@@ -2659,7 +2773,17 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
                     <h3 className="text-lg font-medium">
                       Lives in {profile.city || "Not specified"}, {profile.state || "Not specified"}
                     </h3>
-                    <p className="text-gray-600">{profile.address}</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-gray-600">{profile.street || profile.address}</p>
+                      {addressVerified && <Badge className="bg-green-500 text-white">Verified</Badge>}
+                      {!addressVerified && addressVerificationStatus === "pending" && <Badge className="bg-amber-500 text-white">Pending</Badge>}
+                      {!addressVerified && addressVerificationStatus !== "pending" && isCurrentUser && (
+                        <Button size="sm" variant="outline" onClick={handleVerifyAddress} disabled={isVerifyingAddress}>
+                          {isVerifyingAddress ? "Verifying..." : "Verify"}
+                        </Button>
+                      )}
+                    </div>
+                    {addressVerificationError && <p className="text-sm text-red-500 mt-1">{addressVerificationError}</p>}
                   </div>
                    )}
                   {isCurrentUser && (
@@ -2737,7 +2861,7 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
                       onChange={e => setPhoneText(e.target.value)}
                       placeholder="Phone Number"
                       className="border-b-2 border-blue-600 focus:border-green-600 outline-none px-3 py-2 w-full"
-                      disabled={profile.phone_verified || isSavingContact}
+                      disabled={phoneVerified || isSavingContact}
                     />
                     <div className="flex gap-2 mt-2 w-full">
                       <Button variant="outline" className="w-1/2" onClick={handleCancelEditPhone} type="button" disabled={isSavingContact}>Cancel</Button>
@@ -2750,11 +2874,19 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
                   <>
                     <div className="flex items-center gap-2">
                       <h3 className="text-lg font-medium">{profile.phone_number || "No phone number added"}</h3>
-                      {profile.phone_verified && (
+                      {phoneVerified && (
                         <Badge className="bg-green-500 text-white ml-2">Verified</Badge>
                       )}
-                      {isCurrentUser && !profile.phone_verified && profile.phone_number && (
-                        <Button size="sm" variant="outline" onClick={() => setShowPhoneVerify(true)}>Verify</Button>
+                      {!phoneVerified && isCurrentUser && profile.phone_number && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="ml-2"
+                          onClick={handleSendPhoneOtp}
+                          disabled={isSendingPhoneOtp}
+                        >
+                          {isSendingPhoneOtp ? "Sending..." : "Verify"}
+                        </Button>
                       )}
                     </div>
                     {isCurrentUser && (
@@ -2787,7 +2919,20 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
                   </div>
                 ) : (
                   <>
-                    <span>{profile.email || "No email added"}</span>
+                    <div className="flex items-center gap-2">
+                      <span>{profile.email || "No email added"}</span>
+                      {emailVerified && <Badge className="bg-green-500 text-white">Verified</Badge>}
+                      {!emailVerified && isCurrentUser && profile.email && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={handleSendEmailOtp}
+                          disabled={isSendingEmailOtp}
+                        >
+                          {isSendingEmailOtp ? "Sending..." : "Verify"}
+                        </Button>
+                      )}
+                    </div>
                     {isCurrentUser && (
                       <Button size="sm" variant="ghost" className="ml-auto" onClick={() => { setIsEditingEmail(true); setIsEditingFullName(false); setIsEditingPhone(false); setIsEditingContact(false); }}><Edit className="h-4 w-4" /></Button>
                     )}
@@ -2943,7 +3088,7 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
 
         {activeSection === "bank" && (
           <div className="space-y-6">
-            <h2 className="text-xl font-medium">Repayment Account</h2>
+            <h2 className="text-xl font-medium">Linked Account</h2>
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
@@ -2954,17 +3099,6 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
                 </div>
                 {isCurrentUser && !isEditingBvn && (
                   <div className="flex items-center gap-2">
-                    {(bvnText || profile.bvn) && !(profile.bvn_verified || bvnVerified) && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 px-2 text-xs"
-                        onClick={handleVerifyBvnWithDojah}
-                        disabled={isVerifyingBvn}
-                      >
-                        {isVerifyingBvn ? "Verifying..." : "Verify"}
-                      </Button>
-                    )}
                     <Button
                       variant="ghost"
                       size="sm"
@@ -3143,6 +3277,7 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
                 userId={profile.id}
                 onSave={() => setIsEditingLoanHelper(false)}
                 onCancel={() => setIsEditingLoanHelper(false)}
+                isVerified={Boolean(profile.bvn_verified)}
               />
             ) : (
               <LoanHelperSettingsDisplay userId={profile.id} />
@@ -3355,31 +3490,21 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
     </div>
           </DialogContent>
         </Dialog>
-        {isCurrentUser && (
-          <div className="mt-8 flex justify-end">
-            <Button
-              color="primary"
-              onClick={() => {
-                if (!dojahAppId || !dojahPublicKey) {
-                  toast({ title: "Verification not available", description: "Dojah is not configured for this environment.", variant: "destructive" });
-                  return;
-                }
-                setDojahHidden(false);
-                setShowDojah(true);
-              }}
-            >
-              Complete Profile Verification
-            </Button>
-          </div>
-        )}
         {/* Phone Verification Dialog */}
-        <Dialog open={showPhoneVerify} onOpenChange={setShowPhoneVerify}>
+        <Dialog open={showPhoneVerify} onOpenChange={(open) => {
+          setShowPhoneVerify(open);
+          if (!open) {
+            setPhoneOtpReferenceId(null);
+            setOtp("");
+            setOtpError("");
+          }
+        }}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Verify Your Phone Number</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
-              <p>Enter the OTP sent to your phone number ({profile.phone_number})</p>
+              <p>Enter the OTP sent to your phone number ({profile.phone_number}) via Dojah.</p>
               <input
                 type="text"
                 value={otp}
@@ -3399,6 +3524,41 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
                 </Button>
               </DialogFooter>
       </div>
+          </DialogContent>
+        </Dialog>
+        {/* Email Verification Dialog */}
+        <Dialog open={showEmailVerify} onOpenChange={(open) => {
+          setShowEmailVerify(open)
+          if (!open) {
+            setEmailOtp("")
+            setEmailOtpError("")
+          }
+        }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Verify Your Email</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <p>Enter the confirmation code sent to {profile.email}.</p>
+              <input
+                type="text"
+                value={emailOtp}
+                onChange={e => setEmailOtp(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
+                placeholder="Enter 6-digit code"
+                className="border px-3 py-2 w-full rounded"
+                maxLength={6}
+                disabled={isVerifyingEmailOtp}
+              />
+              {emailOtpError && <div className="text-red-500 text-sm">{emailOtpError}</div>}
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowEmailVerify(false)} disabled={isVerifyingEmailOtp}>
+                  Cancel
+                </Button>
+                <Button onClick={handleVerifyEmailOtp} disabled={emailOtp.length !== 6 || isVerifyingEmailOtp}>
+                  {isVerifyingEmailOtp ? "Verifying..." : "Verify"}
+                </Button>
+              </DialogFooter>
+            </div>
           </DialogContent>
         </Dialog>
         {/* OTP Dialog for BVN Verification */}

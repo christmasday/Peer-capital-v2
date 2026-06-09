@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { checkAdminAuth, createAdminResponse } from "@/lib/admin-auth"
+import { getDojahApiUrl, getDojahSecretKey } from "../../../../lib/dojah"
 
-const DOJAH_SUBSCRIBE_URL = "https://api.dojah.io/api/v1/webhook/subscribe"
-const DOJAH_FETCH_URL = "https://api.dojah.io/api/v1/webhook/fetch"
 const DEFAULT_SERVICES = ["sms", "kyc_widget"]
 
 function getBaseUrl(req: NextRequest) {
@@ -14,10 +13,12 @@ function getCallbackUrl(req: NextRequest) {
 }
 
 function getDojahHeaders() {
+  const secretKey = getDojahSecretKey()
+
   return {
     "Content-Type": "application/json",
     AppId: process.env.DOJAH_APP_ID || "",
-    Authorization: process.env.DOJAH_API_KEY || "",
+    Authorization: secretKey,
   }
 }
 
@@ -40,7 +41,7 @@ export async function GET(req: NextRequest) {
       return createAdminResponse(authResult.error || "Unauthorized")
     }
 
-    const response = await fetch(DOJAH_FETCH_URL, {
+    const response = await fetch(getDojahApiUrl("/api/v1/webhook/fetch"), {
       method: "GET",
       headers: getDojahHeaders(),
     })
@@ -91,13 +92,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid webhook URL format" }, { status: 400 })
     }
 
-    if (!process.env.DOJAH_APP_ID || !process.env.DOJAH_API_KEY) {
+    if (!process.env.DOJAH_APP_ID || !getDojahSecretKey()) {
       return NextResponse.json({ error: "Dojah credentials are not configured" }, { status: 500 })
     }
 
     const results = await Promise.all(
       services.map(async (service) => {
-        const response = await fetch(DOJAH_SUBSCRIBE_URL, {
+        const response = await fetch(getDojahApiUrl("/api/v1/webhook/subscribe"), {
           method: "POST",
           headers: getDojahHeaders(),
           body: JSON.stringify({ webhook: webhookUrl, service }),

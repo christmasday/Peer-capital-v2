@@ -197,6 +197,10 @@ type UpdateProfileInput = {
   bvn_verified_at?: string;
   phoneVerified?: boolean;
   phoneVerifiedAt?: string;
+  addressVerified?: boolean;
+  addressVerifiedAt?: string | null;
+  addressVerificationStatus?: string | null;
+  addressVerificationReferenceId?: string | null;
   // New address fields
   buildingNumber?: string;
   apartment?: string;
@@ -209,6 +213,7 @@ type UpdateProfileInput = {
   fullAddress?: string;
   postalCode?: string;
   id_verified?: boolean;
+  idVerificationDate?: string;
   fraud_screened?: boolean;
   fraud_screened_at?: string;
   srUserId?: string;
@@ -329,6 +334,10 @@ export async function updateProfile(input: UpdateProfileInput, userIdOverride?: 
     if (input.bvn_verified_at !== undefined) updateData.bvn_verified_at = input.bvn_verified_at;
     if (input.phoneVerified !== undefined) updateData.phone_verified = input.phoneVerified;
     if (input.phoneVerifiedAt !== undefined) updateData.phone_verified_at = input.phoneVerifiedAt;
+    if (input.addressVerified !== undefined) updateData.address_verified = input.addressVerified;
+    if (input.addressVerifiedAt !== undefined) updateData.address_verified_at = input.addressVerifiedAt;
+    if (input.addressVerificationStatus !== undefined) updateData.address_verification_status = input.addressVerificationStatus;
+    if (input.addressVerificationReferenceId !== undefined) updateData.address_verification_reference_id = input.addressVerificationReferenceId;
     if (input.buildingNumber !== undefined) updateData.building_number = input.buildingNumber;
     if (input.apartment !== undefined) updateData.apartment = input.apartment;
     if (input.street !== undefined) updateData.street = input.street;
@@ -340,6 +349,7 @@ export async function updateProfile(input: UpdateProfileInput, userIdOverride?: 
     if (input.fullAddress !== undefined) updateData.full_address = input.fullAddress;
     if (input.postalCode !== undefined) updateData.postal_code = input.postalCode;
     if (input.id_verified !== undefined) updateData.id_verified = input.id_verified;
+    if (input.idVerificationDate !== undefined) updateData.id_verification_date = input.idVerificationDate;
     if (input.fraud_screened !== undefined) updateData.fraud_screened = input.fraud_screened;
     if (input.fraud_screened_at !== undefined) updateData.fraud_screened_at = input.fraud_screened_at;
     if (input.srUserId !== undefined) updateData.sr_user_id = input.srUserId;

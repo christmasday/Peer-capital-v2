@@ -12,6 +12,7 @@ import {
   Settings, 
   Key, 
   Webhook,
+  MessageSquareText,
   Menu,
   ChevronDown,
   LogOut,
@@ -44,6 +45,7 @@ const navigation = [
   { name: "API Keys", href: "/admin/api-keys", icon: Key },
   { name: "Webhooks", href: "/admin/webhooks", icon: Webhook },
   { name: "Dojah Webhooks", href: "/admin/dojah-webhooks", icon: Webhook },
+  { name: "Dojah Sender ID", href: "/admin/dojah-sender-id", icon: MessageSquareText },
 ]
 
 export default function AdminLayout({ children }: AdminLayoutProps) {

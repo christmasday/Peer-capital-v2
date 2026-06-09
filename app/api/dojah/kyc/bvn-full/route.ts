@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { checkAuth } from "@/lib/auth-utils"
+import { getDojahApiUrl, getDojahSecretKey } from "../../../../../lib/dojah"
 
 function extractCandidateBvn(payload: any): string | null {
   const raw =
@@ -52,12 +53,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "BVN must be exactly 11 digits" }, { status: 400 })
     }
 
-    const dojahRes = await fetch("https://api.dojah.io/api/v1/kyc/bvn/full", {
+    const secretKey = getDojahSecretKey()
+    if (!process.env.DOJAH_APP_ID || !secretKey) {
+      return NextResponse.json({ error: "Dojah credentials are not configured" }, { status: 500 })
+    }
+
+    const dojahRes = await fetch(getDojahApiUrl("/api/v1/kyc/bvn/full"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "AppId": process.env.DOJAH_APP_ID!,
-        "Authorization": `Bearer ${process.env.DOJAH_API_KEY}`,
+        "Authorization": secretKey,
       },
       body: JSON.stringify({ bvn }),
     })
