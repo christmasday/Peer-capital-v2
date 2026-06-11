@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 
 export async function POST(req: NextRequest) {
   try {
@@ -36,6 +37,19 @@ export async function POST(req: NextRequest) {
 
     if (parsed.code !== code) {
       return NextResponse.json({ error: "Invalid confirmation code." }, { status: 400 })
+    }
+
+    try {
+      const admin = createAdminClient()
+      await admin
+        .from("auth_users")
+        .update({
+          email_confirmed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("email", email)
+    } catch {
+      // Keep verification success for code validation even if persistence fails.
     }
 
     const response = NextResponse.json({ success: true })

@@ -42,6 +42,10 @@ export interface Database {
           address: string | null
           city: string | null
           state: string | null
+          address_verified?: boolean | null
+          address_verified_at?: string | null
+          address_verification_status?: string | null
+          address_verification_reference_id?: string | null
           zip_code: string | null
           country: string | null
           profile_picture_url: string | null
@@ -92,6 +96,10 @@ export interface Database {
           address?: string | null
           city?: string | null
           state?: string | null
+          address_verified?: boolean | null
+          address_verified_at?: string | null
+          address_verification_status?: string | null
+          address_verification_reference_id?: string | null
           zip_code?: string | null
           country?: string | null
           profile_picture_url?: string | null
@@ -142,6 +150,10 @@ export interface Database {
           address?: string | null
           city?: string | null
           state?: string | null
+          address_verified?: boolean | null
+          address_verified_at?: string | null
+          address_verification_status?: string | null
+          address_verification_reference_id?: string | null
           zip_code?: string | null
           country?: string | null
           profile_picture_url?: string | null

@@ -1,5 +1,8 @@
+import crypto from "node:crypto"
 import { NextRequest, NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
+
+const DOJAH_WEBHOOK_SECRET = process.env.DOJAH_WEBHOOK_SECRET || process.env.NEXT_PUBLIC_DOJAH_WEBHOOK_SECRET || ""
 
 function getNestedValue(payload: any, path: string[]) {
   let current = payload
@@ -93,9 +96,71 @@ async function logWebhookEvent(eventType: string, payload: unknown, processed: b
   }
 }
 
+function normalizeSignature(value: string | null) {
+  return value?.trim().toLowerCase() || ""
+}
+
+function safeSignatureEquals(expected: string, received: string) {
+  if (!expected || !received || expected.length !== received.length) {
+    return false
+  }
+
+  const expectedBuffer = Buffer.from(expected, "hex")
+  const receivedBuffer = Buffer.from(received, "hex")
+
+  if (expectedBuffer.length !== receivedBuffer.length) {
+    return false
+  }
+
+  return crypto.timingSafeEqual(expectedBuffer, receivedBuffer)
+}
+
+function verifyDojahWebhookSignature(rawBody: string, request: NextRequest) {
+  if (!DOJAH_WEBHOOK_SECRET) {
+    return { ok: false, error: "Dojah webhook secret is not configured" }
+  }
+
+  const payloadSignature = normalizeSignature(request.headers.get("x-dojah-signature"))
+  const secretOnlySignature = normalizeSignature(request.headers.get("x-dojah-signature-v2"))
+
+  if (!payloadSignature && !secretOnlySignature) {
+    return { ok: false, error: "Missing Dojah signature header" }
+  }
+
+  if (payloadSignature) {
+    const expectedPayloadSignature = crypto
+      .createHmac("sha256", DOJAH_WEBHOOK_SECRET)
+      .update(rawBody)
+      .digest("hex")
+
+    if (safeSignatureEquals(expectedPayloadSignature, payloadSignature)) {
+      return { ok: true }
+    }
+  }
+
+  if (secretOnlySignature) {
+    const expectedSecretOnlySignature = crypto
+      .createHash("sha256")
+      .update(DOJAH_WEBHOOK_SECRET)
+      .digest("hex")
+
+    if (safeSignatureEquals(expectedSecretOnlySignature, secretOnlySignature)) {
+      return { ok: true }
+    }
+  }
+
+  return { ok: false, error: "Invalid Dojah signature" }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const rawBody = await req.text()
+
+    const signatureCheck = verifyDojahWebhookSignature(rawBody, req)
+    if (!signatureCheck.ok) {
+      await logWebhookEvent("dojah.unauthorized", rawBody.slice(0, 500), false, signatureCheck.error)
+      return NextResponse.json({ error: signatureCheck.error }, { status: 401 })
+    }
 
     let payload: any
     try {

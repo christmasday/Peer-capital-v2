@@ -19,9 +19,10 @@ interface LoanHelperSettingsFormProps {
   userId: string
   onSave?: () => void
   onCancel?: () => void
+  isVerified?: boolean
 }
 
-export function LoanHelperSettingsForm({ userId, onSave, onCancel }: LoanHelperSettingsFormProps) {
+export function LoanHelperSettingsForm({ userId, onSave, onCancel, isVerified }: LoanHelperSettingsFormProps) {
   const [loanAmount, setLoanAmount] = useState<number>(0)
   const [interestRate, setInterestRate] = useState<number>(0)
   const [repaymentTime, setRepaymentTime] = useState<number>(12)
@@ -182,6 +183,13 @@ export function LoanHelperSettingsForm({ userId, onSave, onCancel }: LoanHelperS
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
+        {!isVerified && (
+          <Alert variant="default">
+            <AlertDescription>
+              You need to complete your profile verification before you can save lending settings. You can still edit the fields below.
+            </AlertDescription>
+          </Alert>
+        )}
         {loanAmountExceedsBalance && (
           <Alert variant="destructive">
             <AlertDescription>
@@ -193,52 +201,54 @@ export function LoanHelperSettingsForm({ userId, onSave, onCancel }: LoanHelperS
           <p>Loading settings...</p>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <Label htmlFor="loanAmount">Loan Amount</Label>
-              <Input
-                type="number"
-                id="loanAmount"
-                placeholder="Enter loan amount"
-                value={loanAmount}
-                onChange={(e) => setLoanAmount(Number(e.target.value))}
-              />
-            </div>
-            <div>
-              <Label htmlFor="interestRate">Interest Rate</Label>
-              <Input
-                type="number"
-                id="interestRate"
-                placeholder="Enter interest rate"
-                value={interestRate}
-                onChange={(e) => setInterestRate(Number(e.target.value))}
-                min={interestRateLimits?.minPct ?? 5}
-                max={interestRateLimits?.maxPct ?? 20}
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Allowed range: {interestRateLimits?.minPct ?? 5}% - {interestRateLimits?.maxPct ?? 20}%
-              </p>
-            </div>
-            <div>
-              <Label htmlFor="repaymentTime">Repayment Duration</Label>
-              <div className="flex gap-2 items-center">
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="loanAmount">Loan Amount</Label>
                 <Input
                   type="number"
-                  id="repaymentTime"
-                  placeholder="Enter duration"
-                  value={repaymentTime}
-                  onChange={(e) => setRepaymentTime(Number(e.target.value))}
-                  min={1}
+                  id="loanAmount"
+                  placeholder="Enter loan amount"
+                  value={loanAmount}
+                  onChange={(e) => setLoanAmount(Number(e.target.value))}
                 />
-                <Select value={repaymentUnit} onValueChange={setRepaymentUnit}>
-                  <SelectTrigger className="w-28">
-                    <SelectValue placeholder="Unit" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="days">Days</SelectItem>
-                    <SelectItem value="weeks">Weeks</SelectItem>
-                    <SelectItem value="months">Months</SelectItem>
-                  </SelectContent>
-                </Select>
+              </div>
+              <div>
+                <Label htmlFor="interestRate">Interest Rate</Label>
+                <Input
+                  type="number"
+                  id="interestRate"
+                  placeholder="Enter interest rate"
+                  value={interestRate}
+                  onChange={(e) => setInterestRate(Number(e.target.value))}
+                  min={interestRateLimits?.minPct ?? 5}
+                  max={interestRateLimits?.maxPct ?? 20}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Allowed range: {interestRateLimits?.minPct ?? 5}% - {interestRateLimits?.maxPct ?? 20}%
+                </p>
+              </div>
+              <div>
+                <Label htmlFor="repaymentTime">Repayment Duration</Label>
+                <div className="flex gap-2 items-center">
+                  <Input
+                    type="number"
+                    id="repaymentTime"
+                    placeholder="Enter duration"
+                    value={repaymentTime}
+                    onChange={(e) => setRepaymentTime(Number(e.target.value))}
+                    min={1}
+                  />
+                  <Select value={repaymentUnit} onValueChange={setRepaymentUnit}>
+                    <SelectTrigger className="w-28">
+                      <SelectValue placeholder="Unit" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="days">Days</SelectItem>
+                      <SelectItem value="weeks">Weeks</SelectItem>
+                      <SelectItem value="months">Months</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
             <div>
@@ -248,13 +258,14 @@ export function LoanHelperSettingsForm({ userId, onSave, onCancel }: LoanHelperS
                 placeholder="Enter terms and conditions"
                 value={termsAndConditions}
                 onChange={(e) => setTermsAndConditions(e.target.value)}
+                className="border-b-2 border-blue-600 focus:border-green-600 outline-none"
               />
             </div>
             <div className="flex gap-2 justify-end">
               <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={isLoading || loanAmountExceedsBalance}>
+              <Button type="submit" disabled={isLoading || loanAmountExceedsBalance || !isVerified}>
                 {isLoading ? "Saving..." : "Save Settings"}
               </Button>
             </div>
