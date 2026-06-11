@@ -146,6 +146,8 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
   const [accountsError, setAccountsError] = useState("")
   const [removingAccountId, setRemovingAccountId] = useState<string | null>(null)
   const [removeAccountError, setRemoveAccountError] = useState("")
+  const [isResolvingAccountName, setIsResolvingAccountName] = useState(false)
+  const [resolveAccountError, setResolveAccountError] = useState<string | null>(null)
   // Wallets state
   const [wallets, setWallets] = useState<any[]>([])
   const [isLoadingWallets, setIsLoadingWallets] = useState(false)
@@ -1640,8 +1642,41 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
     fetchBanks()
   }, [])
 
-  // Note: Stablesrail doesn't provide account resolution, so account name must be entered manually
-  // The account name field is now editable and users can enter it manually
+  // Resolve account name when account number and bank are set
+  useEffect(() => {
+    async function resolveAccountName() {
+      if (accountBank && accountNumber.length === 10) {
+        setIsResolvingAccountName(true)
+        setResolveAccountError(null)
+        setAccountName("")
+        try {
+          const bankCode = accountBanks.find(b => b.name === accountBank)?.code
+          if (!bankCode) return
+          const res = await fetch("/api/virtual-account", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ account_number: accountNumber, bank_code: bankCode }),
+          })
+          const data = await res.json()
+          if (data.status && data.data && data.data.account_name) {
+            setAccountName(data.data.account_name)
+          } else {
+            setResolveAccountError("Could not resolve account name")
+            setAccountName("")
+          }
+        } catch {
+          setResolveAccountError("Could not resolve account name")
+          setAccountName("")
+        } finally {
+          setIsResolvingAccountName(false)
+        }
+      } else {
+        setAccountName("")
+        setResolveAccountError(null)
+      }
+    }
+    resolveAccountName()
+  }, [accountBank, accountNumber])
 
   // Fetch wallets from DB or Stablesrail
   useEffect(() => {
@@ -3163,9 +3198,11 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
                   </div>
                     <div>
                         <label>Account Name</label>
-                        <input type="text" value={accountName} onChange={e => setAccountName(e.target.value)} placeholder="Enter account name" className="w-full border p-2 rounded" />
+                        <input type="text" value={accountName} readOnly placeholder={isResolvingAccountName ? "Resolving account name..." : "Account name will appear here"} className="w-full border p-2 rounded bg-gray-50" />
+                        {isResolvingAccountName && <div className="text-xs text-blue-500 mt-1">Resolving account name...</div>}
+                        {resolveAccountError && <div className="text-xs text-red-500 mt-1">{resolveAccountError}</div>}
                       </div>
-                      <Button onClick={handleAddAccount} disabled={isAddingAccount || !accountName || !accountNumber || accountNumber.length !== 10 || !accountBank} className="w-full">
+                      <Button onClick={handleAddAccount} disabled={isAddingAccount || !accountName || !accountNumber || accountNumber.length !== 10 || !accountBank || isResolvingAccountName} className="w-full">
                         {isAddingAccount ? "Adding..." : "Add Account"}
                       </Button>
                       {addAccountError && <div className="text-xs text-red-500 mt-1 text-red-600">{addAccountError}</div>}

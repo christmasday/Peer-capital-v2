@@ -151,7 +151,7 @@ export class StablesrailClient {
     // Handle empty response
     if (!json || Object.keys(json).length === 0) {
       console.warn(`⚠️ [StablesrailClient] ${method} ${path} - Empty response from Stablesrail`)
-      throw new StablesrailError(`Empty response from Stablesrail API for ${method} ${path}`, 0, null)
+      throw new StablesrailError(`Empty response from Stablesrail API for ${method} ${path}`, 0, undefined)
     }
 
     // The API uses a status field to indicate success/error
@@ -169,7 +169,7 @@ export class StablesrailClient {
       const data = ok.data
       if (data === undefined) {
         console.warn(`⚠️ [StablesrailClient] ${method} ${path} - Success status but data is undefined`)
-        throw new StablesrailError(`Success response but data is undefined for ${method} ${path}`, 0, null)
+        throw new StablesrailError(`Success response but data is undefined for ${method} ${path}`, 0, undefined)
       }
       if (this.debug) console.log(`🔵 [StablesrailClient] ${method} ${path} - Success`)
       return data
@@ -298,8 +298,8 @@ export class StablesrailClient {
     }>("getfees", { method: "GET" })
   }
 
-  updateAssets(payload: { [key: string]: unknown }) {
-    return this.request<unknown>("updateassets", { method: "POST", body: payload })
+  updateOnrampAsset(payload: { [key: string]: unknown }) {
+    return this.request<unknown>("updateonrampasset", { method: "POST", body: payload })
   }
 
   cngnOnrampStatus(payload: { requestId: string }) {
@@ -370,7 +370,7 @@ export class StablesrailClient {
       webhookUrl: string
       enabled: boolean
       updatedAt: string
-    }>("set-webhook", { method: "POST", body: payload })
+    }>("setwebhook", { method: "POST", body: payload })
   }
 
   getWebhook() {
@@ -378,7 +378,7 @@ export class StablesrailClient {
       webhookUrl: string
       enabled: boolean
       lastVerifiedAt: string
-    }>("get-webhook", { method: "GET" })
+    }>("getwebhook", { method: "GET" })
   }
 
   getBankCodes() {
