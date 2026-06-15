@@ -7,9 +7,11 @@ import { HelperCard } from "@/components/helpers/helper-card"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 import { durationToDays } from "@/lib/loan-limits"
+import { findBorrowers } from "@/lib/actions/find-borrowers"
 
 interface HomeContentProps {
   userProfile: any
@@ -64,6 +66,115 @@ function normalizeLenderCard(helper: any, fallbackRating = 4.5): LenderCardData 
   }
 }
 
+function normalizeBorrowerCard(borrower: any, fallbackRating = 4.5): LenderCardData {
+  return {
+    id: String(borrower.id),
+    name: String(borrower.name ?? "Borrower"),
+    interestRate: Number(borrower.expected_interest_rate ?? 0),
+    maxLoanAmount: Number(borrower.requested_amount ?? 0),
+    loanAmount: Number(borrower.requested_amount ?? 0),
+    loanIssued: 0,
+    amountIssued: 0,
+    profileImage: String(borrower.profile_image_url ?? "/vibrant-street-market.png"),
+    rating: Number(borrower.rating ?? fallbackRating),
+    repaymentTime: Number(borrower.requested_duration ?? 0),
+    repaymentUnit: borrower.requested_duration_unit ?? "months",
+  }
+}
+
+const LoanRequestForm = ({ 
+  loanAmount, setLoanAmount, 
+  loanDuration, setLoanDuration, 
+  loanDurationUnit, setLoanDurationUnit,
+  amountError, durationError,
+  loanLimits, loanLimitsLoading,
+  activePolicy,
+  canSearch,
+  isSearching,
+  onSearch,
+  searchButtonText,
+  searchTab
+}: any) => (
+  <div className="space-y-3">
+    <div>
+      <label htmlFor="loan-amount" className="block text-xs font-medium text-gray-700 mb-1">
+        {searchTab === 'borrower' ? "How much do you want? (optional)" : "Target loan amount (optional)"}
+      </label>
+      <Input
+        id="loan-amount"
+        placeholder="Enter amount"
+        className={`w-full py-2 px-3 text-sm rounded-lg transition-colors border border-transparent border-b-2 ${amountError ? "border-b-red-500 bg-red-50 focus-visible:ring-red-500" : "border-b-gray-200 focus-visible:ring-blue-500"}`}
+        value={loanAmount}
+        onChange={(e) => setLoanAmount(e.target.value)}
+        type="number"
+        min="1000"
+        max={loanLimits?.borrowerMaxAmount}
+        aria-invalid={Boolean(amountError)}
+      />
+      {amountError && (
+        <p className="mt-1 text-xs text-red-600">{amountError}</p>
+      )}
+    </div>
+    <div>
+      <label htmlFor="loan-duration" className="block text-xs font-medium text-gray-700 mb-1">
+        Duration (optional)
+      </label>
+      <div className={`grid items-stretch rounded-lg border border-transparent border-b-2 transition-colors group ${durationError ? "border-b-red-500 bg-red-50 focus-within:border-b-red-500" : "border-b-gray-200 bg-white focus-within:border-b-blue-500"}`} style={{ gridTemplateColumns: "7fr 3fr" }}>
+        <Input
+          id="loan-duration"
+          placeholder="Enter duration"
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          className={`w-full border-0 bg-transparent py-2 px-3 text-sm rounded-r-none shadow-none focus-visible:ring-0 ${durationError ? "text-red-900 placeholder:text-red-300" : "text-gray-900 placeholder:text-gray-400"}`}
+          value={loanDuration}
+          onChange={(e) => setLoanDuration(e.target.value)}
+          aria-invalid={Boolean(durationError)}
+        />
+        <Select value={loanDurationUnit} onValueChange={(value) => setLoanDurationUnit(value as "days" | "months")}> 
+            <SelectTrigger className={`h-full w-full border-l rounded-l-none rounded-r-lg bg-white px-3 py-2 text-sm shadow-none focus:ring-0 ${durationError ? "text-red-700 justify-end pr-2 border-l-transparent" : "text-gray-700 justify-end pr-2 border-l-gray-200 group-focus-within:border-l-blue-500"}`}>
+              <SelectValue placeholder="Unit" className="text-right" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="days">Days</SelectItem>
+              <SelectItem value="months">Months</SelectItem>
+            </SelectContent>
+          </Select>
+      </div>
+      {durationError && (
+        <p className="mt-1 text-xs text-red-600">{durationError}</p>
+      )}
+    </div>
+    {!loanLimitsLoading && loanLimits && (
+      <p className="text-[11px] text-gray-500 leading-relaxed">
+        Current limit: up to ₦{loanLimits.borrowerMaxAmount.toLocaleString()} and a tenor of up to {loanLimits.currentBorrowerPolicy.maxTenorDays} days
+        {" "}
+        ({Math.max(1, Math.ceil(loanLimits.currentBorrowerPolicy.maxTenorDays / 30))} month(s)).
+      </p>
+    )}
+    {loanLimitsLoading && (
+      <p className="text-[11px] text-gray-500">Loading your current limits...</p>
+    )}
+    <Button
+      onClick={onSearch}
+      disabled={isSearching || !canSearch}
+      className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-3 text-sm rounded-lg transition-colors flex items-center justify-center"
+    >
+      {isSearching ? (
+        <>
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          Searching...
+        </>
+      ) : (
+        <>
+          <Search className="mr-2 h-4 w-4" />
+          {searchButtonText}
+        </>
+      )}
+    </Button>
+  </div>
+)
+
 export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
   const { toast } = useToast()
   const searchResultsSentinelRef = useRef<HTMLDivElement | null>(null)
@@ -83,6 +194,7 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
     loanDuration?: number
     loanDurationUnit: "days" | "months"
   } | null>(null)
+  const [searchTab, setSearchTab] = useState<"borrower" | "lender">("borrower")
   const [loanLimits, setLoanLimits] = useState<{
     borrowerMaxAmount: number
     borrowerPolicies: BorrowerPolicy[]
@@ -364,6 +476,122 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
     }
   }
 
+  const fetchBorrowerSearchPage = async (pageToLoad: number, replaceResults: boolean, queryOverride?: typeof searchQuery) => {
+    const query = queryOverride || searchQuery
+
+    if (!query) {
+      return
+    }
+
+    if (replaceResults) {
+      setIsSearching(true)
+      setSearchError(null)
+    } else {
+      setIsLoadingMoreLenders(true)
+    }
+
+    try {
+      const result = await findBorrowers({
+        amount: query.loanAmount || 0,
+        duration: query.loanDuration || 0,
+        durationUnit: query.loanDurationUnit,
+      })
+
+      if (result.error) {
+        if (replaceResults || !searchResults?.length) {
+          setSearchError(result.error)
+          toast({
+            title: "No Matches Found",
+            description: result.error,
+            variant: "destructive",
+          })
+          setSearchResults([])
+          if (replaceResults && query && result.error.toLowerCase().includes("no borrowers found")) {
+            void persistBorrowerSearchAlert(query)
+          }
+        } else {
+          toast({
+            title: "Search Paused",
+            description: result.error,
+            variant: "destructive",
+          })
+        }
+        setSearchHasMore(false)
+        return
+      }
+
+      const borrowers = result.borrowers || []
+
+      if (replaceResults) {
+        if (borrowers.length === 0) {
+          const message = "No borrowers found matching your criteria. Try adjusting your search."
+          setSearchError(message)
+          setSearchResults([])
+          if (query) {
+            void persistBorrowerSearchAlert(query)
+          }
+          toast({
+            title: "No Matches Found",
+            description: message,
+            variant: "destructive",
+          })
+        } else {
+          setSearchResults(borrowers)
+          toast({
+            title: "Borrowers Found",
+            description: `Found ${borrowers.length} borrowers matching your criteria`,
+          })
+        }
+      } else {
+        setSearchResults((current) => [...(current || []), ...borrowers])
+      }
+
+      // Server action currently doesn't return page/hasMore, defaulting to current values
+      setSearchPage(pageToLoad)
+      setSearchHasMore(false) 
+    } catch (error) {
+      const message = "An unexpected error occurred"
+      if (replaceResults || !searchResults?.length) {
+        setSearchError(message)
+        setSearchResults([])
+        toast({
+          title: "Error",
+          description: "Failed to find borrowers. Please try again.",
+          variant: "destructive",
+        })
+      }
+      setSearchHasMore(false)
+    } finally {
+      setIsSearching(false)
+      setIsLoadingMoreLenders(false)
+    }
+  }
+
+  const persistBorrowerSearchAlert = async (query: NonNullable<typeof searchQuery>) => {
+    try {
+      const res = await fetch("/api/search-alerts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          searchKind: "borrower_search",
+          loanAmount: query.loanAmount,
+          loanDuration: query.loanDuration,
+          loanDurationUnit: query.loanDurationUnit,
+        }),
+      })
+
+      if (res.ok) {
+        toast({
+          title: "Search saved",
+          description: "We’ll alert you for the next 7 days if a borrower matches your criteria.",
+        })
+      }
+    } catch {
+      // Best-effort only.
+    }
+  }
+
   const handleFindLenders = async () => {
     setIsSearching(true)
     setSearchError(null)
@@ -373,11 +601,9 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
     setSearchHasMore(false)
 
     try {
-      // Parse inputs
       const amount = loanAmount ? Number.parseFloat(loanAmount) : undefined
       const duration = loanDuration ? Number.parseInt(loanDuration) : undefined
 
-      // Validate that at least one parameter is provided
       if ((!amount || amount <= 0) && (!duration || duration <= 0)) {
         setSearchError("Please enter either a loan amount or duration")
         setIsSearching(false)
@@ -405,6 +631,45 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
     }
   }
 
+  const handleFindBorrowers = async () => {
+    setIsSearching(true)
+    setSearchError(null)
+    setHasSearched(true)
+    setSearchResults(null)
+    setSearchPage(1)
+    setSearchHasMore(false)
+
+    try {
+      const amount = loanAmount ? Number.parseFloat(loanAmount) : undefined
+      const duration = loanDuration ? Number.parseInt(loanDuration) : undefined
+
+      if ((!amount || amount <= 0) && (!duration || duration <= 0)) {
+        setSearchError("Please enter either a loan amount or duration")
+        setIsSearching(false)
+        return
+      }
+
+      const nextQuery = {
+        loanAmount: amount && amount > 0 ? amount : undefined,
+        loanDuration: duration && duration > 0 ? duration : undefined,
+        loanDurationUnit,
+      }
+
+      setSearchQuery(nextQuery)
+      await fetchBorrowerSearchPage(1, true, nextQuery)
+    } catch (error) {
+      setSearchError("An unexpected error occurred")
+      setSearchResults([])
+      toast({
+        title: "Error",
+        description: "Failed to find borrowers. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSearching(false)
+    }
+  }
+
   useEffect(() => {
     if (!hasSearched || !searchHasMore || isSearching || isLoadingMoreLenders) {
       return
@@ -418,7 +683,11 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
     const observer = new IntersectionObserver((entries) => {
       const [entry] = entries
       if (entry?.isIntersecting && searchQuery) {
-        void fetchLenderSearchPage(searchPage + 1, false)
+        if (searchTab === "lender") {
+          void fetchLenderSearchPage(searchPage + 1, false)
+        } else {
+          void fetchBorrowerSearchPage(searchPage + 1, false)
+        }
       }
     }, {
       root: null,
@@ -428,7 +697,7 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
 
     observer.observe(sentinel)
     return () => observer.disconnect()
-  }, [hasSearched, searchHasMore, isSearching, isLoadingMoreLenders, searchPage, searchQuery])
+  }, [hasSearched, searchHasMore, isSearching, isLoadingMoreLenders, searchPage, searchQuery, searchTab])
 
   const parsedLoanAmount = loanAmount ? Number.parseFloat(loanAmount) : undefined
   const parsedLoanDuration = loanDuration ? Number.parseInt(loanDuration, 10) : undefined
@@ -510,6 +779,22 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
     setSearchQuery(null)
     setSearchPage(1)
     setSearchHasMore(false)
+  }
+
+  const normalizeBorrowerCard = (borrower: any, fallbackRating = 4.5): LenderCardData => {
+    return {
+      id: String(borrower.id),
+      name: String(borrower.name ?? "Borrower"),
+      interestRate: Number(borrower.expected_interest_rate ?? 0),
+      maxLoanAmount: Number(borrower.requested_amount ?? 0),
+      loanAmount: Number(borrower.requested_amount ?? 0),
+      loanIssued: 0,
+      amountIssued: 0,
+      profileImage: String(borrower.profile_image_url ?? "/vibrant-street-market.png"),
+      rating: Number(borrower.rating ?? fallbackRating),
+      repaymentTime: Number(borrower.requested_duration ?? 0),
+      repaymentUnit: borrower.requested_duration_unit ?? "months",
+    }
   }
 
   const pollVirtualAccount = async (requestId: string) => {
@@ -1029,9 +1314,13 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
     }
   }
 
-  // Determine which lenders to display
-  const displayLenders = searchResults !== null ? searchResults : loanHelpers
-  const normalizedLenders = displayLenders.map((helper, index) => normalizeLenderCard(helper, 4.5 - index * 0.2))
+  // Determine which results to display
+  const displayResults = searchResults !== null ? searchResults : (searchTab === 'borrower' ? loanHelpers : [])
+  const normalizedResults = displayResults.map((item, index) => 
+    searchTab === 'borrower' 
+      ? normalizeLenderCard(item, 4.5 - index * 0.2)
+      : normalizeBorrowerCard(item, 4.5 - index * 0.2)
+  )
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -1088,107 +1377,86 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
 
           {/* Quick Loan Request */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 h-full">
-            <h2 className="text-lg font-bold text-gray-900 mb-4">Quick Loan Request</h2>
-
-            <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 mb-4">
-              <div className="flex items-start">
-                <Info className="h-4 w-4 text-blue-500 mt-0.5 mr-2 flex-shrink-0" />
-                <p className="text-xs text-blue-700">
-                  Enter either a loan amount, duration, or both to find matching lenders.
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <label htmlFor="loan-amount" className="block text-xs font-medium text-gray-700 mb-1">
-                  How much do you want? (optional)
-                </label>
-                <Input
-                  id="loan-amount"
-                  placeholder="Enter amount"
-                  className={`w-full py-2 px-3 text-sm rounded-lg transition-colors border border-transparent border-b-2 ${amountError ? "border-b-red-500 bg-red-50 focus-visible:ring-red-500" : "border-b-gray-200 focus-visible:ring-blue-500"}`}
-                  value={loanAmount}
-                  onChange={(e) => setLoanAmount(e.target.value)}
-                  type="number"
-                  min="1000"
-                  max={loanLimits?.borrowerMaxAmount}
-                  aria-invalid={Boolean(amountError)}
-                />
-                {amountError && (
-                  <p className="mt-1 text-xs text-red-600">{amountError}</p>
-                )}
-              </div>
-              <div>
-                <label htmlFor="loan-duration" className="block text-xs font-medium text-gray-700 mb-1">
-                  Duration (optional)
-                </label>
-                <div className={`grid items-stretch rounded-lg border border-transparent border-b-2 transition-colors group ${durationError ? "border-b-red-500 bg-red-50 focus-within:border-b-red-500" : "border-b-gray-200 bg-white focus-within:border-b-blue-500"}`} style={{ gridTemplateColumns: "7fr 3fr" }}>
-                  <Input
-                    id="loan-duration"
-                    placeholder="Enter duration"
-                    type="number"
-                    min={loanDurationUnit === "days" ? (loanLimits ? (activePolicy ?? loanLimits.currentBorrowerPolicy).minTenorDays : 1) : loanLimits ? Math.max(1, Math.ceil((activePolicy ?? loanLimits.currentBorrowerPolicy).minTenorDays / 30)) : 1}
-                    max={loanDurationUnit === "days" ? (loanLimits ? (activePolicy ?? loanLimits.currentBorrowerPolicy).maxTenorDays : undefined) : loanLimits ? Math.ceil((activePolicy ?? loanLimits.currentBorrowerPolicy).maxTenorDays / 30) : undefined}
-                    className={`w-full border-0 bg-transparent py-2 px-3 text-sm rounded-r-none shadow-none focus-visible:ring-0 ${durationError ? "text-red-900 placeholder:text-red-300" : "text-gray-900 placeholder:text-gray-400"}`}
-                    value={loanDuration}
-                    onChange={(e) => setLoanDuration(e.target.value)}
-                    aria-invalid={Boolean(durationError)}
-                  />
-                  <Select value={loanDurationUnit} onValueChange={(value) => setLoanDurationUnit(value as "days" | "months")}> 
-                      <SelectTrigger className={`h-full w-full border-l rounded-l-none rounded-r-lg bg-white px-3 py-2 text-sm shadow-none focus:ring-0 ${durationError ? "text-red-700 justify-end pr-2 border-l-transparent" : "text-gray-700 justify-end pr-2 border-l-gray-200 group-focus-within:border-l-blue-500"}`}>
-                        <SelectValue placeholder="Unit" className="text-right" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="days">Days</SelectItem>
-                      <SelectItem value="months">Months</SelectItem>
-                    </SelectContent>
-                  </Select>
+            <Tabs value={searchTab} onValueChange={(v) => setSearchTab(v as "borrower" | "lender")} className="w-full">
+                <TabsList className="grid w-full grid-cols-2 mb-4 bg-gray-100 rounded-lg p-1">
+                  <TabsTrigger 
+                    value="borrower" 
+                    className="data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-sm rounded-md transition-all duration-200 font-medium"
+                  >
+                    Borrower
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="lender" 
+                    className="data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-sm rounded-md transition-all duration-200 font-medium"
+                  >
+                    Find Borrowers
+                  </TabsTrigger>
+                </TabsList>
+              
+              <TabsContent value="borrower" className="mt-0 space-y-4">
+                <h2 className="text-lg font-bold text-gray-900 mb-4">Loan Request</h2>
+                <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 mb-4">
+                  <div className="flex items-start">
+                    <Info className="h-4 w-4 text-blue-500 mt-0.5 mr-2 flex-shrink-0" />
+                    <p className="text-xs text-blue-700">
+                      Enter either a loan amount, duration, or both to find matching lenders.
+                    </p>
+                  </div>
                 </div>
-                {durationError && (
-                  <p className="mt-1 text-xs text-red-600">{durationError}</p>
-                )}
-              </div>
-              {!loanLimitsLoading && loanLimits && (
-                <p className="text-[11px] text-gray-500 leading-relaxed">
-                  Current limit: up to ₦{loanLimits.borrowerMaxAmount.toLocaleString()} and a tenor of up to {loanLimits.currentBorrowerPolicy.maxTenorDays} days
-                  {" "}
-                  ({Math.max(1, Math.ceil(loanLimits.currentBorrowerPolicy.maxTenorDays / 30))} month(s)).
-                </p>
-              )}
-              {loanLimitsLoading && (
-                <p className="text-[11px] text-gray-500">Loading your current limits...</p>
-              )}
-              <Button
-                onClick={handleFindLenders}
-                disabled={isSearching || !canSearch}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-3 text-sm rounded-lg transition-colors flex items-center justify-center"
-              >
-                {isSearching ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Searching...
-                  </>
-                ) : (
-                  <>
-                    <Search className="mr-2 h-4 w-4" />
-                    Find Lenders
-                  </>
-                )}
-              </Button>
-            </div>
+                <LoanRequestForm 
+                  loanAmount={loanAmount} setLoanAmount={setLoanAmount}
+                  loanDuration={loanDuration} setLoanDuration={setLoanDuration}
+                  loanDurationUnit={loanDurationUnit} setLoanDurationUnit={setLoanDurationUnit}
+                  amountError={amountError} durationError={durationError}
+                  loanLimits={loanLimits} loanLimitsLoading={loanLimitsLoading}
+                  activePolicy={activePolicy}
+                  searchTab={searchTab}
+                  canSearch={canSearch}
+                  isSearching={isSearching}
+                  onSearch={handleFindLenders}
+                  searchButtonText="Find Lenders"
+                />
+              </TabsContent>
+
+              <TabsContent value="lender" className="mt-0 space-y-4">
+                <h2 className="text-lg font-bold text-gray-900 mb-4">Find Borrowers</h2>
+                <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 mb-4">
+                  <div className="flex items-start">
+                    <Info className="h-4 w-4 text-blue-500 mt-0.5 mr-2 flex-shrink-0" />
+                    <p className="text-xs text-blue-700">
+                      Enter a loan amount or duration to find borrowers who have recently searched for these terms.
+                    </p>
+                  </div>
+                </div>
+                <LoanRequestForm 
+                  loanAmount={loanAmount} setLoanAmount={setLoanAmount}
+                  loanDuration={loanDuration} setLoanDuration={setLoanDuration}
+                  loanDurationUnit={loanDurationUnit} setLoanDurationUnit={setLoanDurationUnit}
+                  amountError={amountError} durationError={durationError}
+                  loanLimits={loanLimits} loanLimitsLoading={loanLimitsLoading}
+                  activePolicy={activePolicy}
+                  searchTab={searchTab}
+                  canSearch={canSearch}
+                  isSearching={isSearching}
+                  onSearch={handleFindBorrowers}
+                  searchButtonText="Find borrowers"
+                />
+              </TabsContent>
+            </Tabs>
           </div>
         </div>
 
-        {/* Lenders Section */}
+        {/* Results Section */}
         <div className="mb-8">
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-5">
             <h2 className="text-xl font-bold text-gray-900 mb-4 md:mb-0">
-              {hasSearched ? "Search Results" : "Loan offers you may like"}
+              {hasSearched 
+                ? "Search Results" 
+                : (searchTab === 'borrower' ? "Loan offers you may like" : "Borrowers you may like")}
             </h2>
             {hasSearched && (
               <Button variant="outline" onClick={handleResetSearch} className="text-sm py-2 h-auto">
-                Show All Lenders
+                Show All {searchTab === 'borrower' ? 'Lenders' : 'Borrowers'}
               </Button>
             )}
           </div>
@@ -1209,13 +1477,15 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
                 <div className="bg-blue-50 p-3 rounded-full mb-3">
                   <Search className="h-6 w-6 text-blue-500" />
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">No matching lenders found</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  No matching {searchTab === 'borrower' ? 'lenders' : 'borrowers'} found
+                </h3>
                 <p className="text-sm text-gray-500 max-w-md mx-auto mb-4">
-                  We couldn't find any lenders matching your criteria. Try adjusting your search parameters.
+                  We couldn't find any {searchTab === 'borrower' ? 'lenders' : 'borrowers'} matching your criteria. Try adjusting your search parameters.
                 </p>
                 <div className="flex gap-3">
                   <Button size="sm" className="text-sm py-2 h-auto" onClick={handleResetSearch}>
-                    Show All Lenders
+                    Show All {searchTab === 'borrower' ? 'Lenders' : 'Borrowers'}
                   </Button>
                   <Button
                     variant="outline"
@@ -1231,10 +1501,10 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
                 </div>
               </div>
             </div>
-          ) : displayLenders && displayLenders.length > 0 ? (
+          ) : displayResults && displayResults.length > 0 ? (
             <div>
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-                {normalizedLenders.map((helper) => (
+                {normalizedResults.map((helper) => (
                   <HelperCard
                     key={helper.id}
                     id={helper.id}
@@ -1259,7 +1529,7 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
               {isLoadingMoreLenders && (
                 <div className="flex items-center justify-center py-5 text-sm text-gray-500">
                   <Loader2 className="mr-2 h-4 w-4 animate-spin text-blue-500" />
-                  Loading more lenders...
+                  Loading more {searchTab === 'borrower' ? 'lenders' : 'borrowers'}...
                 </div>
               )}
             </div>
@@ -1269,9 +1539,11 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
                 <div className="bg-blue-50 p-3 rounded-full mb-3">
                   <TrendingUp className="h-6 w-6 text-blue-500" />
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">No lenders available</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  No {searchTab === 'borrower' ? 'lenders' : 'borrowers'} available
+                </h3>
                 <p className="text-sm text-gray-500 max-w-md mx-auto mb-4">
-                  We couldn't find any lenders at the moment. Please check back later.
+                  We couldn't find any {searchTab === 'borrower' ? 'lenders' : 'borrowers'} at the moment. Please check back later.
                 </p>
                 <Button size="sm" className="text-sm py-2 h-auto" onClick={handleResetSearch}>
                   Refresh
