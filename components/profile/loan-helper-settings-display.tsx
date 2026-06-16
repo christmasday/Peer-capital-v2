@@ -8,14 +8,16 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 
 interface LoanHelperSettingsDisplayProps {
   userId: string
+  initialData?: any
 }
 
-export function LoanHelperSettingsDisplay({ userId }: LoanHelperSettingsDisplayProps) {
-  const [settings, setSettings] = useState<any>(null)
-  const [isLoading, setIsLoading] = useState(true)
+export function LoanHelperSettingsDisplay({ userId, initialData }: LoanHelperSettingsDisplayProps) {
+  const [settings, setSettings] = useState<any>(initialData || null)
+  const [isLoading, setIsLoading] = useState(!initialData)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    if (initialData) return
     const fetchSettings = async () => {
       setIsLoading(true)
       setError(null)
@@ -33,7 +35,7 @@ export function LoanHelperSettingsDisplay({ userId }: LoanHelperSettingsDisplayP
       }
     }
     fetchSettings()
-  }, [userId])
+  }, [userId, initialData])
 
   // Format currency
   const formatCurrency = (amount: number) => {
@@ -79,10 +81,9 @@ export function LoanHelperSettingsDisplay({ userId }: LoanHelperSettingsDisplayP
           <h3 className="text-lg font-medium text-gray-900 mb-1">No Settings Configured</h3>
           <p className="text-gray-500 max-w-md mb-4">
             You haven't configured your lending goals yet. Configure your settings to become a lender on the platform.
+            Click the edit button to set your lending goals and start lending to borrowers.
           </p>
-          <a href="/profile/loan-helper" className="text-blue-600 hover:text-blue-800 font-medium">
-            Configure lending goals
-          </a>
+        
         </div>
       </div>
     )

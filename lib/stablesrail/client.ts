@@ -235,6 +235,48 @@ export class StablesrailClient {
     return this.request<unknown>("getwithdrawalhistory", { method: "GET", query })
   }
 
+  listTransactions(query?: {
+    direction?: "in" | "out"
+    type?: string
+    userId?: string
+    status?: string
+    startDate?: string
+    endDate?: string
+    limit?: number
+    offset?: number
+  }) {
+    return this.request<{
+      transactions: Array<{
+        id: string
+        type: string
+        direction: string
+        amount: number
+        currency: string
+        status: string
+        transactionReference?: string
+        walletAddress?: string
+        mintTxHash?: string
+        depositor?: { name: string; accountNumber: string; bankName: string }
+        bankAccount?: { accountNumber: string; accountName: string; bankName: string }
+        processingFee?: number
+        totalDeducted?: number
+        createdAt: string
+        completedAt?: string
+        updatedAt?: string
+      }>
+      total: number
+      limit: number
+      offset: number
+      hasMore: boolean
+      summary?: {
+        totalDeposits: number
+        totalPayouts: number
+        depositVolume: string
+        payoutVolume: string
+      }
+    }>("transactions", { method: "GET", query })
+  }
+
   fintechRequestWithdrawal(payload: { [key: string]: unknown }) {
     return this.request<unknown>("fintechrequestwithdrawal", { method: "POST", body: payload })
   }

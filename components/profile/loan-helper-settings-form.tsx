@@ -20,23 +20,26 @@ interface LoanHelperSettingsFormProps {
   onSave?: () => void
   onCancel?: () => void
   isVerified?: boolean
+  initialData?: any
+  initialBalance?: number | null
 }
 
-export function LoanHelperSettingsForm({ userId, onSave, onCancel, isVerified }: LoanHelperSettingsFormProps) {
-  const [loanAmount, setLoanAmount] = useState<number>(0)
-  const [interestRate, setInterestRate] = useState<number>(0)
-  const [repaymentTime, setRepaymentTime] = useState<number>(12)
-  const [repaymentUnit, setRepaymentUnit] = useState<string>("months")
-  const [termsAndConditions, setTermsAndConditions] = useState<string>("")
-  const [isLoading, setIsLoading] = useState(true)
+export function LoanHelperSettingsForm({ userId, onSave, onCancel, isVerified, initialData, initialBalance }: LoanHelperSettingsFormProps) {
+  const [loanAmount, setLoanAmount] = useState<number>(initialData?.loan_amount ?? 0)
+  const [interestRate, setInterestRate] = useState<number>(initialData?.interest_rate ?? 0)
+  const [repaymentTime, setRepaymentTime] = useState<number>(initialData?.repayment_time ?? 12)
+  const [repaymentUnit, setRepaymentUnit] = useState<string>(initialData?.repayment_unit || "months")
+  const [termsAndConditions, setTermsAndConditions] = useState<string>(initialData?.terms_and_conditions || "")
+  const [isLoading, setIsLoading] = useState(!initialData)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const { toast } = useToast()
   const [isHelperEnabled, setIsHelperEnabled] = useState(false)
-  const [accountBalance, setAccountBalance] = useState<number | null>(null)
+  const [accountBalance, setAccountBalance] = useState<number | null>(initialBalance ?? null)
   const [interestRateLimits, setInterestRateLimits] = useState<{ minPct: number; maxPct: number } | null>(null)
 
   useEffect(() => {
+    if (initialData) return
     const fetchSettings = async () => {
       setIsLoading(true)
       setError(null)
@@ -59,7 +62,7 @@ export function LoanHelperSettingsForm({ userId, onSave, onCancel, isVerified }:
     }
 
     fetchSettings()
-  }, [userId])
+  }, [userId, initialData])
 
   useEffect(() => {
     async function fetchInterestRateLimits() {
@@ -92,7 +95,7 @@ export function LoanHelperSettingsForm({ userId, onSave, onCancel, isVerified }:
   }, [userId])
 
   useEffect(() => {
-    // Fetch account balance
+    if (initialBalance !== undefined && initialBalance !== null) return
     async function fetchBalance() {
       const { data, error } = await getAccountBalance(userId);
       if (!error && data && typeof data.balance === 'number') {
@@ -100,7 +103,7 @@ export function LoanHelperSettingsForm({ userId, onSave, onCancel, isVerified }:
       }
     }
     fetchBalance();
-  }, [userId]);
+  }, [userId, initialBalance]);
 
   // Turn off helper if balance is 0
   useEffect(() => {

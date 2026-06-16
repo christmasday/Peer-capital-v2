@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { createAdminClient } from "../../../../lib/supabase/admin"
-import { createServerClient } from "../../../../lib/supabase/server"
+import { getCurrentUserId } from "../../../../lib/auth-utils"
 import { getDojahApiUrl, getDojahSecretKey } from "../../../../lib/dojah"
 
 function normalizeText(value: unknown) {
@@ -24,19 +24,17 @@ async function fetchVerifiedAddress(referenceId: string, appId: string, secretKe
 
 export async function POST() {
   try {
-    const supabase = await createServerClient()
-    const adminClient = createAdminClient()
-    const { data: sessionData } = await supabase.auth.getSession()
-    const user = sessionData.session?.user
-
-    if (!user?.id) {
+    const userId = await getCurrentUserId()
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
+
+    const adminClient = createAdminClient()
 
     const { data: profile, error: profileError } = await adminClient
       .from("profiles")
       .select("id, first_name, middle_name, last_name, phone_number, date_of_birth, address, street, lga, city, state, landmark")
-      .eq("id", user.id)
+      .eq("id", userId)
       .single()
 
     if (profileError || !profile) {
@@ -123,7 +121,7 @@ export async function POST() {
         address_verified_at: persistedAt,
         updated_at: new Date().toISOString(),
       })
-      .eq("id", user.id)
+      .eq("id", userId)
 
     return NextResponse.json({
       success: true,

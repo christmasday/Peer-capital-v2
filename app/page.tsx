@@ -71,7 +71,6 @@ export default function LandingPage() {
   const heroSection = useInView({ threshold: 0.1 })
   const featuresSection = useInView({ threshold: 0.1 })
   const howItWorksSection = useInView({ threshold: 0.1 })
-  const testimonialsSection = useInView({ threshold: 0.1 })
   const ctaSection = useInView({ threshold: 0.1 })
 
   return (
@@ -348,64 +347,6 @@ export default function LandingPage() {
                     transition={{ delay: 0.5, duration: 0.8 }}
                   ></motion.div>
                 )}
-              </motion.div>
-            ))}
-          </motion.div>
-        </div>
-      </section>
-
-      {/* Testimonials */}
-      <section className="py-12 md:py-24">
-        <div className="container mx-auto px-4">
-          <motion.div
-            className="text-center mb-10 md:mb-16"
-            initial="hidden"
-            animate={testimonialsSection.isInView ? "visible" : "hidden"}
-            variants={fadeIn}
-            ref={testimonialsSection.ref}
-          >
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 md:mb-4">What Our Users Say</h2>
-            <p className="text-base md:text-lg text-gray-600 max-w-2xl mx-auto">
-              Hear from people who have used Peer Capital
-            </p>
-          </motion.div>
-
-          <motion.div
-            className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8"
-            variants={staggerContainer}
-            initial="hidden"
-            animate={testimonialsSection.isInView ? "visible" : "hidden"}
-          >
-            {[
-              {
-                quote:
-                  "I was able to consolidate my debt at a much lower interest rate than my credit cards were charging. The process was simple and fast.",
-                name: "Sarah J.",
-                role: "Borrower",
-              },
-              {
-                quote:
-                  "As a lender, I've been able to diversify my investment portfolio while helping others achieve their financial goals. The returns have been excellent.",
-                name: "Michael T.",
-                role: "Lender",
-              },
-            ].map((testimonial, index) => (
-              <motion.div
-                key={index}
-                className="bg-white p-6 md:p-8 rounded-xl shadow-sm border"
-                variants={fadeIn}
-                whileHover={{ y: -5, boxShadow: "0 10px 30px rgba(0, 0, 0, 0.1)" }}
-                transition={{ duration: 0.3 }}
-              >
-                <div className="flex flex-col h-full">
-                  <div className="flex-grow">
-                    <p className="text-sm md:text-base text-gray-600 italic mb-4 md:mb-6">"{testimonial.quote}"</p>
-                  </div>
-                  <div>
-                    <p className="font-semibold">{testimonial.name}</p>
-                    <p className="text-xs md:text-sm text-gray-500">{testimonial.role}</p>
-                  </div>
-                </div>
               </motion.div>
             ))}
           </motion.div>
