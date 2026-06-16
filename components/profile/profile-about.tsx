@@ -1,5 +1,6 @@
 "use client"
 
+import dynamic from "next/dynamic"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Briefcase, GraduationCap, MapPin, Phone, Mail, Heart, Calendar, User, Info, Edit, Wallet, Plus, Wallet as WalletIcon, Loader2 } from "lucide-react"
@@ -18,9 +19,40 @@ import { SlateEditor } from "@/components/profile/useSlateEditor"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
-import { LoanHelperSettingsForm } from "@/components/profile/loan-helper-settings-form"
-import { LoanHelperSettingsDisplay } from "@/components/profile/loan-helper-settings-display"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog"
+
+const LoanHelperSettingsForm = dynamic(
+  () => import("@/components/profile/loan-helper-settings-form").then((m) => m.LoanHelperSettingsForm),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="space-y-4">
+        <div className="h-10 bg-gray-100 animate-pulse rounded" />
+        <div className="h-10 bg-gray-100 animate-pulse rounded" />
+        <div className="h-10 bg-gray-100 animate-pulse rounded" />
+        <div className="h-24 bg-gray-100 animate-pulse rounded" />
+        <div className="h-10 w-1/3 bg-gray-100 animate-pulse rounded" />
+      </div>
+    ),
+  },
+)
+
+const LoanHelperSettingsDisplay = dynamic(
+  () => import("@/components/profile/loan-helper-settings-display").then((m) => m.LoanHelperSettingsDisplay),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="space-y-4">
+        <div className="h-4 w-1/3 bg-gray-100 animate-pulse rounded" />
+        <div className="h-10 w-full bg-gray-100 animate-pulse rounded" />
+        <div className="h-4 w-1/2 bg-gray-100 animate-pulse rounded" />
+        <div className="h-10 w-full bg-gray-100 animate-pulse rounded" />
+        <div className="h-4 w-1/4 bg-gray-100 animate-pulse rounded" />
+        <div className="h-10 w-full bg-gray-100 animate-pulse rounded" />
+      </div>
+    ),
+  },
+)
 
 interface ProfileAboutProps {
   profile: any
@@ -83,6 +115,8 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
   const [isSavingLoanHelper, setIsSavingLoanHelper] = useState(false)
   const [loanHelperError, setLoanHelperError] = useState<string | null>(null)
   const [loanHelperLoaded, setLoanHelperLoaded] = useState(false)
+  const [loanHelperData, setLoanHelperData] = useState<any>(null)
+  const [loanHelperAccountBalance, setLoanHelperAccountBalance] = useState<number | null>(null)
   // Add state for BVN editing and verification
   const [isEditingBvn, setIsEditingBvn] = useState(false);
   const [bvnText, setBvnText] = useState(profile.bvn || "");
@@ -414,39 +448,38 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
   useEffect(() => {
     const fetchLoanHelper = async () => {
       if (activeSection === "loan-helper" && !loanHelperLoaded && profile.id) {
-        // First get the account balance
         const { data: balanceData } = await getAccountBalance(profile.id);
-        
-        if (balanceData?.balance === 0) {
-          // Only update settings if balance is 0
+        const balance = balanceData?.balance ?? null;
+        setLoanHelperAccountBalance(balance);
+
+        if (balance === 0) {
           const { success, error } = await updateLoanHelperSettings(
             profile.id,
-            0, // loan amounT
-            0, // interest ratE
-            0, // repayment timE
-            "months", // repayment unit
-            "", // terms and conditions
+            0,
+            0,
+            0,
+            "months",
+            "",
           );
 
           if (success) {
-            // Turn off the loan helper
             await fetch(`/api/loan-helper-status?userId=${profile.id}`, { method: "DELETE" });
-            
-            // Update local state
+
             setLoanAmount("0");
             setInterestRate("0");
             setPaybackPeriod("0");
             setLoanTerms("");
           }
+          setLoanHelperData(null);
         } else {
-          // If balance is not 0, just fetch the current settings
-        const { data, error } = await getLoanHelperSettings(profile.id);
-        if (data) {
-          setLoanAmount(data.loan_amount?.toString() || "");
-          setInterestRate(data.interest_rate?.toString() || "");
-          setPaybackPeriod(data.repayment_time?.toString() || "");
-          setLoanTerms(data.terms_and_conditions || "");
-        }
+          const { data, error } = await getLoanHelperSettings(profile.id);
+          if (data) {
+            setLoanAmount(data.loan_amount?.toString() || "");
+            setInterestRate(data.interest_rate?.toString() || "");
+            setPaybackPeriod(data.repayment_time?.toString() || "");
+            setLoanTerms(data.terms_and_conditions || "");
+            setLoanHelperData(data);
+          }
         }
 
         setLoanHelperLoaded(true);
@@ -3315,9 +3348,11 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
                 onSave={() => setIsEditingLoanHelper(false)}
                 onCancel={() => setIsEditingLoanHelper(false)}
                 isVerified={Boolean(profile.bvn_verified)}
+                initialData={loanHelperData}
+                initialBalance={loanHelperAccountBalance}
               />
             ) : (
-              <LoanHelperSettingsDisplay userId={profile.id} />
+              <LoanHelperSettingsDisplay userId={profile.id} initialData={loanHelperData} />
             )}
           </div>
         )}

@@ -1,12 +1,13 @@
 "use client"
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 
-import { Menu, X, Home, Wallet, BarChart2, Search, Settings, Shield, Activity, HelpCircle, AlertCircle, Mail, Flag } from "lucide-react"
+import { Menu, X, Home, Wallet, BarChart2, Search, Settings, Shield, Activity, HelpCircle, AlertCircle, Mail, Flag, Loader2, UserRound } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,6 +26,8 @@ import { UserSearchDialog } from "@/components/search/user-search-dialog"
 import { getUnreadNotificationsCount } from "@/lib/actions/notifications"
 import { NotificationsDropdown } from "@/components/notifications/notifications-dropdown"
 import { useNotificationRealtime } from "@/hooks/use-notification-realtime"
+import { useDebounce } from "@/hooks/use-debounce"
+import { searchUsers } from "@/lib/actions/search"
 
 interface TopNavProps {
   userName?: string // This should be the full name
@@ -42,6 +45,47 @@ export function TopNav({ userName, userImage, hideSearch }: TopNavProps) {
   const [localUserImage, setLocalUserImage] = useState(userImage || "")
   const [isAdmin, setIsAdmin] = useState(false)
   const pathname = usePathname()
+  const router = useRouter()
+  const [searchQuery, setSearchQuery] = useState("")
+  const [searchResults, setSearchResults] = useState<Array<{id: string; email: string; displayName: string; avatarUrl: string | null}>>([])
+  const [isSearchingUsers, setIsSearchingUsers] = useState(false)
+  const [showSearchResults, setShowSearchResults] = useState(false)
+  const searchRef = useRef<HTMLDivElement>(null)
+
+  const debouncedSearch = useDebounce(searchQuery, 300)
+
+  useEffect(() => {
+    const performSearch = async () => {
+      if (!debouncedSearch || debouncedSearch.length < 2) {
+        setSearchResults([])
+        setShowSearchResults(false)
+        return
+      }
+
+      setIsSearchingUsers(true)
+      try {
+        const results = await searchUsers(debouncedSearch)
+        setSearchResults(results)
+        setShowSearchResults(true)
+      } catch {
+        setSearchResults([])
+      } finally {
+        setIsSearchingUsers(false)
+      }
+    }
+
+    performSearch()
+  }, [debouncedSearch])
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setShowSearchResults(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
 
   // Fetch user data if not provided via props
   useEffect(() => {
@@ -187,22 +231,87 @@ export function TopNav({ userName, userImage, hideSearch }: TopNavProps) {
             <>
               {/* Search */}
               {!hideSearch && (
-                <div className="relative">
+                <div className="relative" ref={searchRef}>
                   <div className="hidden md:flex items-center">
                     <div className="relative">
                       <input
                         type="text"
                         placeholder="Search users..."
                         className="w-64 rounded-full border border-gray-200 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onFocus={() => searchResults.length > 0 && setShowSearchResults(true)}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
-                            setSearchOpen(true)
+                            if (searchResults.length > 0) {
+                              router.push(`/profile/${searchResults[0].id}`)
+                              setSearchQuery("")
+                              setShowSearchResults(false)
+                            } else {
+                              setSearchOpen(true)
+                            }
                           }
                         }}
                       />
                       <Search className="h-4 w-4 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     </div>
                   </div>
+
+                  {/* Search Results Dropdown */}
+                  {showSearchResults && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 overflow-hidden hidden md:block">
+                      {isSearchingUsers ? (
+                        <div className="flex justify-center py-4">
+                          <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
+                        </div>
+                      ) : searchResults.length === 0 ? (
+                        <div className="px-4 py-3 text-sm text-gray-500 text-center">
+                          No users found
+                        </div>
+                      ) : (
+                        <>
+                          <ul>
+                            {searchResults.slice(0, 5).map((result) => (
+                              <li
+                                key={result.id}
+                                className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 cursor-pointer"
+                                onClick={() => {
+                                  router.push(`/profile/${result.id}`)
+                                  setSearchQuery("")
+                                  setShowSearchResults(false)
+                                }}
+                              >
+                                <Avatar className="h-8 w-8">
+                                  {result.avatarUrl ? (
+                                    <AvatarImage src={result.avatarUrl} alt={result.displayName} />
+                                  ) : (
+                                    <AvatarFallback>
+                                      <UserRound className="h-4 w-4" />
+                                    </AvatarFallback>
+                                  )}
+                                </Avatar>
+                                <div className="overflow-hidden">
+                                  <p className="text-sm font-medium truncate">{result.displayName}</p>
+                                  <p className="text-xs text-gray-500 truncate">{result.email}</p>
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                          {searchResults.length > 5 && (
+                            <div
+                              className="border-t border-gray-100 px-4 py-2.5 text-sm text-blue-600 hover:bg-blue-50 cursor-pointer text-center font-medium"
+                              onClick={() => {
+                                setSearchOpen(true)
+                                setShowSearchResults(false)
+                              }}
+                            >
+                              Display all results ({searchResults.length})
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
                   <Button variant="ghost" size="icon" className="md:hidden relative" onClick={() => setSearchOpen(true)}>
                     <Search className="h-5 w-5 text-gray-700" />
                   </Button>

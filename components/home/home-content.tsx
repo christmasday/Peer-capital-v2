@@ -98,7 +98,7 @@ const LoanRequestForm = ({
   <div className="space-y-3">
     <div>
       <label htmlFor="loan-amount" className="block text-xs font-medium text-gray-700 mb-1">
-        {searchTab === 'borrower' ? "How much do you want? (optional)" : "Target loan amount (optional)"}
+        {searchTab === 'borrower' ? "How much do you want?" : "Target loan amount"}
       </label>
       <Input
         id="loan-amount"
@@ -468,7 +468,7 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
       if (res.ok) {
         toast({
           title: "Search saved",
-          description: "We’ll alert you for the next 7 days if a lender matches your criteria.",
+          description: "We’ll alert you if a lender matches your criteria.",
         })
       }
     } catch {
@@ -584,7 +584,7 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
       if (res.ok) {
         toast({
           title: "Search saved",
-          description: "We’ll alert you for the next 7 days if a borrower matches your criteria.",
+          description: "We’ll alert you if a borrower matches your criteria.",
         })
       }
     } catch {
@@ -1389,7 +1389,7 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
                     value="lender" 
                     className="data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-sm rounded-md transition-all duration-200 font-medium"
                   >
-                    Find Borrowers
+                    Lend
                   </TabsTrigger>
                 </TabsList>
               
@@ -1454,11 +1454,6 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
                 ? "Search Results" 
                 : (searchTab === 'borrower' ? "Loan offers you may like" : "Borrowers you may like")}
             </h2>
-            {hasSearched && (
-              <Button variant="outline" onClick={handleResetSearch} className="text-sm py-2 h-auto">
-                Show All {searchTab === 'borrower' ? 'Lenders' : 'Borrowers'}
-              </Button>
-            )}
           </div>
 
           {searchError && (
@@ -1484,9 +1479,6 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
                   We couldn't find any {searchTab === 'borrower' ? 'lenders' : 'borrowers'} matching your criteria. Try adjusting your search parameters.
                 </p>
                 <div className="flex gap-3">
-                  <Button size="sm" className="text-sm py-2 h-auto" onClick={handleResetSearch}>
-                    Show All {searchTab === 'borrower' ? 'Lenders' : 'Borrowers'}
-                  </Button>
                   <Button
                     variant="outline"
                     size="sm"
