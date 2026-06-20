@@ -2,11 +2,14 @@
 
 import { useState } from "react"
 import Image from "next/image"
-import Link from "next/link"
-import { ArrowRight, Star, Clock, TrendingUp, Percent } from "lucide-react"
+import { ArrowRight, Star, Clock, TrendingUp, Percent, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { motion } from "framer-motion"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useToast } from "@/hooks/use-toast"
 import { LoanRequestForm } from "@/components/loans/loan-request-form"
 
 interface HelperCardProps {
@@ -23,6 +26,7 @@ interface HelperCardProps {
   repaymentTime?: number
   repaymentUnit?: string
   currentUser?: any
+  isBorrowerResult?: boolean
 }
 
 export function HelperCard({
@@ -38,20 +42,63 @@ export function HelperCard({
   loanAmount,
   repaymentTime,
   repaymentUnit,
+  isBorrowerResult = false,
 }: HelperCardProps) {
   const [isHovered, setIsHovered] = useState(false)
   const [open, setOpen] = useState(false)
-  const loansIssuedLabel = Number(loanIssued) === 1 ? "loan Issued" : "loans Issued"
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const { toast } = useToast()
+
+  // Offer form state
+  const [offerAmount, setOfferAmount] = useState(String(loanAmount ?? ""))
+  const [offerInterest, setOfferInterest] = useState("")
+  const [offerDuration, setOfferDuration] = useState(String(repaymentTime ?? 6))
+  const [offerDurationUnit, setOfferDurationUnit] = useState("months")
+
+  const loansLabel = Number(loanIssued) === 1
+    ? (isBorrowerResult ? "loan taken" : "loan Issued")
+    : (isBorrowerResult ? "loans taken" : "loans Issued")
 
   const formatTenor = (time?: number, unit?: string, fallback?: string) => {
     if (time === undefined || time === null) return fallback || null
-    // If no unit provided, just return the number
     if (!unit) return `${time}`
     const u = unit.toLowerCase()
     let base = u.includes("month") ? "month" : u.includes("week") ? "week" : u.includes("day") ? "day" : unit
-    // pluralize
     const label = time === 1 ? base : `${base}s`
     return `${time} ${label}`
+  }
+
+  const handleSubmitOffer = async () => {
+    if (!offerAmount || Number(offerAmount) <= 0) {
+      toast({ title: "Invalid amount", description: "Please enter a valid loan amount", variant: "destructive" })
+      return
+    }
+    setIsSubmitting(true)
+    try {
+      const res = await fetch("/api/loan-offer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          borrowerId: id,
+          amount: Number(offerAmount),
+          interestRate: Number(offerInterest) || 0,
+          duration: Number(offerDuration) || 6,
+          durationUnit: offerDurationUnit,
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast({ title: "Offer Sent", description: `Loan offer sent to ${name}` })
+        setOpen(false)
+      } else {
+        toast({ title: "Failed to send offer", description: data.error || "Please try again", variant: "destructive" })
+      }
+    } catch {
+      toast({ title: "Error", description: "Failed to send loan offer", variant: "destructive" })
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -95,11 +142,10 @@ export function HelperCard({
                   <span className="text-xs text-gray-500 ml-1">{rating} rating</span>
                 </div>
               ) : (
-                <div className="mt-1 text-xs text-gray-500">{loanIssued} {loansIssuedLabel}</div>
+                <div className="mt-1 text-xs text-gray-500">{loanIssued} {loansLabel}</div>
               )}
             </div>
           </div>
-          {/* top-right interest badge removed per design */}
         </div>
 
         <div className="grid grid-cols-3 gap-2 mb-4">
@@ -108,21 +154,21 @@ export function HelperCard({
               <TrendingUp size={14} className="text-blue-600" />
             </div>
             <p className="text-xs sm:text-sm font-bold text-gray-900 line-clamp-1">{maxLoan}</p>
-            <p className="text-xs text-gray-500">Loan Amount</p>
+            <p className="text-xs text-gray-500">{isBorrowerResult ? "Total Loans Taken" : "Loan Amount"}</p>
           </div>
           <div className="bg-gray-50 rounded-lg p-2 text-center">
             <div className="flex justify-center mb-1">
               <Clock size={14} className="text-blue-600" />
             </div>
-            <p className="text-xs sm:text-sm font-bold text-gray-900 line-clamp-1">{formatTenor(repaymentTime, repaymentUnit, loanIssued)}</p>
-            <p className="text-xs text-gray-500">Loan Tenor</p>
+            <p className="text-xs sm:text-sm font-bold text-gray-900 line-clamp-1">{formatTenor(repaymentTime, isBorrowerResult ? "months" : repaymentUnit, loanIssued)}</p>
+            <p className="text-xs text-gray-500">{isBorrowerResult ? "Avg Loan Tenor" : "Loan Tenor"}</p>
           </div>
           <div className="bg-gray-50 rounded-lg p-2 text-center">
             <div className="flex justify-center mb-1">
               <Percent size={14} className="text-blue-600" />
             </div>
             <p className="text-xs sm:text-sm font-bold text-blue-600 line-clamp-1">{interestRate ? (interestRate.toString().includes("%") ? interestRate : `${interestRate}%`) : amountIssued}</p>
-            <p className="text-xs text-gray-500">Interest Rate</p>
+            <p className="text-xs text-gray-500">{isBorrowerResult ? "Repayment Rate" : "Interest Rate"}</p>
           </div>
         </div>
 
@@ -133,25 +179,98 @@ export function HelperCard({
             } hover:bg-blue-700`}
             onClick={() => setOpen(true)}
           >
-            Request Loan
+            {isBorrowerResult ? "Offer Loan" : "Request Loan"}
             <ArrowRight
               size={14}
               className={`ml-2 transition-transform duration-300 ${isHovered ? "translate-x-1" : ""}`}
             />
           </Button>
-          <DialogContent className="max-w-lg w-full">
-            <DialogHeader>
-              <DialogTitle>Request Loan from {name}</DialogTitle>
-            </DialogHeader>
-            <LoanRequestForm
-              helperId={id}
-              helperName={name}
-              interestRate={parseFloat(interestRate)}
-              maxLoanAmount={loanAmount ?? parseFloat(maxLoan)}
-              duration={repaymentTime ?? 0}
-              durationUnit={repaymentUnit ?? "months"}
-            />
-          </DialogContent>
+
+          {isBorrowerResult ? (
+            <DialogContent className="max-w-md w-full">
+              <DialogHeader>
+                <DialogTitle>Offer Loan to {name}</DialogTitle>
+                <DialogDescription>
+                  Set the terms for this loan offer. The borrower can review and respond.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-2">
+                <div className="space-y-2">
+                  <Label htmlFor="offer-amount">Loan Amount (₦)</Label>
+                  <Input
+                    id="offer-amount"
+                    type="number"
+                    placeholder="Enter amount"
+                    value={offerAmount}
+                    onChange={(e) => setOfferAmount(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="offer-interest">Interest Rate (%)</Label>
+                  <Input
+                    id="offer-interest"
+                    type="number"
+                    step="0.1"
+                    placeholder="e.g. 5"
+                    value={offerInterest}
+                    onChange={(e) => setOfferInterest(e.target.value)}
+                  />
+                </div>
+                <div className="grid grid-cols-7 gap-3">
+                  <div className="col-span-4 space-y-2">
+                    <Label htmlFor="offer-duration">Duration</Label>
+                    <Input
+                      id="offer-duration"
+                      type="number"
+                      placeholder="Duration"
+                      value={offerDuration}
+                      onChange={(e) => setOfferDuration(e.target.value)}
+                    />
+                  </div>
+                  <div className="col-span-3 space-y-2">
+                    <Label>Unit</Label>
+                    <Select value={offerDurationUnit} onValueChange={setOfferDurationUnit}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="months">Months</SelectItem>
+                        <SelectItem value="days">Days</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <Button
+                  className="w-full mt-2"
+                  onClick={handleSubmitOffer}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Sending Offer...
+                    </>
+                  ) : (
+                    "Send Offer"
+                  )}
+                </Button>
+              </div>
+            </DialogContent>
+          ) : (
+            <DialogContent className="max-w-lg w-full">
+              <DialogHeader>
+                <DialogTitle>Request Loan from {name}</DialogTitle>
+              </DialogHeader>
+              <LoanRequestForm
+                helperId={id}
+                helperName={name}
+                interestRate={parseFloat(interestRate)}
+                maxLoanAmount={loanAmount ?? parseFloat(maxLoan)}
+                duration={repaymentTime ?? 0}
+                durationUnit={repaymentUnit ?? "months"}
+              />
+            </DialogContent>
+          )}
         </Dialog>
       </div>
     </motion.div>

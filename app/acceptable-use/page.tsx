@@ -19,7 +19,7 @@ export default async function AcceptableUsePage() {
 
   return (
     <div className="flex flex-col min-h-screen">
-      {auth.authenticated ? <TopNav userName={userName} userImage={userImage} /> : <LandingNav />}
+      {auth.authenticated ? <TopNav userName={userName} userImage={userImage} currentUserId={currentUserId} /> : <LandingNav />}
       <main className="flex-1">
         <div className="container max-w-3xl mx-auto py-10">
           <h1 className="text-3xl font-bold mb-6">Acceptable Use Policy</h1>

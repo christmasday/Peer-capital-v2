@@ -56,27 +56,25 @@ function createMockClient(): SupabaseClient<Database> {
 
         return createSelectQueryBuilder()
       },
-      insert: async () => ({ data: null, error: null }),
+      insert: async () => ({ data: null, error: { message: "Offline mode: operation not available" } }),
       update: function (_data: any) {
-        // Return a query builder that supports .eq() chaining (thenable)
         const createQueryBuilder = (): any => ({
           eq: function (_column: string, _value: any) {
             return createQueryBuilder()
           },
-          then: async (resolve: any) => resolve({ data: null, error: null }),
-          catch: async (reject: any) => reject({ data: null, error: null })
+          then: async (resolve: any) => resolve({ data: null, error: { message: "Offline mode: update not performed" } }),
+          catch: async (_reject: any) => ({ data: null, error: { message: "Offline mode: update not performed" } })
         })
         return createQueryBuilder()
       },
-      upsert: async () => ({ data: null, error: null }),
+      upsert: async () => ({ data: null, error: { message: "Offline mode: operation not available" } }),
       delete: function () {
-        // Return a query builder that supports .eq() chaining (thenable)
         const createQueryBuilder = (): any => ({
           eq: function (_column: string, _value: any) {
             return createQueryBuilder()
           },
-          then: async (resolve: any) => resolve({ data: null, error: null }),
-          catch: async (reject: any) => reject({ data: null, error: null })
+          then: async (resolve: any) => resolve({ data: null, error: { message: "Offline mode: delete not performed" } }),
+          catch: async (_reject: any) => ({ data: null, error: { message: "Offline mode: delete not performed" } })
         })
         return createQueryBuilder()
       },

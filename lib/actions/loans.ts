@@ -141,13 +141,22 @@ export async function createLoanRequest({
       return { error: error.message }
     }
 
+    // Fetch borrower username
+    const { data: borrowerNameRow } = await adminClient
+      .from("profiles")
+      .select("username")
+      .eq("id", userId)
+      .maybeSingle()
+
+    const borrowerUsername = borrowerNameRow?.username || "borrower"
+
     // Notify the helper (lender) of the new loan request
     await createNotification({
       userId: helperId, // the lender
       actorId: userId, // the borrower
       type: "loan_request",
+      content: `@${borrowerUsername} requested a loan of ₦${amount.toLocaleString()}.`,
       data: {
-        loanRequestId: loanId,
         amount,
         interestRate,
         duration,
@@ -330,27 +339,37 @@ export async function cancelLoanRequest(loanRequestId: string) {
   }
 }
 
-export async function getAllLoanRequests() {
+export async function getAllLoanRequests(userId?: string) {
   try {
     const adminClient = createAdminClient() as SupabaseClient<Database>
-    const { data, error } = await adminClient
+
+    let query = adminClient
       .from("loan_requests")
       .select(`*`)
-      .order("created_at", { ascending: false });
+
+    if (userId) {
+      query = query.or(`user_id.eq.${userId},helper_id.eq.${userId}`)
+    }
+
+    const { data, error } = await query.order("created_at", { ascending: false });
     if (error) {
       console.error("Error fetching all loan requests:", error);
       return { loanRequests: [] };
     }
     const loanRequests = data || [];
 
-    // Fetch borrower profiles in one query and attach
-    const userIds = Array.from(new Set(loanRequests.map((r: any) => r.user_id).filter(Boolean)));
+    // Collect all unique user IDs (borrowers + helpers)
+    const allUserIds = Array.from(
+      new Set(
+        loanRequests.flatMap((r: any) => [r.user_id, r.helper_id].filter(Boolean))
+      )
+    );
     let profilesMap: Record<string, any> = {};
-    if (userIds.length > 0) {
+    if (allUserIds.length > 0) {
       const { data: profiles, error: profilesError } = await adminClient
         .from("profiles")
         .select("id, username, first_name, last_name, profile_picture_url")
-        .in("id", userIds);
+        .in("id", allUserIds);
       if (!profilesError && profiles) {
         profilesMap = profiles.reduce((acc: Record<string, any>, p: any) => {
           acc[p.id] = p;
@@ -362,6 +381,7 @@ export async function getAllLoanRequests() {
     const enriched = loanRequests.map((r: any) => ({
       ...r,
       borrower: profilesMap[r.user_id] || null,
+      helper: profilesMap[r.helper_id] || null,
     }));
 
     // Filter out requests from blocked users
@@ -651,13 +671,12 @@ export async function approveLoanRequest({ loanRequestId, pin, approverId }: { l
     userId: loanRequest.user_id,
     actorId: approverId,
     type: "loan_approved",
+    content: `Your loan of ₦${loanRequest.amount.toLocaleString()} has been approved.`,
     data: {
-      loanRequestId,
       amount: loanRequest.amount,
       interestRate: loanRequest.interest_rate,
       duration: loanRequest.duration_months,
       durationUnit: loanRequest.duration_unit,
-      helperId: approverId,
     },
   })
   return { success: true }
@@ -706,13 +725,12 @@ export async function rejectLoanRequest({ loanRequestId, approverId }: { loanReq
       userId: loanRequest.user_id,
       actorId: approverId,
       type: "loan_rejected",
+      content: `Your loan of ₦${loanRequest.amount.toLocaleString()} has been declined.`,
       data: {
-        loanRequestId,
         amount: loanRequest.amount,
         interestRate: loanRequest.interest_rate,
         duration: loanRequest.duration_months,
         durationUnit: loanRequest.duration_unit,
-        helperId: approverId,
       },
     })
     return { success: true }

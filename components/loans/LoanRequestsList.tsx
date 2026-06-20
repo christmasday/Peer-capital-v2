@@ -1,6 +1,6 @@
 "use client"
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { CancelLoanButton } from "@/components/loans/cancel-loan-button"
 import { UserRound } from "lucide-react"
@@ -26,6 +26,26 @@ export function LoanRequestsList({ loanRequests: initialLoanRequests, currentUse
   const [rejectModalOpen, setRejectModalOpen] = useState(false)
   const [rejectingRequestId, setRejectingRequestId] = useState<string | null>(null)
 
+  const fetchLoanRequests = async () => {
+    const res = await getAllLoanRequests(currentUserId)
+    setLoanRequests(res.loanRequests || [])
+  }
+
+  // Fetch on mount for own profile (no initial data provided)
+  useEffect(() => {
+    if (initialLoanRequests.length > 0) {
+      setLoanRequests(initialLoanRequests)
+    } else if (currentUserId) {
+      fetchLoanRequests()
+    }
+  }, [currentUserId])
+
+  useEffect(() => {
+    if (initialLoanRequests.length > 0) {
+      setLoanRequests(initialLoanRequests)
+    }
+  }, [initialLoanRequests])
+
   // Scroll to and highlight the card if highlight is set
   useEffect(() => {
     if (highlight) {
@@ -38,16 +58,7 @@ export function LoanRequestsList({ loanRequests: initialLoanRequests, currentUse
         }, 3000)
       }
     }
-  }, [highlight])
-
-  const fetchLoanRequests = async () => {
-    const res = await getAllLoanRequests()
-    setLoanRequests(res.loanRequests || [])
-  }
-
-  useEffect(() => {
-    setLoanRequests(initialLoanRequests)
-  }, [initialLoanRequests])
+  }, [highlight, loanRequests])
 
   const handleApprove = (loanId: string) => {
     const req = loanRequests.find(r => r.id === loanId)
@@ -95,24 +106,35 @@ export function LoanRequestsList({ loanRequests: initialLoanRequests, currentUse
       <Card className="shadow-sm mb-4">
         <CardContent className="py-12 text-center">
           <p className="text-gray-500 mb-2">No loan requests found</p>
-          <p className="text-sm text-gray-400">Loan requests from all users will appear here.</p>
+          <p className="text-sm text-gray-400">You have no loan requests yet. Sent and received loan requests will appear here.</p>
         </CardContent>
       </Card>
     )
   }
 
+  const formatName = (profile: any) => {
+    if (!profile) return "User"
+    if (profile.username) return `@${profile.username}`
+    return `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "User"
+  }
+
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-      {loanRequests.map((req) => (
+      {loanRequests.map((req) => {
+        const isBorrower = currentUserId === req.user_id
+        const isHelper = currentUserId === req.helper_id
+        const counterparty = isBorrower ? req.helper : req.borrower
+
+        return (
         <Card key={req.id} id={`loan-request-${req.id}`} className={"h-full shadow-sm " + (highlight === req.id ? "ring-2 ring-blue-500 ring-offset-2 animate-pulse" : "") }>
           <CardHeader className="flex flex-row items-center gap-4 pb-2">
             <Avatar className="h-10 w-10">
-              {req.borrower?.profile_picture_url ? (
-                <AvatarImage src={req.borrower.profile_picture_url} alt={req.borrower.username ? `@${req.borrower.username}` : `${req.borrower.first_name || ""} ${req.borrower.last_name || ""}`} />
+              {counterparty?.profile_picture_url ? (
+                <AvatarImage src={counterparty.profile_picture_url} alt={formatName(counterparty)} />
               ) : (
                 <AvatarFallback className="bg-blue-100">
-                  {req.borrower?.username ? (
-                    req.borrower.username.slice(0, 2).toUpperCase()
+                  {counterparty?.username ? (
+                    counterparty.username.slice(0, 2).toUpperCase()
                   ) : (
                     <UserRound className="h-5 w-5 text-blue-500" />
                   )}
@@ -120,8 +142,8 @@ export function LoanRequestsList({ loanRequests: initialLoanRequests, currentUse
               )}
             </Avatar>
             <div>
-              <div className="font-semibold text-gray-900">{req.borrower?.username ? `@${req.borrower.username}` : `${req.borrower?.first_name || ""} ${req.borrower?.last_name || ""}`.trim() || "User"}</div>
-              <div className="text-xs text-gray-500">Requested on {new Date(req.created_at).toLocaleDateString()}</div>
+              <div className="font-semibold text-gray-900">{formatName(counterparty)}</div>
+              <div className="text-xs text-gray-500">{new Date(req.created_at).toLocaleDateString()}</div>
             </div>
             <div className="ml-auto text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-700 whitespace-nowrap">
               {req.status.charAt(0).toUpperCase() + req.status.slice(1)}
@@ -136,8 +158,14 @@ export function LoanRequestsList({ loanRequests: initialLoanRequests, currentUse
               </div>
               <div className="flex-1">
                 <div className="text-sm text-gray-700">Purpose: {req.purpose}</div>
+                {isBorrower && (
+                  <div className="text-xs text-gray-400 mt-1">You requested this loan</div>
+                )}
+                {isHelper && (
+                  <div className="text-xs text-gray-400 mt-1">Loan request from {formatName(req.borrower)}</div>
+                )}
               </div>
-              {showAdminActions && req.status === "pending" ? (
+              {showAdminActions && isHelper && req.status === "pending" ? (
                 <div className="flex gap-2 pt-2">
                   <Button variant="default" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => handleApprove(req.id)}>
                     Approve
@@ -146,7 +174,7 @@ export function LoanRequestsList({ loanRequests: initialLoanRequests, currentUse
                     Reject
                   </Button>
                 </div>
-              ) : currentUserId === req.user_id && req.status === "pending" ? (
+              ) : isBorrower && req.status === "pending" ? (
                 <div className="pt-2">
                   <CancelLoanButton loanId={req.id} />
                 </div>
@@ -154,7 +182,8 @@ export function LoanRequestsList({ loanRequests: initialLoanRequests, currentUse
             </div>
           </CardContent>
         </Card>
-      ))}
+        )
+      })}
       <ApproveLoanModal
         open={modalOpen}
         onClose={handleModalClose}

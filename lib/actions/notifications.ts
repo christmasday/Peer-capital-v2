@@ -1,7 +1,6 @@
 "use server"
 
 import { createAdminClient } from "@/lib/supabase/admin"
-import { createServerClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { v4 as uuidv4 } from "uuid"
 import { getCurrentUserId } from "@/lib/auth-utils"
@@ -363,33 +362,33 @@ export async function getNotifications(pageOrUserId?: number | string, limit = 1
     const adminClient = createAdminClient()
     const offset = (page - 1) * limit
 
-    // Build query
-    let query = adminClient
+    // Build main query
+    let mainQuery = adminClient
       .from("notifications")
       .select("*", { count: "exact" })
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1)
 
-    // Filter by read status if needed
     if (!includeRead) {
-      query = query.eq("is_read", false)
+      mainQuery = mainQuery.eq("is_read", false)
     }
 
-    const { data: notifications, error, count } = await query
-
-    if (error) {
-      return { error: "Failed to get notifications" }
-    }
-
-    // Get unread count
-    const { count: unreadCount, error: countError } = await adminClient
+    // Build unread count query (always needed for badge)
+    const unreadCountQuery = adminClient
       .from("notifications")
       .select("*", { count: "exact", head: true })
       .eq("user_id", userId)
       .eq("is_read", false)
 
-    if (countError) {
+    // Run both queries in parallel
+    const [mainResult, unreadResult] = await Promise.all([mainQuery, unreadCountQuery])
+
+    const { data: notifications, error, count } = mainResult
+    const { count: unreadCount } = unreadResult
+
+    if (error) {
+      return { error: "Failed to get notifications" }
     }
 
     return {
@@ -410,9 +409,9 @@ export async function getUnreadNotificationsCount() {
       return { success: true, count: 0 } // Return 0 if not logged in
     }
 
-    const supabase = await createServerClient()
+    const adminClient = createAdminClient()
 
-    const { count, error } = await supabase
+    const { count, error } = await adminClient
       .from("notifications")
       .select("*", { count: "exact", head: true })
       .eq("user_id", userId)

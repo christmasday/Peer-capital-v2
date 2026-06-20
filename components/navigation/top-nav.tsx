@@ -23,6 +23,7 @@ import { SignoutButton } from "@/components/auth/signout-button"
 import { Logo } from "@/components/logo"
 import Image from "next/image"
 import { UserSearchDialog } from "@/components/search/user-search-dialog"
+import { UserPreviewModal } from "@/components/profile/user-preview-modal"
 import { getUnreadNotificationsCount } from "@/lib/actions/notifications"
 import { NotificationsDropdown } from "@/components/notifications/notifications-dropdown"
 import { useNotificationRealtime } from "@/hooks/use-notification-realtime"
@@ -33,9 +34,11 @@ interface TopNavProps {
   userName?: string // This should be the full name
   userImage?: string
   hideSearch?: boolean
+  currentUserId?: string | null
+  unreadNotificationsCount?: number
 }
 
-export function TopNav({ userName, userImage, hideSearch }: TopNavProps) {
+export function TopNav({ userName, userImage, hideSearch, currentUserId, unreadNotificationsCount }: TopNavProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [unreadNotifications, setUnreadNotifications] = useState(0)
@@ -50,6 +53,8 @@ export function TopNav({ userName, userImage, hideSearch }: TopNavProps) {
   const [searchResults, setSearchResults] = useState<Array<{id: string; email: string; displayName: string; avatarUrl: string | null}>>([])
   const [isSearchingUsers, setIsSearchingUsers] = useState(false)
   const [showSearchResults, setShowSearchResults] = useState(false)
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
+  const [showUserPreview, setShowUserPreview] = useState(false)
   const searchRef = useRef<HTMLDivElement>(null)
 
   const debouncedSearch = useDebounce(searchQuery, 300)
@@ -198,7 +203,8 @@ export function TopNav({ userName, userImage, hideSearch }: TopNavProps) {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white">
       {/* Search Dialog */}
-      <UserSearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
+      <UserSearchDialog open={searchOpen} onOpenChange={setSearchOpen} onUserSelect={(userId) => { setSelectedUserId(userId); setShowUserPreview(true); setSearchOpen(false) }} />
+      <UserPreviewModal userId={selectedUserId} currentUserId={currentUserId} open={showUserPreview} onOpenChange={setShowUserPreview} />
 
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         {/* Logo */}
@@ -244,7 +250,8 @@ export function TopNav({ userName, userImage, hideSearch }: TopNavProps) {
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
                             if (searchResults.length > 0) {
-                              router.push(`/profile/${searchResults[0].id}`)
+                              setSelectedUserId(searchResults[0].id)
+                              setShowUserPreview(true)
                               setSearchQuery("")
                               setShowSearchResults(false)
                             } else {
@@ -276,7 +283,8 @@ export function TopNav({ userName, userImage, hideSearch }: TopNavProps) {
                                 key={result.id}
                                 className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 cursor-pointer"
                                 onClick={() => {
-                                  router.push(`/profile/${result.id}`)
+                                  setSelectedUserId(result.id)
+                                  setShowUserPreview(true)
                                   setSearchQuery("")
                                   setShowSearchResults(false)
                                 }}
@@ -327,19 +335,13 @@ export function TopNav({ userName, userImage, hideSearch }: TopNavProps) {
 
               {/* messaging removed */}
 
-              {/* Notifications - Using only the NotificationsDropdown component */}
-              <div className="relative">
-                <NotificationsDropdown
-                  open={notificationsOpen}
-                  onOpenChange={setNotificationsOpen}
-                  onNotificationRead={() => setUnreadNotifications((prev) => Math.max(0, prev - 1))}
-                />
-                {unreadNotifications > 0 && (
-                  <span className="absolute top-0 right-0 h-4 w-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center z-10">
-                    {unreadNotifications > 99 ? "99+" : unreadNotifications}
-                  </span>
-                )}
-              </div>
+              {/* Notifications */}
+              <NotificationsDropdown
+                open={notificationsOpen}
+                onOpenChange={setNotificationsOpen}
+                onCountChange={(count) => setUnreadNotifications(count)}
+                onNotificationRead={() => setUnreadNotifications((prev) => Math.max(0, prev - 1))}
+              />
 
               {/* Profile Dropdown */}
               <DropdownMenu>

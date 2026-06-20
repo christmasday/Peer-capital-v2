@@ -67,18 +67,23 @@ function normalizeLenderCard(helper: any, fallbackRating = 4.5): LenderCardData 
 }
 
 function normalizeBorrowerCard(borrower: any, fallbackRating = 4.5): LenderCardData {
+  const loansTakenCount = Number(borrower.loans_taken_count ?? 0)
+  const totalAmountTaken = Number(borrower.total_amount_taken ?? 0)
+  const avgTenorMonths = Number(borrower.avg_tenor_months ?? 0)
+  const repaymentRate = Number(borrower.repayment_rate ?? 0)
+
   return {
     id: String(borrower.id),
     name: String(borrower.name ?? "Borrower"),
-    interestRate: Number(borrower.expected_interest_rate ?? 0),
-    maxLoanAmount: Number(borrower.requested_amount ?? 0),
-    loanAmount: Number(borrower.requested_amount ?? 0),
-    loanIssued: 0,
-    amountIssued: 0,
+    interestRate: repaymentRate,
+    maxLoanAmount: totalAmountTaken || Number(borrower.requested_amount ?? 0),
+    loanAmount: totalAmountTaken || Number(borrower.requested_amount ?? 0),
+    loanIssued: loansTakenCount,
+    amountIssued: totalAmountTaken,
     profileImage: String(borrower.profile_image_url ?? "/vibrant-street-market.png"),
     rating: Number(borrower.rating ?? fallbackRating),
-    repaymentTime: Number(borrower.requested_duration ?? 0),
-    repaymentUnit: borrower.requested_duration_unit ?? "months",
+    repaymentTime: avgTenorMonths,
+    repaymentUnit: "months",
   }
 }
 
@@ -107,7 +112,7 @@ const LoanRequestForm = ({
         value={loanAmount}
         onChange={(e) => setLoanAmount(e.target.value)}
         type="number"
-        min="1000"
+        min="10000"
         max={loanLimits?.borrowerMaxAmount}
         aria-invalid={Boolean(amountError)}
       />
@@ -723,6 +728,9 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
     if (Number.isNaN(parsedLoanAmount) || parsedLoanAmount === undefined || parsedLoanAmount <= 0) {
       return "Enter a valid amount"
     }
+    if (parsedLoanAmount < 10000) {
+      return "Minimum amount is ₦10,000"
+    }
     if (loanLimitsLoading) {
       return null
     }
@@ -782,18 +790,23 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
   }
 
   const normalizeBorrowerCard = (borrower: any, fallbackRating = 4.5): LenderCardData => {
+    const loansTakenCount = Number(borrower.loans_taken_count ?? 0)
+    const totalAmountTaken = Number(borrower.total_amount_taken ?? 0)
+    const avgTenorMonths = Number(borrower.avg_tenor_months ?? 0)
+    const repaymentRate = Number(borrower.repayment_rate ?? 0)
+
     return {
       id: String(borrower.id),
       name: String(borrower.name ?? "Borrower"),
-      interestRate: Number(borrower.expected_interest_rate ?? 0),
-      maxLoanAmount: Number(borrower.requested_amount ?? 0),
-      loanAmount: Number(borrower.requested_amount ?? 0),
-      loanIssued: 0,
-      amountIssued: 0,
+      interestRate: repaymentRate,
+      maxLoanAmount: totalAmountTaken || Number(borrower.requested_amount ?? 0),
+      loanAmount: totalAmountTaken || Number(borrower.requested_amount ?? 0),
+      loanIssued: loansTakenCount,
+      amountIssued: totalAmountTaken,
       profileImage: String(borrower.profile_image_url ?? "/vibrant-street-market.png"),
       rating: Number(borrower.rating ?? fallbackRating),
-      repaymentTime: Number(borrower.requested_duration ?? 0),
-      repaymentUnit: borrower.requested_duration_unit ?? "months",
+      repaymentTime: avgTenorMonths,
+      repaymentUnit: "months",
     }
   }
 
@@ -1512,6 +1525,7 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
                     repaymentTime={helper.repaymentTime}
                     repaymentUnit={helper.repaymentUnit}
                     currentUser={userProfile}
+                    isBorrowerResult={searchTab === "lender"}
                   />
                 ))}
               </div>
