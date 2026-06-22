@@ -191,15 +191,9 @@ export default function OfframpRequestsPage() {
 
   const getEventTypeBadge = (eventType: string) => {
     switch (eventType) {
-      case 'vault.return.payout.completed':
-        return <Badge variant="outline" className="text-xs">Payout</Badge>
-      case 'vault.return.payout.failed':
-        return <Badge variant="outline" className="text-xs text-red-600">Payout Failed</Badge>
-      case 'vault.return.transfer.confirmed':
-        return <Badge variant="outline" className="text-xs">Transfer</Badge>
-      case 'swaps.completed':
+      case 'swap.completed':
         return <Badge variant="outline" className="text-xs">Swap</Badge>
-      case 'swaps.failed':
+      case 'swap.failed':
         return <Badge variant="outline" className="text-xs text-red-600">Swap Failed</Badge>
       default:
         return <Badge variant="outline" className="text-xs">{eventType}</Badge>
@@ -249,7 +243,6 @@ export default function OfframpRequestsPage() {
               <SelectContent>
                 <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="transfer_confirmed">Transfer Confirmed</SelectItem>
                 <SelectItem value="completed">Completed</SelectItem>
                 <SelectItem value="failed">Failed</SelectItem>
               </SelectContent>

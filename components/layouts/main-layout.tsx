@@ -199,7 +199,7 @@ export function MainLayout({
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50 overflow-hidden">
-      <TopNav userName={userName} userImage={userImage} unreadNotificationsCount={unreadNotificationsCount} />
+      <TopNav userName={userName} userImage={userImage} currentUserId={currentUserId} unreadNotificationsCount={unreadNotificationsCount} />
       <main className={`flex-1 w-full mx-auto ${className} overflow-hidden`}>{children}</main>
       {isAuthenticated && currentUserId && (
         <SessionTracker userId={currentUserId} />

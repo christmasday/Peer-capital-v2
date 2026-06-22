@@ -53,7 +53,7 @@ async function testVirtualAccountFlow() {
     // 4. Test API endpoint availability (without auth)
     console.log('\n4. Testing API endpoint availability...')
     try {
-      const response = await fetch('http://localhost:3001/api/stablesrail/create-virtual-account', {
+      const response = await fetch('http://localhost:3001/api/sr/create-virtual-account', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({})

@@ -16,27 +16,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 })
     }
 
-    // Fetch user's base wallet address from wallet_address table
-    const admin = createAdminClient()
-    const { data: walletAddress, error: walletError } = await admin
-      .from("wallet_address")
-      .select("base_address")
-      .eq("user_id", auth.userId)
-      .maybeSingle()
-    
-    if (walletError && walletError.code !== 'PGRST116') {
-      console.error("Error fetching user wallet address:", walletError)
-      return NextResponse.json({ error: "Failed to fetch user wallet address" }, { status: 500 })
-    }
-
-    const userBaseWalletAddress = walletAddress?.base_address
-    if (!userBaseWalletAddress) {
-      return NextResponse.json({ 
-        error: "Base wallet address not found. Please ensure your wallet is set up first." 
-      }, { status: 400 })
-    }
-
     // Fetch the user's StablesRail user ID from their profile
+    const admin = createAdminClient()
     const { data: profile, error: profileError } = await admin
       .from("profiles")
       .select("sr_user_id")
@@ -55,15 +36,13 @@ export async function POST(req: NextRequest) {
       }, { status: 400 })
     }
 
-    // Prepare full payload with wallet address for validation
+    // Prepare payload for StablesRail
     const fullPayload = {
       userId: srUserId,
       amount: body.amount,
-      owner: userBaseWalletAddress,
-      network: body.network || "BASE",
+      sweepToOfframp: true,
       assetSwap: "CNGN",
-      autoSwap: false,
-      sweepToOfframp: true
+      autoSwap: true,
     }
 
     // Validate request using Zod schema

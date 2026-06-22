@@ -11,11 +11,11 @@ import type { WebhookEvent } from "@/types/stablesrail"
 
 /**
  * Verify webhook signature using HMAC-SHA256
- * Per StablesRail docs:
- * 1. Construct signing string: timestamp + raw_body
+ * Per Strails docs:
+ * 1. Build signing string: `${timestamp}.${payloadString}`
  * 2. Compute HMAC-SHA256 using webhook secret as key
- * 3. Hex-encode and prefix with "sha256="
- * 4. Compare with X-Traycer-Signature header using constant-time comparison
+ * 3. Hex-encode
+ * 4. Compare with X-Strails-Signature header using constant-time comparison
  */
 function verifyWebhookSignature(
   rawBody: string,
@@ -27,27 +27,21 @@ function verifyWebhookSignature(
     return false
   }
 
-  // Step 1: Construct the signing string (timestamp + raw_body)
-  const signingString = timestamp + rawBody
+  const signingString = `${timestamp}.${rawBody}`
 
-  // Step 2: Compute HMAC-SHA256
   const expected = crypto
     .createHmac('sha256', secret)
     .update(signingString)
     .digest('hex')
 
-  // Step 3: Hex-encode and prefix with "sha256="
-  const expectedSignature = `sha256=${expected}`
-
-  // Step 4: Constant-time comparison to prevent timing attacks
   try {
-    const expectedBuffer = Buffer.from(expectedSignature)
+    const expectedBuffer = Buffer.from(expected)
     const receivedBuffer = Buffer.from(signatureHeader)
-    
+
     if (expectedBuffer.length !== receivedBuffer.length) {
       return false
     }
-    
+
     return crypto.timingSafeEqual(expectedBuffer, receivedBuffer)
   } catch {
     return false
@@ -59,14 +53,15 @@ function verifyWebhookSignature(
  */
 function validateWebhookHeaders(req: NextRequest): { valid: boolean; missingHeaders: string[] } {
   const requiredHeaders = [
-    'x-traycer-signature',
-    'x-traycer-timestamp',
-    'user-agent',
-    'content-type'
+    'x-strails-signature',
+    'x-strails-timestamp',
+    'x-strails-event',
+    'x-webhook-id',
+    'content-type',
   ]
 
   const missingHeaders: string[] = []
-  
+
   for (const header of requiredHeaders) {
     if (!req.headers.get(header)) {
       missingHeaders.push(header)
@@ -75,15 +70,8 @@ function validateWebhookHeaders(req: NextRequest): { valid: boolean; missingHead
 
   return {
     valid: missingHeaders.length === 0,
-    missingHeaders
+    missingHeaders,
   }
-}
-
-/**
- * Verify User-Agent header matches expected value
- */
-function validateUserAgent(userAgent: string | null): boolean {
-  return userAgent === 'cNGN-Webhook/1.0'
 }
 
 /**
@@ -94,22 +82,27 @@ function validateContentType(contentType: string | null): boolean {
 }
 
 /**
- * Validate timestamp to prevent replay attacks
+ * Validate timestamp to prevent replay attacks (ISO 8601 format)
  */
 function validateTimestamp(timestamp: string | null): { valid: boolean; reason?: string } {
   if (!timestamp) {
     return { valid: false, reason: 'Missing timestamp' }
   }
 
-  const timestampMs = parseInt(timestamp, 10) * 1000 // Convert to milliseconds
+  const timestampMs = new Date(timestamp).getTime()
+  if (isNaN(timestampMs)) {
+    return { valid: false, reason: 'Invalid timestamp format (expected ISO 8601)' }
+  }
+
   const now = Date.now()
-  const fiveMinutesAgo = now - (5 * 60 * 1000) // 5 minutes tolerance
+  const fiveMinutesAgo = now - (5 * 60 * 1000)
+  const oneMinuteFuture = now + 60000
 
   if (timestampMs < fiveMinutesAgo) {
     return { valid: false, reason: 'Timestamp too old (replay attack)' }
   }
 
-  if (timestampMs > now + 60000) { // 1 minute future tolerance
+  if (timestampMs > oneMinuteFuture) {
     return { valid: false, reason: 'Timestamp too far in future' }
   }
 
@@ -120,9 +113,6 @@ function validateTimestamp(timestamp: string | null): { valid: boolean; reason?:
 // Logging Helper
 // ============================================================================
 
-/**
- * Log webhook event to database
- */
 async function logEvent(
   eventType: string,
   payload: unknown,
@@ -136,10 +126,9 @@ async function logEvent(
       payload,
       processed,
       notes,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
     })
   } catch (error) {
-    // Swallow logging errors to avoid impacting webhook ack
     console.error('🔴 [WEBHOOK] Failed to log event:', error)
   }
 }
@@ -160,63 +149,56 @@ export async function POST(req: NextRequest) {
     // Step 2: Validate required headers are present
     const headerValidation = validateWebhookHeaders(req)
     if (!headerValidation.valid) {
-      await logEvent("webhook.headers.missing", { 
+      await logEvent("webhook.headers.missing", {
         missingHeaders: headerValidation.missingHeaders,
       }, false)
-      return NextResponse.json({ 
-        error: `Missing required headers: ${headerValidation.missingHeaders.join(', ')}` 
+      return NextResponse.json({
+        error: `Missing required headers: ${headerValidation.missingHeaders.join(', ')}`,
       }, { status: 400 })
     }
 
-    // Step 3: Validate User-Agent header
-    const userAgent = req.headers.get('user-agent')
-    if (!validateUserAgent(userAgent)) {
-      await logEvent("webhook.user_agent.invalid", { 
-        receivedUserAgent: userAgent,
-        expectedUserAgent: 'cNGN-Webhook/1.0'
-      }, false)
-      return NextResponse.json({ error: "Invalid User-Agent" }, { status: 401 })
-    }
-
-    // Step 4: Validate Content-Type header
+    // Step 3: Validate Content-Type header
     const contentType = req.headers.get('content-type')
     if (!validateContentType(contentType)) {
-      await logEvent("webhook.content_type.invalid", { 
+      await logEvent("webhook.content_type.invalid", {
         receivedContentType: contentType,
-        expectedContentType: 'application/json'
+        expectedContentType: 'application/json',
       }, false)
       return NextResponse.json({ error: "Invalid Content-Type" }, { status: 400 })
     }
 
-    // Step 5: Read raw body for signature verification (must be done before JSON parsing)
+    // Step 4: Read raw body for signature verification
     const rawBody = await req.text()
 
-    // Step 6: Extract signature and timestamp headers
-    const signature = req.headers.get("x-traycer-signature")
-    const timestamp = req.headers.get("x-traycer-timestamp")
+    // Step 5: Extract signature and timestamp headers
+    const signature = req.headers.get("x-strails-signature")
+    const timestamp = req.headers.get("x-strails-timestamp")
+    const eventTypeHeader = req.headers.get("x-strails-event")
+    const webhookId = req.headers.get("x-webhook-id")
 
-    // Step 7: Validate timestamp to prevent replay attacks
+    // Step 6: Validate timestamp to prevent replay attacks
     const timestampValidation = validateTimestamp(timestamp)
     if (!timestampValidation.valid) {
-      await logEvent("webhook.timestamp.invalid", { 
+      await logEvent("webhook.timestamp.invalid", {
         timestamp,
         reason: timestampValidation.reason,
-        currentTime: Date.now()
+        currentTime: Date.now(),
       }, false)
       return NextResponse.json({ error: `Invalid timestamp: ${timestampValidation.reason}` }, { status: 401 })
     }
 
-    // Step 8: Verify webhook signature using HMAC-SHA256
+    // Step 7: Verify webhook signature using HMAC-SHA256
     const signatureValid = verifyWebhookSignature(rawBody, signature, timestamp, secret)
     if (!signatureValid) {
-      await logEvent("webhook.signature.invalid", { 
+      await logEvent("webhook.signature.invalid", {
         timestamp,
+        webhookId,
         signatureReceived: signature?.substring(0, 20) + '...',
       }, false)
       return NextResponse.json({ error: "Invalid signature" }, { status: 401 })
     }
 
-    // Step 9: Parse JSON payload (only after signature verification)
+    // Step 8: Parse JSON payload
     let parsed: unknown
     try {
       parsed = JSON.parse(rawBody)
@@ -225,81 +207,64 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid JSON" }, { status: 400 })
     }
 
-    // Step 10: Validate basic webhook structure
-    let genericPayload
-    try {
-      genericPayload = validateRequest(genericWebhookPayloadSchema, parsed)
-    } catch (error) {
-      if (error instanceof ValidationError) {
-        await logEvent("webhook.payload.validation_failed", { 
-          errors: error.fieldErrors,
-          payload: parsed 
-        }, false)
-        return NextResponse.json({ 
-          error: "Invalid webhook payload structure",
-          details: error.fieldErrors 
-        }, { status: 400 })
-      }
-      throw error
-    }
-
-    const { eventType } = genericPayload
-    const payload = genericPayload.data || genericPayload
+    // Step 9: Extract event type from body or header fallback
+    const bodyEventType = (parsed as any)?.eventType || (parsed as any)?.event_type
+    const eventType = bodyEventType || eventTypeHeader
 
     if (!eventType) {
       await logEvent("webhook.event.missing_type", parsed, false)
       return NextResponse.json({ error: "Missing eventType" }, { status: 400 })
     }
 
+    // Step 10: Extract inner payload for typed processing
+    const innerPayload = (parsed as any)?.payload || parsed
+
     console.log(`🟢 [WEBHOOK] Received event: ${eventType}`)
 
-    // Step 11: Log receipt immediately (after all validations pass)
-    await logEvent(eventType, payload, false)
+    // Step 11: Log receipt immediately — store the full parsed body (including requestId)
+    await logEvent(eventType, parsed, false)
 
     // Step 12: Check if this is a known event type and process with typed handler
     if (isKnownEventType(eventType)) {
       try {
-        // Validate against the full typed schema
         const typedEvent = validateRequest(webhookEventSchema, {
           eventType,
-          timestamp: genericPayload.timestamp || new Date().toISOString(),
-          requestId: genericPayload.requestId,
-          userId: genericPayload.userId,
-          data: payload,
+          eventId: (parsed as any)?.eventId,
+          fintechId: (parsed as any)?.fintechId,
+          version: (parsed as any)?.version,
+          timestamp: (parsed as any)?.timestamp || new Date().toISOString(),
+          requestId: (parsed as any)?.requestId,
+          userId: (parsed as any)?.userId,
+          data: innerPayload,
         })
 
-        // Process with typed handler
         const result = await processWebhookEvent(typedEvent as WebhookEvent)
-        
+
         console.log(`✅ [WEBHOOK] Event ${eventType} processed:`, result)
-        
-        // Update the logged event as processed
+
         if (result.success) {
-          await logEvent(eventType, { ...payload, handlerResult: result }, true)
+          await logEvent(eventType, { ...parsed, handlerResult: result }, true)
         }
 
         return NextResponse.json({ ok: true, result })
       } catch (error) {
-        // If typed validation fails, fall back to generic processing
         if (error instanceof ValidationError) {
           console.warn(`⚠️ [WEBHOOK] Event ${eventType} failed typed validation, processing as generic:`, error.fieldErrors)
-          // Still acknowledge the webhook to prevent retries
-          await logEvent(eventType, { payload, validationErrors: error.fieldErrors }, true, 'Processed as generic due to validation failure')
+          await logEvent(eventType, { ...parsed, validationErrors: error.fieldErrors }, true, 'Processed as generic due to validation failure')
           return NextResponse.json({ ok: true, warning: 'Processed as generic event' })
         }
         throw error
       }
     } else {
-      // Unknown event type - log and acknowledge
       console.warn(`⚠️ [WEBHOOK] Unknown event type: ${eventType}`)
-      await logEvent("webhook.unknown_event", { eventType, payload }, true, 'Unknown event type')
+      await logEvent("webhook.unknown_event", { eventType, payload: innerPayload }, true, 'Unknown event type')
       return NextResponse.json({ ok: true, warning: `Unknown event type: ${eventType}` })
     }
   } catch (err) {
     console.error('🔴 [WEBHOOK] Unhandled error:', err)
-    await logEvent("webhook.handler.error", { 
+    await logEvent("webhook.handler.error", {
       error: err instanceof Error ? err.message : String(err),
-      stack: err instanceof Error ? err.stack : undefined
+      stack: err instanceof Error ? err.stack : undefined,
     }, false)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }

@@ -58,7 +58,7 @@ export default function AdminFeesPage() {
 
   const fetchStablesrailFees = async () => {
     try {
-      const res = await fetch('/api/stablesrail/manage-fees', {
+      const res = await fetch('/api/sr/manage-fees', {
         credentials: 'include'
       })
       const data = await res.json()
@@ -333,7 +333,7 @@ export default function AdminFeesPage() {
 
     setSavingStablesrail(true)
     try {
-      const res = await fetch('/api/stablesrail/manage-fees', {
+      const res = await fetch('/api/sr/manage-fees', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

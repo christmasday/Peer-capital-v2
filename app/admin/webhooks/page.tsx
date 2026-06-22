@@ -368,21 +368,30 @@ export default function WebhookConfiguration() {
             <div className="space-y-2">
               <h4 className="font-medium text-gray-900">Supported Stablesrail Events:</h4>
               <ul className="text-sm text-gray-600 space-y-1">
-                <li>• <code className="bg-gray-100 px-1 rounded">user.otp.send.completed</code> - OTP delivery confirmation</li>
                 <li>• <code className="bg-gray-100 px-1 rounded">virtual.account.created</code> - Virtual account creation</li>
                 <li>• <code className="bg-gray-100 px-1 rounded">payments.confirmed</code> - Payment confirmation</li>
                 <li>• <code className="bg-gray-100 px-1 rounded">wallet.funding.completed</code> - Wallet funding completion</li>
-                <li>• <code className="bg-gray-100 px-1 rounded">swaps.completed</code> - Successful token swaps</li>
-                <li>• <code className="bg-gray-100 px-1 rounded">swaps.failed</code> - Failed token swaps</li>
-                <li>• <code className="bg-gray-100 px-1 rounded">vault.return.transfer.confirmed</code> - Vault return transfer confirmation</li>
-                <li>• <code className="bg-gray-100 px-1 rounded">vault.return.payout.completed</code> - Vault return payout completion</li>
-                <li>• <code className="bg-gray-100 px-1 rounded">vault.return.payout.failed</code> - Vault return payout failure</li>
+                <li>• <code className="bg-gray-100 px-1 rounded">swap.completed</code> - Successful token swap</li>
+                <li>• <code className="bg-gray-100 px-1 rounded">swap.failed</code> - Failed token swap</li>
+                <li>• <code className="bg-gray-100 px-1 rounded">fintech.virtual_account.deposit.received</code> - Virtual account deposit received</li>
+                <li>• <code className="bg-gray-100 px-1 rounded">fintech.user.deposit.received</code> - User deposit received</li>
+                <li>• <code className="bg-gray-100 px-1 rounded">fintech.user.deposit.funding.completed</code> - User deposit funding completed</li>
+                <li>• <code className="bg-gray-100 px-1 rounded">fintech.user.deposit.refunded</code> - User deposit refunded</li>
+                <li>• <code className="bg-gray-100 px-1 rounded">fintech.asset.transfer.completed</code> - Asset transfer completed</li>
+                <li>• <code className="bg-gray-100 px-1 rounded">fintech.asset.transfer.failed</code> - Asset transfer failed</li>
+                <li>• <code className="bg-gray-100 px-1 rounded">fintech.user.asset.transfer.completed</code> - User asset transfer completed</li>
+                <li>• <code className="bg-gray-100 px-1 rounded">fintech.user.asset.transfer.failed</code> - User asset transfer failed</li>
+                <li>• <code className="bg-gray-100 px-1 rounded">fintech.offramp.initiated</code> - Offramp initiated</li>
+                <li>• <code className="bg-gray-100 px-1 rounded">fintech.offramp.transfer.completed</code> - Offramp transfer completed</li>
+                <li>• <code className="bg-gray-100 px-1 rounded">fintech.offramp.payout.initiated</code> - Offramp payout initiated</li>
+                <li>• <code className="bg-gray-100 px-1 rounded">fintech.offramp.completed</code> - Offramp completed</li>
+                <li>• <code className="bg-gray-100 px-1 rounded">fintech.offramp.failed</code> - Offramp failed</li>
               </ul>
             </div>
 
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <ExternalLink className="h-4 w-4" />
-              <span>Webhook endpoint: <code className="bg-gray-100 px-1 rounded">/api/stablesrail/webhook</code></span>
+              <span>Webhook endpoint: <code className="bg-gray-100 px-1 rounded">/api/sr/webhook</code></span>
             </div>
           </div>
         </CardContent>

@@ -34,9 +34,9 @@ export async function proxy(req: NextRequest) {
     "/api/auth/logout",
     "/api/auth/verify-token",
     "/api/sync-auth-users",
-    "/api/stablesrail/onboard-user",
-    "/api/stablesrail/verify-otp",
-    "/api/stablesrail/webhook",
+    "/api/sr/onboard-user",
+    "/api/sr/verify-otp",
+    "/api/sr/webhook",
   ]
 
   const path = req.nextUrl.pathname

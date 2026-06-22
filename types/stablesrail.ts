@@ -575,40 +575,26 @@ export interface GetWebhookResponse {
 // Webhook Event Types
 // ============================================================================
 
-/** Base webhook event payload */
+/** Base webhook event payload (Strairs API v1.0) */
 export interface WebhookEventBase {
-  /** Event type identifier */
+  eventId: string
   eventType: string
-  /** Event timestamp */
   timestamp: string
-  /** Request/correlation ID */
   requestId?: string
-  /** Associated user ID */
+  fintechId: string
+  version: string
   userId?: string
-}
-
-/** OTP send completed event */
-export interface UserOtpSendCompletedEvent extends WebhookEventBase {
-  eventType: 'user.otp.send.completed'
-  data: {
-    userId: string
-    otpId: string
-    completedAt: string
-    channel: 'sms' | 'email'
-  }
 }
 
 /** Virtual account created event */
 export interface VirtualAccountCreatedEvent extends WebhookEventBase {
   eventType: 'virtual.account.created'
   data: {
-    userId: string
+    vaId: string
     accountNumber: string
-    accountName: string
     bankName: string
-    bankCode: string
-    currency: StablesrailCurrency
-    createdAt?: string
+    accountName: string
+    createdAt: string
   }
 }
 
@@ -617,140 +603,427 @@ export interface PaymentsConfirmedEvent extends WebhookEventBase {
   eventType: 'payments.confirmed'
   data: {
     txRef: string
-    userId: string
+    reference: string
     amount: number
-    currency: StablesrailCurrency
-    accountNumber: string
+    currency: string
+    status: string
     confirmedAt: string
-    senderName?: string
-    narration?: string
+    paymentTimestamp: string
+    metadata: {
+      vaId: string
+      provider: string
+      walletAddress: string
+    }
   }
 }
 
-/** Wallet funding success event */
-export interface WalletFundingSuccessEvent extends WebhookEventBase {
-  eventType: 'wallet.funding.success'
+/** Wallet funding completed event */
+export interface WalletFundingCompletedEvent extends WebhookEventBase {
+  eventType: 'wallet.funding.completed'
   data: {
-    userId: string
-    amount: number
-    tokenAddress: string
+    walletAddress: string
+    amount: string
     transactionHash: string
     completedAt: string
-    fundingSource: string
-    walletAddress: string
-    network: StablesrailNetwork
   }
 }
 
 /** Swap completed event */
-export interface SwapsCompletedEvent extends WebhookEventBase {
-  eventType: 'swaps.completed'
+export interface SwapCompletedEvent extends WebhookEventBase {
+  eventType: 'swap.completed'
   data: {
-    userId: string
-    requestId: string
+    walletAddress: string
+    owner: string
     sellToken: string
     buyToken: string
-    amountIn: number
-    amountOut: number
+    amountIn: string
+    amountOut: string
     swapTxHash: string
     transferTxHash?: string
     completedAt: string
-    smartwalletContext?: Record<string, unknown>
+    smartWalletContext?: {
+      smartWalletAddress: string
+      managedWalletAddress: string
+    }
     swapMetrics?: {
       executionTime: number
-      slippage: number
+      gasUsed: string
+      slippage: string
     }
   }
 }
 
 /** Swap failed event */
-export interface SwapsFailedEvent extends WebhookEventBase {
-  eventType: 'swaps.failed'
+export interface SwapFailedEvent extends WebhookEventBase {
+  eventType: 'swap.failed'
   data: {
-    userId: string
-    requestId: string
+    walletAddress: string
+    owner: string
     sellToken: string
     buyToken: string
-    amountIn: number
+    amountIn: string
     failedAt: string
-    reason: string
+    error: {
+      code: string
+      message: string
+    }
     retryable: boolean
-    errorCode?: string
+    metadata?: {
+      attemptNumber: number
+      pool: string
+    }
   }
 }
 
-/** Vault return transfer confirmed event */
-export interface VaultReturnTransferConfirmedEvent extends WebhookEventBase {
-  eventType: 'vault.return.transfer.confirmed'
+/** Fintech virtual account deposit received event */
+export interface FintechVirtualAccountDepositReceivedEvent extends WebhookEventBase {
+  eventType: 'fintech.virtual_account.deposit.received'
   data: {
-    transferId: string
-    vaultReturnId: string
+    depositId: string
+    virtualAccount: {
+      accountNumber: string
+      accountName: string
+    }
+    deposit: {
+      amount: number
+      currency: string
+      reference: string
+    }
+    depositor: {
+      name: string
+      accountNumber: string
+      bankName: string
+      bankCode: string
+    }
+    metadata: {
+      provider: string
+      receivedAt: string
+    }
+  }
+}
+
+/** Fintech user deposit received event */
+export interface FintechUserDepositReceivedEvent extends WebhookEventBase {
+  eventType: 'fintech.user.deposit.received'
+  data: {
+    depositId: string
+    virtualAccount: {
+      accountNumber: string
+      accountName: string
+    }
+    deposit: {
+      amount: number
+      currency: string
+      reference: string
+    }
+    depositor: {
+      name: string
+      accountNumber: string
+      bankName: string
+      bankCode: string
+    }
+    metadata: {
+      provider: string
+      receivedAt: string
+    }
+  }
+}
+
+/** Fintech user deposit funding completed event */
+export interface FintechUserDepositFundingCompletedEvent extends WebhookEventBase {
+  eventType: 'fintech.user.deposit.funding.completed'
+  data: {
+    depositId: string
+    amount: string
+    currency: string
+    transactionReference: string
+    smartWalletAddress: string
+    transactionHash: string
+    depositor: {
+      accountNumber: string
+      accountName: string
+      bankCode: string
+      bankName: string
+    }
+    bvnVerified: boolean
+    completedAt: string
+  }
+}
+
+/** Fintech user deposit refunded event */
+export interface FintechUserDepositRefundedEvent extends WebhookEventBase {
+  eventType: 'fintech.user.deposit.refunded'
+  data: {
+    depositId: string
     amount: number
+    currency: string
+    transactionReference: string
+    refundReference: string
+    refundReason: string
+    accountType: string
+    depositor: {
+      accountNumber: string
+      accountName: string
+      bankCode: string
+      bankName: string
+    }
+    bvnVerification: {
+      isMatch: boolean
+      confidenceScore: number
+      rejectionReasons: string[]
+    }
+    refundedAt: string
+    metadata: Record<string, unknown>
+  }
+}
+
+/** Fintech asset transfer completed event */
+export interface FintechAssetTransferCompletedEvent extends WebhookEventBase {
+  eventType: 'fintech.asset.transfer.completed'
+  data: {
+    smartWalletAddress: string
+    destinationAddress: string
+    destinationLabel?: string
+    amount: string
+    ticker: string
     tokenAddress: string
     transactionHash: string
-    confirmedAt: string
     blockNumber: number
-    network: StablesrailNetwork
-  }
-}
-
-/** Vault return payout completed event */
-export interface VaultReturnPayoutCompletedEvent extends WebhookEventBase {
-  eventType: 'vault.return.payout.completed'
-  data: {
-    payoutId: string
-    vaultReturnId: string
-    amount: number
-    recipientAccountNumber: string
-    recipientBankCode: string
-    transactionReference: string
+    gasUsed: string
+    commitmentsSafeguarded?: {
+      activeOrders: number
+      activeEscrows: number
+      totalCommitted: string
+      remainingBalance: string
+    }
+    note?: string
     completedAt: string
-    currency: StablesrailCurrency
   }
 }
 
-/** Vault return payout failed event */
-export interface VaultReturnPayoutFailedEvent extends WebhookEventBase {
-  eventType: 'vault.return.payout.failed'
+/** Fintech asset transfer failed event */
+export interface FintechAssetTransferFailedEvent extends WebhookEventBase {
+  eventType: 'fintech.asset.transfer.failed'
   data: {
-    payoutId: string
-    vaultReturnId: string
-    amount: number
-    recipientAccountNumber: string
-    recipientBankCode: string
+    error: string
     failedAt: string
-    reason: string
-    retryable: boolean
-    errorCode?: string
+  }
+}
+
+/** Fintech user asset transfer completed event */
+export interface FintechUserAssetTransferCompletedEvent extends WebhookEventBase {
+  eventType: 'fintech.user.asset.transfer.completed'
+  data: {
+    smartWalletAddress: string
+    destinationAddress: string
+    amount: string
+    ticker: string
+    tokenAddress: string
+    network: string
+    transactionHash: string
+    blockNumber: string
+    gasUsed: string
+    completedAt: string
+  }
+}
+
+/** Fintech user asset transfer failed event */
+export interface FintechUserAssetTransferFailedEvent extends WebhookEventBase {
+  eventType: 'fintech.user.asset.transfer.failed'
+  data: {
+    smartWalletAddress: string
+    destinationAddress: string
+    amount: string
+    ticker: string
+    tokenAddress: string
+    network: string
+    error: string
+    failedAt: string
+  }
+}
+
+/** Fintech offramp initiated event */
+export interface FintechOfframpInitiatedEvent extends WebhookEventBase {
+  eventType: 'fintech.offramp.initiated'
+  data: {
+    amount: number
+    currency: string
+    status: string
+    bankAccount: {
+      accountNumber: string
+      accountName: string
+      bankName: string
+    }
+    wallet: {
+      source: string
+      address: string
+      network: string
+    }
+    metadata: {
+      description: string
+      initiatedBy: string
+    }
+  }
+}
+
+/** Fintech offramp transfer completed event */
+export interface FintechOfframpTransferCompletedEvent extends WebhookEventBase {
+  eventType: 'fintech.offramp.transfer.completed'
+  data: {
+    amount: number
+    currency: string
+    status: string
+    burnDetails: {
+      txHash: string
+      status: string
+      cNgnAmount: number
+      blockNumber: number
+      confirmations: number
+    }
+    metadata: {
+      gasUsed: string
+      transferredAt: string
+    }
+  }
+}
+
+/** Fintech offramp payout initiated event */
+export interface FintechOfframpPayoutInitiatedEvent extends WebhookEventBase {
+  eventType: 'fintech.offramp.payout.initiated'
+  data: {
+    amount: number
+    currency: string
+    status: string
+    bankAccount: {
+      accountNumber: string
+      accountName: string
+      bankName: string
+      bankCode: string
+    }
+    payoutDetails: {
+      reference: string
+      provider: string
+      status: string
+    }
+    metadata: {
+      payoutInitiatedAt: string
+    }
+  }
+}
+
+/** Fintech offramp completed event */
+export interface FintechOfframpCompletedEvent extends WebhookEventBase {
+  eventType: 'fintech.offramp.completed'
+  data: {
+    amount: number
+    currency: string
+    status: string
+    bankAccount: {
+      accountNumber: string
+      accountName: string
+      bankName: string
+    }
+    wallet: {
+      source: string
+      address: string
+      network: string
+    }
+    burnDetails: {
+      txHash: string
+      status: string
+      cNgnAmount: number
+    }
+    payoutDetails: {
+      reference: string
+      provider: string
+      status: string
+    }
+    completedAt: string
+    metadata: {
+      processingTime: number
+    }
+  }
+}
+
+/** Fintech offramp failed event */
+export interface FintechOfframpFailedEvent extends WebhookEventBase {
+  eventType: 'fintech.offramp.failed'
+  data: {
+    amount: number
+    currency: string
+    status: string
+    bankAccount: {
+      accountNumber: string
+      accountName: string
+      bankName: string
+    }
+    wallet: {
+      source: string
+      address: string
+      network: string
+    }
+    burnDetails?: {
+      txHash: string
+      status: string
+      cNgnAmount: number
+    }
+    error: {
+      message: string
+      code: string
+    }
+    timestamp: string
+    metadata: {
+      failedAt: string
+      retryable: boolean
+      attemptNumber: number
+    }
   }
 }
 
 /** Union type of all webhook events */
 export type WebhookEvent =
-  | UserOtpSendCompletedEvent
   | VirtualAccountCreatedEvent
   | PaymentsConfirmedEvent
-  | WalletFundingSuccessEvent
-  | SwapsCompletedEvent
-  | SwapsFailedEvent
-  | VaultReturnTransferConfirmedEvent
-  | VaultReturnPayoutCompletedEvent
-  | VaultReturnPayoutFailedEvent
+  | WalletFundingCompletedEvent
+  | SwapCompletedEvent
+  | SwapFailedEvent
+  | FintechVirtualAccountDepositReceivedEvent
+  | FintechUserDepositReceivedEvent
+  | FintechUserDepositFundingCompletedEvent
+  | FintechUserDepositRefundedEvent
+  | FintechAssetTransferCompletedEvent
+  | FintechAssetTransferFailedEvent
+  | FintechUserAssetTransferCompletedEvent
+  | FintechUserAssetTransferFailedEvent
+  | FintechOfframpInitiatedEvent
+  | FintechOfframpTransferCompletedEvent
+  | FintechOfframpPayoutInitiatedEvent
+  | FintechOfframpCompletedEvent
+  | FintechOfframpFailedEvent
 
 /** All possible webhook event type strings */
 export type WebhookEventType = WebhookEvent['eventType']
 
 /** Webhook event type constants */
 export const WEBHOOK_EVENT_TYPES = {
-  USER_OTP_SEND_COMPLETED: 'user.otp.send.completed',
   VIRTUAL_ACCOUNT_CREATED: 'virtual.account.created',
   PAYMENTS_CONFIRMED: 'payments.confirmed',
-  WALLET_FUNDING_SUCCESS: 'wallet.funding.success',
-  SWAPS_COMPLETED: 'swaps.completed',
-  SWAPS_FAILED: 'swaps.failed',
-  VAULT_RETURN_TRANSFER_CONFIRMED: 'vault.return.transfer.confirmed',
-  VAULT_RETURN_PAYOUT_COMPLETED: 'vault.return.payout.completed',
-  VAULT_RETURN_PAYOUT_FAILED: 'vault.return.payout.failed',
+  WALLET_FUNDING_COMPLETED: 'wallet.funding.completed',
+  SWAP_COMPLETED: 'swap.completed',
+  SWAP_FAILED: 'swap.failed',
+  FINTECH_VA_DEPOSIT_RECEIVED: 'fintech.virtual_account.deposit.received',
+  FINTECH_USER_DEPOSIT_RECEIVED: 'fintech.user.deposit.received',
+  FINTECH_USER_DEPOSIT_FUNDING_COMPLETED: 'fintech.user.deposit.funding.completed',
+  FINTECH_USER_DEPOSIT_REFUNDED: 'fintech.user.deposit.refunded',
+  FINTECH_ASSET_TRANSFER_COMPLETED: 'fintech.asset.transfer.completed',
+  FINTECH_ASSET_TRANSFER_FAILED: 'fintech.asset.transfer.failed',
+  FINTECH_USER_ASSET_TRANSFER_COMPLETED: 'fintech.user.asset.transfer.completed',
+  FINTECH_USER_ASSET_TRANSFER_FAILED: 'fintech.user.asset.transfer.failed',
+  FINTECH_OFFRAMP_INITIATED: 'fintech.offramp.initiated',
+  FINTECH_OFFRAMP_TRANSFER_COMPLETED: 'fintech.offramp.transfer.completed',
+  FINTECH_OFFRAMP_PAYOUT_INITIATED: 'fintech.offramp.payout.initiated',
+  FINTECH_OFFRAMP_COMPLETED: 'fintech.offramp.completed',
+  FINTECH_OFFRAMP_FAILED: 'fintech.offramp.failed',
 } as const
 
 // ============================================================================

@@ -170,7 +170,7 @@ function generateExampleRequest() {
   
   const signature = generateWebhookSignature(TEST_RAW_BODY, TEST_TIMESTAMP, TEST_SECRET)
   
-  console.log('POST /api/stablesrail/webhook')
+  console.log('POST /api/sr/webhook')
   console.log('Headers:')
   console.log(`  X-Traycer-Signature: ${signature}`)
   console.log(`  X-Traycer-Timestamp: ${TEST_TIMESTAMP}`)

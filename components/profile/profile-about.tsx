@@ -1484,7 +1484,7 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
   ];
 
   async function submitBvnForOnboarding(bvnValue: string) {
-    const res = await fetch("/api/stablesrail/onboard-user", {
+    const res = await fetch("/api/sr/onboard-user", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -1639,7 +1639,7 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
     async function fetchBanks() {
       setIsLoadingAccountBanks(true)
       try {
-        const res = await fetch("/api/stablesrail/get-bank-codes", {
+        const res = await fetch("/api/sr/get-bank-codes", {
           credentials: 'include'
         })
         const data = await res.json()
@@ -1727,7 +1727,7 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
         const effectiveSrUserId = resolvedSrUserId || profile.sr_user_id || null
 
         if (bvnOnboardRequestId && !effectiveSrUserId) {
-          const onboardStatusRes = await fetch("/api/stablesrail/onboard-status", {
+          const onboardStatusRes = await fetch("/api/sr/onboard-status", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             credentials: "include",
@@ -1760,7 +1760,7 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
         const srUserIdForWallets = resolvedSrUserId || profile.sr_user_id || null
 
         // First, try to fetch from database
-        const dbRes = await fetch("/api/stablesrail/wallet-address", {
+        const dbRes = await fetch("/api/sr/wallet-address", {
           credentials: 'include'
         })
         
@@ -1808,7 +1808,7 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
         // If no wallets in DB, check if user has Stablesrail ID
         if (srUserIdForWallets) {
           // Call Stablesrail to get wallets
-          const stablesrailRes = await fetch("/api/stablesrail/list-user-wallets", {
+          const stablesrailRes = await fetch("/api/sr/list-user-wallets", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ userId: srUserIdForWallets }),
@@ -1820,7 +1820,7 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
             
             if (stablesrailData.success && stablesrailData.data?.wallets && Array.isArray(stablesrailData.data.wallets) && stablesrailData.data.wallets.length > 0) {
               // Save wallets to database
-              const saveRes = await fetch("/api/stablesrail/save-wallets", {
+              const saveRes = await fetch("/api/sr/save-wallets", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ wallets: stablesrailData.data.wallets }),
@@ -2240,7 +2240,7 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
     setIsVerifyingOtp(true);
     setOtpErrorMsg("");
     try {
-      const res = await fetch("/api/stablesrail/verify-otp", {
+      const res = await fetch("/api/sr/verify-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -3490,7 +3490,7 @@ export function ProfileAbout({ profile, isCurrentUser = false, initialSection }:
                     setOtpError("");
                     try {
                       const phoneToUse = walletPhoneNumber || profile.phone_number;
-                      const res = await fetch("/api/stablesrail/verify-otp", {
+                      const res = await fetch("/api/sr/verify-otp", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({

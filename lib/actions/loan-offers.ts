@@ -63,6 +63,15 @@ export async function createLoanOfferFromSearchAlert(input: {
       return { success: false, error: helperError || new Error("Lender profile not found") }
     }
 
+    // Fetch lender username
+    const { data: lenderProfile } = await adminClient
+      .from("profiles")
+      .select("username")
+      .eq("id", input.lenderUserId)
+      .maybeSingle()
+
+    const lenderUsername = lenderProfile?.username || "lender"
+
     const { data: settings, error: settingsError } = await adminClient
       .from("loan_helper_settings")
       .select("loan_amount, interest_rate, repayment_time, repayment_unit")
@@ -86,7 +95,7 @@ export async function createLoanOfferFromSearchAlert(input: {
       .insert({
         id: offerId,
         user_id: borrowerId,
-        helper_id: helper.id,
+        helper_id: helper.user_id,
         amount,
         interest_rate: interestRate,
         duration_months: duration,
@@ -108,12 +117,8 @@ export async function createLoanOfferFromSearchAlert(input: {
       userId: borrowerId,
       actorId: input.lenderUserId,
       type: "loan_offer",
-      content: `${helper.name || "A lender"} sent you a loan offer. Review the terms before you decide.`,
+      content: `@${lenderUsername} sent you a loan offer. Review the terms before you decide.`,
       data: {
-        loanRequestId: offerId,
-        lenderId: input.lenderUserId,
-        lenderName: helper.name || "A lender",
-        lenderImageUrl: helper.profile_image_url,
         amount,
         interestRate,
         duration,
@@ -121,7 +126,6 @@ export async function createLoanOfferFromSearchAlert(input: {
         purpose,
         subscriptionId: input.subscriptionId,
         deliveryEntityId: input.deliveryEntityId,
-        targetPath: offerPath,
       },
     })
 
@@ -252,15 +256,10 @@ export async function respondToLoanOffer(input: {
         type: eventType,
         content: description,
         data: {
-          loanRequestId: input.loanRequestId,
-          borrowerId: input.userId,
-          lenderId: lenderUserId,
-          lenderName: offer.loan_helpers?.name || "A lender",
           amount: offer.amount,
           interestRate: offer.interest_rate,
           duration: offer.duration_months,
           durationUnit: (offer as any).duration_unit || "months",
-          targetPath: `/loan-offers/${input.loanRequestId}`,
         },
       })
 

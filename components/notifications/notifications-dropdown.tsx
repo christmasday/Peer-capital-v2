@@ -23,9 +23,10 @@ interface NotificationsDropdownProps {
   open?: boolean
   onOpenChange?: (open: boolean) => void
   onNotificationRead?: () => void
+  onCountChange?: (count: number) => void
 }
 
-export function NotificationsDropdown({ open, onOpenChange, onNotificationRead }: NotificationsDropdownProps = {}) {
+export function NotificationsDropdown({ open, onOpenChange, onNotificationRead, onCountChange }: NotificationsDropdownProps = {}) {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -103,11 +104,11 @@ export function NotificationsDropdown({ open, onOpenChange, onNotificationRead }
   return (
     <DropdownMenu open={open !== undefined ? open : isOpen} onOpenChange={handleOpenChange}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative group transition-all">
-          <NotificationBadge />
+        <Button variant="ghost" size="icon" className="relative transition-all">
+          <NotificationBadge onCountChange={onCountChange} />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-80">
+      <DropdownMenuContent align="end" className="w-[380px]">
         <div className="flex items-center justify-between p-4">
           <h3 className="font-medium">Notifications</h3>
           {unreadCount > 0 && (
@@ -128,7 +129,7 @@ export function NotificationsDropdown({ open, onOpenChange, onNotificationRead }
           )}
         </div>
         <DropdownMenuSeparator />
-        <ScrollArea className="h-[300px]">
+        <ScrollArea className="h-[400px]">
           {loading ? (
             <div className="flex items-center justify-center p-4">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />

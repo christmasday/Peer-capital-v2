@@ -165,7 +165,7 @@ export function ProfileTabs({ initialTab = "about", aboutContent, currentUserId,
 
       {mountedTabs["contacts"] && (
         <div role="tabpanel" hidden={activeTab !== "contacts"}>
-          <ContactsList />
+          <ContactsList currentUserId={currentUserId} />
         </div>
       )}
 

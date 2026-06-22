@@ -46,11 +46,11 @@ export function NotificationsClient() {
   }
 
   useEffect(() => {
-    fetchNotifications(activeTab === "all")
-  }, [activeTab])
+    fetchNotifications(true)
+  }, [])
 
   useNotificationRealtime(() => {
-    fetchNotifications(activeTab === "all")
+    fetchNotifications(true)
   })
 
   const handleMarkAllAsRead = async () => {
@@ -61,7 +61,7 @@ export function NotificationsClient() {
           title: "Success",
           description: "All notifications marked as read.",
         })
-        fetchNotifications(activeTab === "all")
+        fetchNotifications(true)
       } else {
         toast({
           title: "Error",
@@ -169,7 +169,7 @@ export function NotificationsClient() {
                 <NotificationItem
                   key={notification.id}
                   notification={notification}
-                  onUpdate={() => fetchNotifications(activeTab === "all")}
+                  onUpdate={() => fetchNotifications(true)}
                 />
               ))}
             </div>

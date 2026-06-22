@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { checkAuth } from "@/lib/auth-utils"
 
 /**
- * @deprecated Use /api/stablesrail/cngn-request-status instead.
+ * @deprecated Use /api/sr/cngn-request-status instead.
  * This endpoint is kept for backward compatibility and proxies to the canonical endpoint.
  */
 export async function GET(req: NextRequest) {
@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Proxy to the canonical cngn-request-status endpoint
-    const canonicalUrl = new URL("/api/stablesrail/cngn-request-status", req.url)
+    const canonicalUrl = new URL("/api/sr/cngn-request-status", req.url)
     canonicalUrl.searchParams.set("correlationId", correlationId)
 
     // Forward cookies for auth

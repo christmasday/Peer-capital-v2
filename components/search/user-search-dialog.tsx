@@ -14,6 +14,7 @@ import { searchUsers } from "@/lib/actions/search"
 type UserSearchDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
+  onUserSelect?: (userId: string) => void
 }
 
 type UserSearchResult = {
@@ -23,7 +24,7 @@ type UserSearchResult = {
   avatarUrl: string | null
 }
 
-export function UserSearchDialog({ open, onOpenChange }: UserSearchDialogProps) {
+export function UserSearchDialog({ open, onOpenChange, onUserSelect }: UserSearchDialogProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [results, setResults] = useState<UserSearchResult[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -73,8 +74,12 @@ export function UserSearchDialog({ open, onOpenChange }: UserSearchDialogProps) 
   }
 
   const handleResultClick = (userId: string) => {
-    router.push(`/profile/${userId}`)
-    onOpenChange(false)
+    if (onUserSelect) {
+      onUserSelect(userId)
+    } else {
+      router.push(`/profile/${userId}`)
+      onOpenChange(false)
+    }
   }
 
   const getInitials = (name: string) => {

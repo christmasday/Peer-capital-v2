@@ -125,10 +125,10 @@ export default async function UserProfilePage({
 
   const user = userProfile.user
 
-  // Fetch all loan requests for the 'Loan Requests' tab
+  // Fetch loan requests for the profile user
   let allLoanRequests: any[] = []
   if (activeTab === "loan-requests") {
-    const allLoanReqResult = await getAllLoanRequests()
+    const allLoanReqResult = await getAllLoanRequests(userId)
     allLoanRequests = allLoanReqResult.loanRequests || []
   }
 

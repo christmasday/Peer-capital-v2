@@ -67,18 +67,23 @@ function normalizeLenderCard(helper: any, fallbackRating = 4.5): LenderCardData 
 }
 
 function normalizeBorrowerCard(borrower: any, fallbackRating = 4.5): LenderCardData {
+  const loansTakenCount = Number(borrower.loans_taken_count ?? 0)
+  const totalAmountTaken = Number(borrower.total_amount_taken ?? 0)
+  const avgTenorMonths = Number(borrower.avg_tenor_months ?? 0)
+  const repaymentRate = Number(borrower.repayment_rate ?? 0)
+
   return {
     id: String(borrower.id),
     name: String(borrower.name ?? "Borrower"),
-    interestRate: Number(borrower.expected_interest_rate ?? 0),
-    maxLoanAmount: Number(borrower.requested_amount ?? 0),
-    loanAmount: Number(borrower.requested_amount ?? 0),
-    loanIssued: 0,
-    amountIssued: 0,
+    interestRate: repaymentRate,
+    maxLoanAmount: totalAmountTaken || Number(borrower.requested_amount ?? 0),
+    loanAmount: totalAmountTaken || Number(borrower.requested_amount ?? 0),
+    loanIssued: loansTakenCount,
+    amountIssued: totalAmountTaken,
     profileImage: String(borrower.profile_image_url ?? "/vibrant-street-market.png"),
     rating: Number(borrower.rating ?? fallbackRating),
-    repaymentTime: Number(borrower.requested_duration ?? 0),
-    repaymentUnit: borrower.requested_duration_unit ?? "months",
+    repaymentTime: avgTenorMonths,
+    repaymentUnit: "months",
   }
 }
 
@@ -107,7 +112,7 @@ const LoanRequestForm = ({
         value={loanAmount}
         onChange={(e) => setLoanAmount(e.target.value)}
         type="number"
-        min="1000"
+        min="10000"
         max={loanLimits?.borrowerMaxAmount}
         aria-invalid={Boolean(amountError)}
       />
@@ -223,9 +228,8 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
   const [virtualAccountDetails, setVirtualAccountDetails] = useState<any>(null)
   const [isPollingVA, setIsPollingVA] = useState(false)
   const [virtualAccountError, setVirtualAccountError] = useState<string | null>(null)
-  const [vaRetryCount, setVaRetryCount] = useState(0)
-  const VA_MAX_RETRIES = 3
   const [hasConfirmedTransfer, setHasConfirmedTransfer] = useState(false)
+  const vaEventSourceRef = useRef<EventSource | null>(null)
   const [isPollingCompletion, setIsPollingCompletion] = useState(false)
   const [fundingCompleted, setFundingCompleted] = useState(false)
   const [onrampWalletAddress, setOnrampWalletAddress] = useState<string | null>(null)
@@ -272,7 +276,7 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
 
         // Fetch BASE wallet balance if wallet address exists
         try {
-          const walletResponse = await fetch('/api/stablesrail/wallet-address', {
+          const walletResponse = await fetch('/api/sr/wallet-address', {
             credentials: 'include'
           })
           
@@ -318,6 +322,15 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
 
     return () => {
       cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (vaEventSourceRef.current) {
+        vaEventSourceRef.current.close()
+        vaEventSourceRef.current = null
+      }
     }
   }, [])
 
@@ -723,6 +736,9 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
     if (Number.isNaN(parsedLoanAmount) || parsedLoanAmount === undefined || parsedLoanAmount <= 0) {
       return "Enter a valid amount"
     }
+    if (parsedLoanAmount < 10000) {
+      return "Minimum amount is ₦10,000"
+    }
     if (loanLimitsLoading) {
       return null
     }
@@ -782,157 +798,82 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
   }
 
   const normalizeBorrowerCard = (borrower: any, fallbackRating = 4.5): LenderCardData => {
+    const loansTakenCount = Number(borrower.loans_taken_count ?? 0)
+    const totalAmountTaken = Number(borrower.total_amount_taken ?? 0)
+    const avgTenorMonths = Number(borrower.avg_tenor_months ?? 0)
+    const repaymentRate = Number(borrower.repayment_rate ?? 0)
+
     return {
       id: String(borrower.id),
       name: String(borrower.name ?? "Borrower"),
-      interestRate: Number(borrower.expected_interest_rate ?? 0),
-      maxLoanAmount: Number(borrower.requested_amount ?? 0),
-      loanAmount: Number(borrower.requested_amount ?? 0),
-      loanIssued: 0,
-      amountIssued: 0,
+      interestRate: repaymentRate,
+      maxLoanAmount: totalAmountTaken || Number(borrower.requested_amount ?? 0),
+      loanAmount: totalAmountTaken || Number(borrower.requested_amount ?? 0),
+      loanIssued: loansTakenCount,
+      amountIssued: totalAmountTaken,
       profileImage: String(borrower.profile_image_url ?? "/vibrant-street-market.png"),
       rating: Number(borrower.rating ?? fallbackRating),
-      repaymentTime: Number(borrower.requested_duration ?? 0),
-      repaymentUnit: borrower.requested_duration_unit ?? "months",
+      repaymentTime: avgTenorMonths,
+      repaymentUnit: "months",
     }
   }
 
-  const pollVirtualAccount = async (requestId: string) => {
-    // Prevent multiple polling instances
-    if (isPollingVA) {
-      console.warn('Polling already in progress, skipping duplicate call')
-      return
+  const waitForVirtualAccount = (requestId: string) => {
+    if (vaEventSourceRef.current) {
+      vaEventSourceRef.current.close()
     }
-    
-    let attempts = 0
-    const maxAttempts = 10 // Poll for up to 30 seconds (10 * 3 seconds)
-    let lastError: string | null = null
-    
-    setIsPollingVA(true)
-    console.log(`[pollVirtualAccount] Starting to poll for requestId: ${requestId}`)
-    
-    const poll = async () => {
-      attempts++
-      console.log(`[pollVirtualAccount] Attempt ${attempts}/${maxAttempts} for requestId: ${requestId}`)
-      
-      if (attempts > maxAttempts) {
-        console.log(`[pollVirtualAccount] Max attempts reached, stopping polling`)
-        setIsPollingVA(false)
-        // If automatic retries remain, schedule another poll
-        if (vaRetryCount < VA_MAX_RETRIES) {
-          const nextRetry = vaRetryCount + 1
-          setVaRetryCount(nextRetry)
-          console.log(`[pollVirtualAccount] Scheduling automatic retry ${nextRetry}/${VA_MAX_RETRIES}`)
-          toast({
-            title: 'Retrying Virtual Account Generation',
-            description: `Attempt ${nextRetry} of ${VA_MAX_RETRIES}...`,
-          })
-          setTimeout(() => {
-            setVirtualAccountError(null)
-            pollVirtualAccount(requestId)
-          }, 2000)
-          return
-        }
 
-        // No retries left — surface final timeout
+    setIsPollingVA(true)
+    setVirtualAccountError(null)
+
+    const eventSource = new EventSource(`/api/sr/va-sse?requestId=${encodeURIComponent(requestId)}`)
+    vaEventSourceRef.current = eventSource
+
+    eventSource.addEventListener("connected", () => {
+      console.log("[SSE] Connected, watching for virtual account...")
+    })
+
+    eventSource.addEventListener("virtual-account-ready", (event) => {
+      try {
+        const data = JSON.parse(event.data)
+        setVirtualAccountDetails(data)
+        setVirtualAccountError(null)
+        toast({
+          title: "Virtual Account Ready",
+          description: "Your virtual account has been created. Use the details below to make a transfer.",
+        })
+      } catch (err) {
+        console.error("[SSE] Error parsing VA data:", err)
+      } finally {
+        setIsPollingVA(false)
+        eventSource.close()
+        vaEventSourceRef.current = null
+      }
+    })
+
+    eventSource.addEventListener("timeout", (event) => {
+      try {
+        const data = JSON.parse(event.data)
+        setVirtualAccountError(data.message)
         toast({
           title: "Virtual Account Generation Timeout",
-          description: lastError || "Virtual account is taking longer than expected. Please try again later.",
-          variant: "destructive"
+          description: data.message,
+          variant: "destructive",
         })
-        setVirtualAccountError(lastError)
-        return
+      } finally {
+        setIsPollingVA(false)
+        eventSource.close()
+        vaEventSourceRef.current = null
       }
-      
-      try {
-        console.log(`[pollVirtualAccount] Calling /api/stablesrail/virtual-account with requestId: ${requestId}`)
-        const response = await fetch('/api/stablesrail/virtual-account', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ requestId }),
-          credentials: 'include'
-        })
-        
-        console.log(`[pollVirtualAccount] Response status: ${response.status}, ok: ${response.ok}`)
-        const data = await response.json()
-        console.log(`[pollVirtualAccount] Response data:`, data)
-        
-        // If the response is a 4xx, this is likely a transient "not ready yet" state — retry automatically
-        if (!response.ok && response.status >= 400 && response.status < 500) {
-          lastError = data.error || data.message || data.details?.error || `HTTP ${response.status}`
-          const friendly = `Virtual account not ready yet — retrying automatically (attempt ${attempts}/${maxAttempts})...`
-          setVirtualAccountError(friendly)
-          console.log(`[pollVirtualAccount] Received ${response.status} — will retry immediately (short delay). Error: ${lastError}`)
-          // Immediate short retry (500ms) to reduce wait when backend returns quick 4xx
-          if (attempts < maxAttempts) {
-            setTimeout(() => poll(), 500)
-            return
-          }
-          // else fall through to exhaustion handling below
-        }
+    })
 
-        if (response.ok && data.success && data.data?.virtualAccount) {
-          // VA details are available
-          console.log(`[pollVirtualAccount] Virtual account found!`, data.data)
-          setVirtualAccountDetails(data.data)
-          setVirtualAccountError(null)
-          setIsPollingVA(false)
-          return
-        }
-
-        // Capture last error but continue polling until maxAttempts
-        lastError = data.error || data.message || data.details?.error || lastError || "Virtual account not ready yet. Still checking..."
-        // Show a friendly retrying message with attempt counts so user understands we're retrying
-        const friendly = `Virtual account not ready yet — still checking (attempt ${attempts}/${maxAttempts})...`
-        setVirtualAccountError(friendly)
-        console.log(`[pollVirtualAccount] VA not ready yet. Error: ${lastError}. Will continue polling...`)
-
-        if (attempts < maxAttempts) {
-          setTimeout(() => {
-            poll()
-          }, 3000) // Poll every 3 seconds
-        } // else handled at top of loop
-      } catch (error) {
-        console.error('[pollVirtualAccount] Error polling VA:', error)
-        lastError = error instanceof Error ? error.message : 'Network error while polling virtual account.'
-        // Show friendly retrying message if we will retry
-        if (attempts < maxAttempts) {
-          const friendly = `Network error while checking virtual account — retrying (attempt ${attempts + 1}/${maxAttempts})...`
-          setVirtualAccountError(friendly)
-          console.log(`[pollVirtualAccount] Network error, scheduling next poll in 3 seconds (attempt ${attempts + 1}/${maxAttempts})`)
-          setTimeout(() => {
-            console.log(`[pollVirtualAccount] Executing scheduled poll after error (attempt ${attempts + 1})`)
-            poll()
-          }, 3000)
-        } else {
-          console.log(`[pollVirtualAccount] Max attempts reached after error, stopping polling`)
-          setIsPollingVA(false)
-          // If retries remain, schedule automatic retry
-          if (vaRetryCount < VA_MAX_RETRIES) {
-            const nextRetry = vaRetryCount + 1
-            setVaRetryCount(nextRetry)
-            toast({
-              title: 'Retrying Virtual Account Generation',
-              description: `Attempt ${nextRetry} of ${VA_MAX_RETRIES} after error...`,
-            })
-            setTimeout(() => {
-              setVirtualAccountError(null)
-              pollVirtualAccount(requestId)
-            }, 2000)
-            return
-          }
-
-          setVirtualAccountError(lastError)
-          toast({
-            title: "Virtual Account Error",
-            description: lastError || "Failed to check virtual account status. Please try again.",
-            variant: "destructive"
-          })
-        }
+    eventSource.onerror = () => {
+      if (eventSource.readyState === EventSource.CLOSED) {
+        setVirtualAccountError("Connection lost. Please try again.")
+        setIsPollingVA(false)
+        vaEventSourceRef.current = null
       }
     }
-    
-    poll()
   }
 
   const handleFund = async () => {
@@ -962,14 +903,12 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
 
     try {
       // Call CNGN onramp with userId and amount
-      const response = await fetch('/api/stablesrail/cngn-onramp', {
+      const response = await fetch('/api/sr/cngn-onramp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: userProfile.profile.sr_user_id,
           amount: Number(fundAmount),
-          network: "BASE",
-          ownerid: ""
         }),
         credentials: 'include'
       })
@@ -981,18 +920,15 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
         
         // Store requestId and initial fee breakdown
         setFundingRequestId(requestId)
-        // Capture wallet address from onramp response if present — use this for status polling
+        // Capture wallet address from onramp response if present
         if (data.data.walletAddress) {
           setOnrampWalletAddress(data.data.walletAddress)
         } else if (data.data.walletAddresses?.base_address) {
           setOnrampWalletAddress(data.data.walletAddresses.base_address)
         }
-        // Clear any previous VA error and reset retry counter, then wait 4 seconds before polling
+        // Start SSE connection to wait for virtual account webhook
         setVirtualAccountError(null)
-        setVaRetryCount(0)
-        await sleep(4000)
-        // Start polling for VA details (will retry automatically up to VA_MAX_RETRIES)
-        pollVirtualAccount(requestId)
+        waitForVirtualAccount(requestId)
         
         toast({
           title: "Funding Request Initiated",
@@ -1065,7 +1001,7 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
       
       try {
         // Poll /cngnrampstatus endpoint with wallet address and request ID
-        const response = await fetch('/api/stablesrail/cngn-ramp-status', {
+        const response = await fetch('/api/sr/cngn-ramp-status', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ walletAddress }),
@@ -1145,7 +1081,7 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
       
       try {
         const response = await fetch(
-          `/api/stablesrail/cngn-request-status?correlationId=${correlationId}`,
+          `/api/sr/cngn-request-status?correlationId=${correlationId}`,
           { credentials: 'include' }
         )
         
@@ -1171,7 +1107,7 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
               })
               
               // Refresh balance after successful funding
-              const walletResponse = await fetch('/api/stablesrail/wallet-address', {
+              const walletResponse = await fetch('/api/sr/wallet-address', {
                 credentials: 'include'
               })
               if (walletResponse.ok) {
@@ -1207,7 +1143,7 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
       const cngnContract = process.env.NEXT_PUBLIC_CNGN_CONTRACT_ADDRESS || process.env.CNGN_CONTRACT_ADDRESS || ''
       const contractQuery = cngnContract ? `&contract=${encodeURIComponent(cngnContract)}` : ''
       const response = await fetch(
-        `/api/stablesrail/base-balance?address=${encodeURIComponent(baseAddress)}${contractQuery}`,
+        `/api/sr/base-balance?address=${encodeURIComponent(baseAddress)}${contractQuery}`,
         { credentials: 'include' }
       )
       
@@ -1275,7 +1211,7 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
 
     try {
       // Call the CNGN offramp API with the correct payload structure
-      const response = await fetch('/api/stablesrail/cngn-offramp', {
+      const response = await fetch('/api/sr/cngn-offramp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1512,6 +1448,7 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
                     repaymentTime={helper.repaymentTime}
                     repaymentUnit={helper.repaymentUnit}
                     currentUser={userProfile}
+                    isBorrowerResult={searchTab === "lender"}
                   />
                 ))}
               </div>
@@ -1560,6 +1497,10 @@ export function HomeContent({ userProfile, loanHelpers }: HomeContentProps) {
             setFundingCompleted(false)
             setIsPollingVA(false)
             setIsPollingCompletion(false)
+            if (vaEventSourceRef.current) {
+              vaEventSourceRef.current.close()
+              vaEventSourceRef.current = null
+            }
           }
         }}>
             <DialogContent className="max-w-md">

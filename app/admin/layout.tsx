@@ -18,7 +18,8 @@ import {
   LogOut,
   DollarSign,
   ArrowUpRight,
-  ArrowDownRight
+  ArrowDownRight,
+  FileText
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -36,6 +37,7 @@ interface AdminLayoutProps {
 const navigation = [
   { name: "Dashboard", href: "/admin/dashboard", icon: BarChart3 },
   { name: "Case Management", href: "/admin/cases", icon: ClipboardList },
+  { name: "Loan Requests", href: "/admin/loan-requests", icon: FileText },
   { name: "Users", href: "/admin/users", icon: Users },
   { name: "Onramp Requests", href: "/admin/onramp-requests", icon: ArrowUpRight },
   { name: "Offramp Requests", href: "/admin/offramp-requests", icon: ArrowDownRight },

@@ -60,7 +60,7 @@ export function DashboardOverview() {
       
       // Fetch virtual account from database via Stablesrail
       console.log("🏦 Fetching virtual account from database...")
-      const virtualAccountRes = await fetch("/api/stablesrail/virtual-account", {
+      const virtualAccountRes = await fetch("/api/sr/virtual-account", {
         credentials: 'include'
       })
       console.log("🏦 Virtual account response status:", virtualAccountRes.status)
