@@ -36,19 +36,20 @@ export async function POST(req: NextRequest) {
     const { data: latestFunding } = await admin
       .from('webhook_events')
       .select('payload, created_at')
-      .in('event_type', ['wallet.funding.success', 'payments.confirmed'])
+      .in('event_type', ['wallet.funding.completed', 'payments.confirmed'])
       .order('created_at', { ascending: false })
       .limit(20)
 
     if (latestFunding) {
       const match = latestFunding.find((evt: any) => {
         const p = typeof evt.payload === 'string' ? JSON.parse(evt.payload) : evt.payload
-        const addr = p?.data?.walletAddress || p?.walletAddress
+        // Handle both old format (flat) and new format (nested under payload key)
+        const addr = p?.data?.walletAddress || p?.walletAddress || p?.payload?.walletAddress || p?.payload?.data?.walletAddress
         return addr?.toLowerCase() === walletAddress?.toLowerCase()
       })
       if (match) {
-        const payload = typeof match.payload === 'string' ? JSON.parse(match.payload) : match.payload
-        return NextResponse.json({ success: true, data: { status: 'completed', ...payload } })
+        const p = typeof match.payload === 'string' ? JSON.parse(match.payload) : match.payload
+        return NextResponse.json({ success: true, data: { status: 'completed', ...p } })
       }
     }
 

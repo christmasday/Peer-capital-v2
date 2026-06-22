@@ -333,39 +333,29 @@ export const manageFeesSchema = z.object({
 export type ManageFeesInput = z.infer<typeof manageFeesSchema>
 
 // ============================================================================
-// Webhook Payload Schemas
+// Webhook Payload Schemas (Strails API v1.0)
 // ============================================================================
 
 /** Base webhook event schema */
 const webhookEventBaseSchema = z.object({
+  eventId: z.string(),
   eventType: z.string(),
   timestamp: z.string(),
   requestId: z.string().optional(),
+  fintechId: z.string(),
+  version: z.string(),
   userId: z.string().optional(),
-})
-
-/** User OTP send completed event schema */
-export const userOtpSendCompletedSchema = webhookEventBaseSchema.extend({
-  eventType: z.literal('user.otp.send.completed'),
-  data: z.object({
-    userId: z.string(),
-    otpId: z.string(),
-    completedAt: z.string(),
-    channel: z.enum(['sms', 'email']),
-  }),
 })
 
 /** Virtual account created event schema */
 export const virtualAccountCreatedSchema = webhookEventBaseSchema.extend({
   eventType: z.literal('virtual.account.created'),
   data: z.object({
-    userId: z.string(),
+    vaId: z.string(),
     accountNumber: z.string(),
-    accountName: z.string(),
     bankName: z.string(),
-    bankCode: z.string(),
-    currency: currencySchema,
-    createdAt: z.string().optional(),
+    accountName: z.string(),
+    createdAt: z.string(),
   }),
 })
 
@@ -374,135 +364,417 @@ export const paymentsConfirmedSchema = webhookEventBaseSchema.extend({
   eventType: z.literal('payments.confirmed'),
   data: z.object({
     txRef: z.string(),
-    userId: z.string(),
+    reference: z.string(),
     amount: z.number(),
-    currency: currencySchema,
-    accountNumber: z.string(),
+    currency: z.string(),
+    status: z.string(),
     confirmedAt: z.string(),
-    senderName: z.string().optional(),
-    narration: z.string().optional(),
+    paymentTimestamp: z.string(),
+    metadata: z.object({
+      vaId: z.string(),
+      provider: z.string(),
+      walletAddress: z.string(),
+    }),
   }),
 })
 
-/** Wallet funding success event schema */
-export const walletFundingSuccessSchema = webhookEventBaseSchema.extend({
-  eventType: z.literal('wallet.funding.success'),
+/** Wallet funding completed event schema */
+export const walletFundingCompletedSchema = webhookEventBaseSchema.extend({
+  eventType: z.literal('wallet.funding.completed'),
   data: z.object({
-    userId: z.string(),
-    amount: z.number(),
-    tokenAddress: z.string(),
+    walletAddress: z.string(),
+    amount: z.string(),
     transactionHash: z.string(),
     completedAt: z.string(),
-    fundingSource: z.string(),
-    walletAddress: z.string(),
-    network: networkSchema,
   }),
 })
 
-/** Swaps completed event schema */
-export const swapsCompletedSchema = webhookEventBaseSchema.extend({
-  eventType: z.literal('swaps.completed'),
+/** Swap completed event schema */
+export const swapCompletedSchema = webhookEventBaseSchema.extend({
+  eventType: z.literal('swap.completed'),
   data: z.object({
-    userId: z.string(),
-    requestId: z.string(),
+    walletAddress: z.string(),
+    owner: z.string(),
     sellToken: z.string(),
     buyToken: z.string(),
-    amountIn: z.number(),
-    amountOut: z.number(),
+    amountIn: z.string(),
+    amountOut: z.string(),
     swapTxHash: z.string(),
     transferTxHash: z.string().optional(),
     completedAt: z.string(),
-    smartwalletContext: z.record(z.unknown()).optional(),
+    smartWalletContext: z.object({
+      smartWalletAddress: z.string(),
+      managedWalletAddress: z.string(),
+    }).optional(),
     swapMetrics: z.object({
       executionTime: z.number(),
-      slippage: z.number(),
+      gasUsed: z.string(),
+      slippage: z.string(),
     }).optional(),
   }),
 })
 
-/** Swaps failed event schema */
-export const swapsFailedSchema = webhookEventBaseSchema.extend({
-  eventType: z.literal('swaps.failed'),
+/** Swap failed event schema */
+export const swapFailedSchema = webhookEventBaseSchema.extend({
+  eventType: z.literal('swap.failed'),
   data: z.object({
-    userId: z.string(),
-    requestId: z.string(),
+    walletAddress: z.string(),
+    owner: z.string(),
     sellToken: z.string(),
     buyToken: z.string(),
-    amountIn: z.number(),
+    amountIn: z.string(),
     failedAt: z.string(),
-    reason: z.string(),
+    error: z.object({
+      code: z.string(),
+      message: z.string(),
+    }),
     retryable: z.boolean(),
-    errorCode: z.string().optional(),
+    metadata: z.object({
+      attemptNumber: z.number(),
+      pool: z.string(),
+    }).optional(),
   }),
 })
 
-/** Vault return transfer confirmed event schema */
-export const vaultReturnTransferConfirmedSchema = webhookEventBaseSchema.extend({
-  eventType: z.literal('vault.return.transfer.confirmed'),
+/** Fintech virtual account deposit received event schema */
+export const fintechVirtualAccountDepositReceivedSchema = webhookEventBaseSchema.extend({
+  eventType: z.literal('fintech.virtual_account.deposit.received'),
   data: z.object({
-    transferId: z.string(),
-    vaultReturnId: z.string(),
+    depositId: z.string(),
+    virtualAccount: z.object({
+      accountNumber: z.string(),
+      accountName: z.string(),
+    }),
+    deposit: z.object({
+      amount: z.number(),
+      currency: z.string(),
+      reference: z.string(),
+    }),
+    depositor: z.object({
+      name: z.string(),
+      accountNumber: z.string(),
+      bankName: z.string(),
+      bankCode: z.string(),
+    }),
+    metadata: z.object({
+      provider: z.string(),
+      receivedAt: z.string(),
+    }),
+  }),
+})
+
+/** Fintech user deposit received event schema */
+export const fintechUserDepositReceivedSchema = webhookEventBaseSchema.extend({
+  eventType: z.literal('fintech.user.deposit.received'),
+  data: z.object({
+    depositId: z.string(),
+    virtualAccount: z.object({
+      accountNumber: z.string(),
+      accountName: z.string(),
+    }),
+    deposit: z.object({
+      amount: z.number(),
+      currency: z.string(),
+      reference: z.string(),
+    }),
+    depositor: z.object({
+      name: z.string(),
+      accountNumber: z.string(),
+      bankName: z.string(),
+      bankCode: z.string(),
+    }),
+    metadata: z.object({
+      provider: z.string(),
+      receivedAt: z.string(),
+    }),
+  }),
+})
+
+/** Fintech user deposit funding completed event schema */
+export const fintechUserDepositFundingCompletedSchema = webhookEventBaseSchema.extend({
+  eventType: z.literal('fintech.user.deposit.funding.completed'),
+  data: z.object({
+    depositId: z.string(),
+    amount: z.string(),
+    currency: z.string(),
+    transactionReference: z.string(),
+    smartWalletAddress: z.string(),
+    transactionHash: z.string(),
+    depositor: z.object({
+      accountNumber: z.string(),
+      accountName: z.string(),
+      bankCode: z.string(),
+      bankName: z.string(),
+    }),
+    bvnVerified: z.boolean(),
+    completedAt: z.string(),
+  }),
+})
+
+/** Fintech user deposit refunded event schema */
+export const fintechUserDepositRefundedSchema = webhookEventBaseSchema.extend({
+  eventType: z.literal('fintech.user.deposit.refunded'),
+  data: z.object({
+    depositId: z.string(),
     amount: z.number(),
+    currency: z.string(),
+    transactionReference: z.string(),
+    refundReference: z.string(),
+    refundReason: z.string(),
+    accountType: z.string(),
+    depositor: z.object({
+      accountNumber: z.string(),
+      accountName: z.string(),
+      bankCode: z.string(),
+      bankName: z.string(),
+    }),
+    bvnVerification: z.object({
+      isMatch: z.boolean(),
+      confidenceScore: z.number(),
+      rejectionReasons: z.array(z.string()),
+    }),
+    refundedAt: z.string(),
+    metadata: z.record(z.unknown()),
+  }),
+})
+
+/** Fintech asset transfer completed event schema */
+export const fintechAssetTransferCompletedSchema = webhookEventBaseSchema.extend({
+  eventType: z.literal('fintech.asset.transfer.completed'),
+  data: z.object({
+    smartWalletAddress: z.string(),
+    destinationAddress: z.string(),
+    destinationLabel: z.string().optional(),
+    amount: z.string(),
+    ticker: z.string(),
     tokenAddress: z.string(),
     transactionHash: z.string(),
-    confirmedAt: z.string(),
     blockNumber: z.number(),
-    network: networkSchema,
-  }),
-})
-
-/** Vault return payout completed event schema */
-export const vaultReturnPayoutCompletedSchema = webhookEventBaseSchema.extend({
-  eventType: z.literal('vault.return.payout.completed'),
-  data: z.object({
-    payoutId: z.string(),
-    vaultReturnId: z.string(),
-    amount: z.number(),
-    recipientAccountNumber: z.string(),
-    recipientBankCode: z.string(),
-    transactionReference: z.string(),
+    gasUsed: z.string(),
+    commitmentsSafeguarded: z.object({
+      activeOrders: z.number(),
+      activeEscrows: z.number(),
+      totalCommitted: z.string(),
+      remainingBalance: z.string(),
+    }).optional(),
+    note: z.string().optional(),
     completedAt: z.string(),
-    currency: currencySchema,
   }),
 })
 
-/** Vault return payout failed event schema */
-export const vaultReturnPayoutFailedSchema = webhookEventBaseSchema.extend({
-  eventType: z.literal('vault.return.payout.failed'),
+/** Fintech asset transfer failed event schema */
+export const fintechAssetTransferFailedSchema = webhookEventBaseSchema.extend({
+  eventType: z.literal('fintech.asset.transfer.failed'),
   data: z.object({
-    payoutId: z.string(),
-    vaultReturnId: z.string(),
-    amount: z.number(),
-    recipientAccountNumber: z.string(),
-    recipientBankCode: z.string(),
+    error: z.string(),
     failedAt: z.string(),
-    reason: z.string(),
-    retryable: z.boolean(),
-    errorCode: z.string().optional(),
+  }),
+})
+
+/** Fintech user asset transfer completed event schema */
+export const fintechUserAssetTransferCompletedSchema = webhookEventBaseSchema.extend({
+  eventType: z.literal('fintech.user.asset.transfer.completed'),
+  data: z.object({
+    smartWalletAddress: z.string(),
+    destinationAddress: z.string(),
+    amount: z.string(),
+    ticker: z.string(),
+    tokenAddress: z.string(),
+    network: z.string(),
+    transactionHash: z.string(),
+    blockNumber: z.string(),
+    gasUsed: z.string(),
+    completedAt: z.string(),
+  }),
+})
+
+/** Fintech user asset transfer failed event schema */
+export const fintechUserAssetTransferFailedSchema = webhookEventBaseSchema.extend({
+  eventType: z.literal('fintech.user.asset.transfer.failed'),
+  data: z.object({
+    smartWalletAddress: z.string(),
+    destinationAddress: z.string(),
+    amount: z.string(),
+    ticker: z.string(),
+    tokenAddress: z.string(),
+    network: z.string(),
+    error: z.string(),
+    failedAt: z.string(),
+  }),
+})
+
+/** Fintech offramp initiated event schema */
+export const fintechOfframpInitiatedSchema = webhookEventBaseSchema.extend({
+  eventType: z.literal('fintech.offramp.initiated'),
+  data: z.object({
+    amount: z.number(),
+    currency: z.string(),
+    status: z.string(),
+    bankAccount: z.object({
+      accountNumber: z.string(),
+      accountName: z.string(),
+      bankName: z.string(),
+    }),
+    wallet: z.object({
+      source: z.string(),
+      address: z.string(),
+      network: z.string(),
+    }),
+    metadata: z.object({
+      description: z.string(),
+      initiatedBy: z.string(),
+    }),
+  }),
+})
+
+/** Fintech offramp transfer completed event schema */
+export const fintechOfframpTransferCompletedSchema = webhookEventBaseSchema.extend({
+  eventType: z.literal('fintech.offramp.transfer.completed'),
+  data: z.object({
+    amount: z.number(),
+    currency: z.string(),
+    status: z.string(),
+    burnDetails: z.object({
+      txHash: z.string(),
+      status: z.string(),
+      cNgnAmount: z.number(),
+      blockNumber: z.number(),
+      confirmations: z.number(),
+    }),
+    metadata: z.object({
+      gasUsed: z.string(),
+      transferredAt: z.string(),
+    }),
+  }),
+})
+
+/** Fintech offramp payout initiated event schema */
+export const fintechOfframpPayoutInitiatedSchema = webhookEventBaseSchema.extend({
+  eventType: z.literal('fintech.offramp.payout.initiated'),
+  data: z.object({
+    amount: z.number(),
+    currency: z.string(),
+    status: z.string(),
+    bankAccount: z.object({
+      accountNumber: z.string(),
+      accountName: z.string(),
+      bankName: z.string(),
+      bankCode: z.string(),
+    }),
+    payoutDetails: z.object({
+      reference: z.string(),
+      provider: z.string(),
+      status: z.string(),
+    }),
+    metadata: z.object({
+      payoutInitiatedAt: z.string(),
+    }),
+  }),
+})
+
+/** Fintech offramp completed event schema */
+export const fintechOfframpCompletedSchema = webhookEventBaseSchema.extend({
+  eventType: z.literal('fintech.offramp.completed'),
+  data: z.object({
+    amount: z.number(),
+    currency: z.string(),
+    status: z.string(),
+    bankAccount: z.object({
+      accountNumber: z.string(),
+      accountName: z.string(),
+      bankName: z.string(),
+    }),
+    wallet: z.object({
+      source: z.string(),
+      address: z.string(),
+      network: z.string(),
+    }),
+    burnDetails: z.object({
+      txHash: z.string(),
+      status: z.string(),
+      cNgnAmount: z.number(),
+    }),
+    payoutDetails: z.object({
+      reference: z.string(),
+      provider: z.string(),
+      status: z.string(),
+    }),
+    completedAt: z.string(),
+    metadata: z.object({
+      processingTime: z.number(),
+    }),
+  }),
+})
+
+/** Fintech offramp failed event schema */
+export const fintechOfframpFailedSchema = webhookEventBaseSchema.extend({
+  eventType: z.literal('fintech.offramp.failed'),
+  data: z.object({
+    amount: z.number(),
+    currency: z.string(),
+    status: z.string(),
+    bankAccount: z.object({
+      accountNumber: z.string(),
+      accountName: z.string(),
+      bankName: z.string(),
+    }),
+    wallet: z.object({
+      source: z.string(),
+      address: z.string(),
+      network: z.string(),
+    }),
+    burnDetails: z.object({
+      txHash: z.string(),
+      status: z.string(),
+      cNgnAmount: z.number(),
+    }).optional(),
+    error: z.object({
+      message: z.string(),
+      code: z.string(),
+    }),
+    timestamp: z.string(),
+    metadata: z.object({
+      failedAt: z.string(),
+      retryable: z.boolean(),
+      attemptNumber: z.number(),
+    }),
   }),
 })
 
 /** Discriminated union of all webhook event schemas */
 export const webhookEventSchema = z.discriminatedUnion('eventType', [
-  userOtpSendCompletedSchema,
   virtualAccountCreatedSchema,
   paymentsConfirmedSchema,
-  walletFundingSuccessSchema,
-  swapsCompletedSchema,
-  swapsFailedSchema,
-  vaultReturnTransferConfirmedSchema,
-  vaultReturnPayoutCompletedSchema,
-  vaultReturnPayoutFailedSchema,
+  walletFundingCompletedSchema,
+  swapCompletedSchema,
+  swapFailedSchema,
+  fintechVirtualAccountDepositReceivedSchema,
+  fintechUserDepositReceivedSchema,
+  fintechUserDepositFundingCompletedSchema,
+  fintechUserDepositRefundedSchema,
+  fintechAssetTransferCompletedSchema,
+  fintechAssetTransferFailedSchema,
+  fintechUserAssetTransferCompletedSchema,
+  fintechUserAssetTransferFailedSchema,
+  fintechOfframpInitiatedSchema,
+  fintechOfframpTransferCompletedSchema,
+  fintechOfframpPayoutInitiatedSchema,
+  fintechOfframpCompletedSchema,
+  fintechOfframpFailedSchema,
 ])
 
 export type WebhookEventInput = z.infer<typeof webhookEventSchema>
 
 /** Generic webhook payload schema (for unknown events) */
 export const genericWebhookPayloadSchema = z.object({
+  eventId: z.string().optional(),
   eventType: z.string(),
   timestamp: z.string().optional(),
   requestId: z.string().optional(),
+  fintechId: z.string().optional(),
+  version: z.string().optional(),
   userId: z.string().optional(),
+  payload: z.record(z.unknown()).optional(),
   data: z.record(z.unknown()).optional(),
 }).passthrough()
 

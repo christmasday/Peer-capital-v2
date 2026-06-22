@@ -40,7 +40,9 @@ export async function POST(req: NextRequest) {
     const fullPayload = {
       userId: srUserId,
       amount: body.amount,
-      sweepToOfframp: true
+      sweepToOfframp: true,
+      assetSwap: "CNGN",
+      autoSwap: true,
     }
 
     // Validate request using Zod schema

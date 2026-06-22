@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
     let query = admin
       .from("webhook_events")
       .select("*", { count: "exact" })
-      .or("event_type.eq.vault.return.payout.completed,event_type.eq.vault.return.payout.failed,event_type.eq.vault.return.transfer.confirmed,event_type.eq.swaps.completed,event_type.eq.swaps.failed")
+      .or("event_type.eq.swap.completed,event_type.eq.swap.failed")
       .order("created_at", { ascending: false })
 
     // Apply search filter if provided
@@ -101,14 +101,10 @@ export async function GET(req: NextRequest) {
 
 function getStatusFromEventType(eventType: string, eventData?: any): string {
   switch (eventType) {
-    case "vault.return.payout.completed":
-    case "swaps.completed":
+    case "swap.completed":
       return "completed"
-    case "vault.return.payout.failed":
-    case "swaps.failed":
+    case "swap.failed":
       return "failed"
-    case "vault.return.transfer.confirmed":
-      return "transfer_confirmed"
     default:
       // Check if there's a status field in the payload
       if (eventData?.status) {

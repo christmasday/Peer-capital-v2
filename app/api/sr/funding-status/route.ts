@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
     const { data: fundingEvents } = await admin
       .from('webhook_events')
       .select('*')
-      .eq('event_type', 'wallet.funding.success')
+      .eq('event_type', 'wallet.funding.completed')
       .order('created_at', { ascending: false })
       .limit(10)
 

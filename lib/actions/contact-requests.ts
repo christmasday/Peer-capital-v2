@@ -16,10 +16,11 @@ export async function ensureContactsTable() {
 
 async function getProfileName(userId: string) {
   const adminClient = createAdminClient()
-  const { data } = await adminClient.from("profiles").select("first_name, last_name, profile_picture_url").eq("id", userId).single()
-  if (!data) return { name: "Someone", avatarUrl: null }
+  const { data } = await adminClient.from("profiles").select("first_name, last_name, username, profile_picture_url").eq("id", userId).single()
+  if (!data) return { name: "Someone", username: null, avatarUrl: null }
   return {
     name: [data.first_name, data.last_name].filter(Boolean).join(" ") || "Someone",
+    username: data.username,
     avatarUrl: data.profile_picture_url,
   }
 }
@@ -83,15 +84,16 @@ export async function sendContactRequest(targetUserId: string): Promise<{ succes
   if (error || !inserted) return { success: false, error: error?.message || "Failed to create contact request" }
 
   const requesterProfile = await getProfileName(userId)
+  const requesterDisplay = requesterProfile.username ? `@${requesterProfile.username}` : requesterProfile.name
 
   await createNotification({
     userId: targetUserId,
     type: "connection_request",
-    content: `${requesterProfile.name} wants to add you as a contact.`,
+    content: `${requesterDisplay} wants to add you as a contact.`,
     data: {
       requesterId: userId,
       requestId: inserted.id,
-      requesterName: requesterProfile.name,
+      requesterName: requesterDisplay,
       requesterProfilePicture: requesterProfile.avatarUrl,
     },
   })
@@ -123,14 +125,15 @@ export async function acceptContactRequest(requestId: string): Promise<{ success
   if (error) return { success: false, error: error.message }
 
   const acceptorProfile = await getProfileName(userId)
+  const acceptorDisplay = acceptorProfile.username ? `@${acceptorProfile.username}` : acceptorProfile.name
 
   await createNotification({
     userId: request.requester_id,
     type: "connection_accepted",
-    content: `${acceptorProfile.name} accepted your contact request.`,
+    content: `${acceptorDisplay} accepted your contact request.`,
     data: {
       acceptorId: userId,
-      acceptorName: acceptorProfile.name,
+      acceptorName: acceptorDisplay,
       acceptorProfilePicture: acceptorProfile.avatarUrl,
     },
   })

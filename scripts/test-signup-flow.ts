@@ -10,7 +10,7 @@ async function testSignupFlow() {
     // Test 1: onboard-user endpoint
     console.log('1. Testing onboard-user endpoint...')
     try {
-      const onboardResponse = await fetch('http://localhost:3001/api/stablesrail/onboard-user', {
+      const onboardResponse = await fetch('http://localhost:3001/api/sr/onboard-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ bvn: '12345678901' })
@@ -32,7 +32,7 @@ async function testSignupFlow() {
     // Test 2: verify-otp endpoint
     console.log('\n2. Testing verify-otp endpoint...')
     try {
-      const otpResponse = await fetch('http://localhost:3001/api/stablesrail/verify-otp', {
+      const otpResponse = await fetch('http://localhost:3001/api/sr/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId: 'test-session-id', otp: '123456' })
